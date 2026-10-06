@@ -51,13 +51,11 @@ button.on{background:var(--ok);color:var(--ink);border-color:var(--ok)}
 <body>
 <iframe id="game" title="Redline Nights" allow="autoplay; fullscreen"></iframe>
 <div id="lobby"><div class="card" id="card"></div></div>
-<script src="lib/peerjs.min.js"></script>
-<script src="relay.js"></script>
 <script>
 (() => {
 'use strict';
 // ---------------------------------------------------------------- state
-const VER = '1.1';                           // multiplayer protocol: only matching versions can play together
+const VER = '1.2';                           // multiplayer protocol: only matching versions can play together
 const $ = id => document.getElementById(id);
 const store = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
 const APP = !!window.rn;                     // inside the desktop app (LAN hosting available)
@@ -92,6 +90,7 @@ addEventListener('message', e => {
   if (m.t === 'ready') {
     S.info = { cars: m.cars, paints: m.paints, maps: m.maps };
     if (!S.info.cars.some(c => c.id === S.car)) S.car = S.info.cars[0].id;
+    if (S.net && S.net.room) toGame({ t: 'clock', off: S.net.room.off });
     if (S.pendingStart) { const c = S.pendingStart; S.pendingStart = null; toGame({ t: 'start', cfg: c }); }
     if (S.screen !== 'race') render();
   } else if (m.t === 'openLobby') { show(true); go('home'); }
@@ -103,118 +102,80 @@ addEventListener('message', e => {
   else if (m.t === 'st' || m.t === 'fin' || m.t === 'ev') {      // our own car's news: share it
     if (!S.net) return;
     const out = Object.assign({}, m, { id: m.id || S.net.myId, byName: S.name });
-    if (S.net.isHost) S.net.broadcast(out); else S.net.send(out);
+    if (S.net.isHost) S.net.broadcast(out); else S.net.shout(out);
   }
 });
 function show(on) { $('lobby').hidden = !on; }
 
 // ---------------------------------------------------------------- networking: one host hub, any number of clients
-// The host's lobby is the hub: it keeps the player list and settings, starts races and relays every car's state to
-// everyone else. Clients reach it over the LAN (the app's WebSocket relay) or online by room code: a direct WebRTC link
-// when the two networks allow one, otherwise through public MQTT brokers (relay.js). The host listens on all of them.
+// Everyone in a game connects to a room: the Redline Nights game server for online games (found by room code), or the
+// desktop app's relay for LAN games. Both route messages between players with the same small protocol (server/
+// worker.js, lan.js). The host's lobby is the hub: it keeps the player list and settings and starts races. Car states
+// go from each player straight to everyone else through the room; everything else goes to or from the host.
+const SERVER = (/[?&]server=([^&#]+)/.exec(location.search) || [])[1]
+  ? decodeURIComponent(/[?&]server=([^&#]+)/.exec(location.search)[1]) : 'wss://redline-nights.REPLACE-ME.workers.dev';
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const newCode = () => Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
-const peerId = code => 'redline-nights-' + code.toLowerCase();
+const clock = () => performance.timeOrigin + performance.now();
 
-function hostGame() {
-  const hub = { isHost: true, myId: 'H', clients: new Map(), code: null, lanIPs: [], players: new Map(), racing: false };
-  hub.sendTo = (id, d) => { const c = hub.clients.get(id); if (c) c.send(d); };
-  hub.broadcast = (d, except) => { for (const [id, c] of hub.clients) if (id !== except) c.send(d); };
-  hub.close = () => {
-    hub.broadcast({ t: 'closed' }); relayFlush(hub); clearInterval(hub.relayTick);
-    if (hub.ws) hub.ws.close(); if (APP) rn.hostStop();
-    setTimeout(() => { if (hub.peer) hub.peer.destroy(); hub.relays.forEach(c => c.close()); }, 300);
+// A connection to a room. It also keeps our offset from the room's clock (the best of the last eight pings), which
+// the game uses to draw other cars where they are right now.
+function openRoom(url, role, h) {
+  let ws; try { ws = new WebSocket(url); } catch (e) { setTimeout(() => h.onError('unreachable')); return null; }
+  const room = { id: null, open: false, ended: false, rtt: 0, off: 0 }, samples = [];
+  const raw = m => { if (ws.readyState === 1) ws.send(JSON.stringify(m)); };
+  const ping = () => raw({ type: 'ping', c: clock() });
+  let pinger = null;
+  room.send = (to, data, except) => raw({ type: 'send', to, data, except });
+  room.close = () => { room.ended = true; clearInterval(pinger); try { ws.close(); } catch (e) {} };
+  ws.onopen = () => raw({ type: 'hello', role });
+  ws.onmessage = e => {
+    let m; try { m = JSON.parse(e.data); } catch (x) { return; }
+    if (m.type === 'msg') h.onMsg(m.from, m.data);
+    else if (m.type === 'pong') {
+      const now = clock(), rtt = now - m.c; samples.push({ rtt, off: m.s + rtt / 2 - now }); if (samples.length > 8) samples.shift();
+      const best = samples.reduce((a, b) => (b.rtt < a.rtt ? b : a)); room.rtt = Math.round(rtt); room.off = best.off;
+      toGame({ t: 'clock', off: room.off }); const el = $('ping'); if (el) el.textContent = room.rtt + ' ms';
+    }
+    else if (m.type === 'welcome') { room.id = m.id; room.open = true; ping(); pinger = setInterval(ping, 2000); h.onWelcome(m.id); }
+    else if (m.type === 'join') { if (h.onJoin) h.onJoin(m.id); }
+    else if (m.type === 'leave') { if (h.onLeave) h.onLeave(m.id); }
+    else if (m.type === 'closed') { room.ended = true; h.onClosed(m.why); }
+    else if (m.type === 'error') { room.ended = true; h.onError(m.msg); }
   };
+  ws.onclose = () => { clearInterval(pinger); if (!room.ended) { room.ended = true; if (room.open) h.onDrop(); else h.onError('unreachable'); } };
+  return room;
+}
+// handlers only act while that connection is still the current one
+const forNet = (net, h) => Object.fromEntries(Object.entries(h).map(([k, f]) => [k, (...a) => { if (S.net === net) f(...a); }]));
+
+function hostGame(kind) {
+  const hub = { isHost: true, myId: 'H', kind, clients: new Set(), players: new Map(), racing: false, code: null, lanIPs: [], room: null };
+  hub.sendTo = (id, d) => hub.room && hub.room.send(id, d);
+  hub.broadcast = (d, except) => hub.room && hub.room.send('*', d, except);
+  hub.close = () => { if (hub.room) hub.room.close(); if (kind === 'lan' && APP) rn.hostStop(); };
   hub.players.set('H', { id: 'H', name: S.name, car: S.car, paint: S.paint, ready: true, host: true });
   S.net = hub; S.lobby = null; go('lobby');
-  // LAN: the app's relay
-  if (APP) {
-    rn.hostStart(beaconInfo()).then(r => {
-      hub.lanIPs = r.ips;
-      const ws = new WebSocket('ws://127.0.0.1:' + r.port); hub.ws = ws;
-      ws.onopen = () => ws.send(JSON.stringify({ type: 'hello', role: 'host' }));
-      ws.onmessage = e => {
-        const m = JSON.parse(e.data);
-        if (m.type === 'join') hub.clients.set(m.id, { via: 'LAN', send: d => ws.readyState === 1 && ws.send(JSON.stringify({ type: 'send', to: m.id, data: d })) });
-        else if (m.type === 'leave') hubLeave(m.id);
-        else if (m.type === 'msg') hubMsg(m.from, m.data);
-      };
-      ws.onerror = () => { hub.lanErr = 'LAN hosting is unavailable (is another game already hosting on this computer?)'; render(); };
-      render();
-    });
-  }
-  // online: the room code is both our WebRTC peer id and our relay inbox; it shows once either one is listening
-  hub.relays = []; hub.relayIds = new Map(); hub.nR = 0; hub.peerOk = false;
-  let nP = 0;
-  const listen = c => c.sub(RN_RELAY.hostTopic(hub.tryCode));
-  const codeReady = () => {
-    if (hub.code || !(hub.peerOk || hub.relays.length) || S.net !== hub) return;
-    hub.code = hub.tryCode; hub.onlineErr = null; render(); if (APP) rn.hostUpdate(beaconInfo());
+  const h = forNet(hub, {
+    onWelcome: () => { if (kind === 'lan') rn.hostUpdate(beaconInfo()); render(); },
+    onMsg: hubMsg, onJoin: id => hub.clients.add(id), onLeave: hubLeave,
+    onClosed: why => fail(why),
+    onError: msg => {
+      if (msg === 'taken' && kind === 'online') return connect();        // that code is in use: pick another
+      fail(kind === 'online' ? 'Couldn’t reach the game server. Check your internet connection and try again.'
+        : 'LAN hosting is unavailable (is another game already hosting on this computer?)');
+    },
+    onDrop: () => fail(kind === 'online' ? 'Lost the connection to the game server.' : 'The LAN game stopped.')
+  });
+  const connect = () => {
+    if (kind === 'online') { hub.code = newCode(); hub.room = openRoom(SERVER + '/room/' + hub.code, 'host', h); }
+    else rn.hostStart(beaconInfo()).then(r => { if (S.net !== hub) return; hub.lanIPs = r.ips; hub.room = openRoom('ws://127.0.0.1:' + r.port, 'host', h); render(); });
   };
-  const openPeer = () => {
-    hub.tryCode = newCode(); hub.relays.forEach(listen);
-    if (!window.Peer) return;
-    const peer = new Peer(peerId(hub.tryCode), { debug: 0 }); hub.peer = peer;
-    peer.on('open', () => { hub.peerOk = true; codeReady(); });
-    peer.on('error', err => {
-      if (err.type === 'unavailable-id') { peer.destroy(); if (!hub.code) openPeer(); return; }   // code taken: pick another
-    });
-    peer.on('disconnected', () => { if (!peer.destroyed) peer.reconnect(); });
-    peer.on('connection', conn => {
-      const id = 'P' + (++nP);
-      conn.on('open', () => hub.clients.set(id, { via: 'direct', send: d => conn.open && conn.send(d) }));
-      conn.on('data', d => hubMsg(id, d));
-      conn.on('close', () => hubLeave(id));
-      conn.on('error', () => hubLeave(id));
-    });
-  };
-  openPeer();
-  for (const url of RN_RELAY.BROKERS) RN_RELAY.connect(url).then(c => {
-    if (S.net !== hub) return c.close();
-    hub.relays.push(c); c.onmsg = (topic, text) => relayIn(c, topic, text);
-    c.onclose = () => { hub.relays = hub.relays.filter(x => x !== c); };
-    listen(c); codeReady();
-  }, () => {});
-  hub.relayTick = setInterval(() => relayFlush(hub), 50);
-  setTimeout(() => { if (S.net === hub && !hub.code) { hub.onlineErr = 'Online play is unavailable: no internet connection?' + (APP ? ' LAN still works.' : ''); render(); } }, 12000);
-  render();
-}
-// relay clients: messages are batched into one publish per 50 ms each way; silence for 15 s means they've gone
-function relayIn(c, topic, text) {
-  const hub = S.net; if (!hub || !hub.isHost || topic !== RN_RELAY.hostTopic(hub.code || hub.tryCode)) return;
-  let m; try { m = JSON.parse(text); } catch (e) { return; }
-  const rid = String(m.f || ''); if (!rid) return;
-  let id = hub.relayIds.get(rid);
-  if (m.k === 'join') {
-    if (id) {                                          // asked again (our answer was lost) or through another broker
-      const known = hub.clients.get(id);
-      if (known && known.conn === c && hub.players.has(id)) hub.sendTo(id, lobbyFor(id));
-      return;
-    }
-    id = 'R' + (++hub.nR); hub.relayIds.set(rid, id);
-    const cl = { via: 'relay', conn: c, rid, out: [], seen: Date.now(), sent: 0 }; cl.send = d => cl.out.push(d);
-    hub.clients.set(id, cl);
-  }
-  const cl = id && hub.clients.get(id); if (!cl) return;
-  cl.seen = Date.now();
-  if (m.k === 'bye') hubLeave(id);
-  else if (Array.isArray(m.b)) m.b.forEach(d => hubMsg(id, d));
-}
-function relayFlush(hub) {
-  if (!hub.relays) return;
-  const now = Date.now(), code = hub.code || hub.tryCode;
-  for (const [id, cl] of hub.clients) {
-    if (cl.via !== 'relay') continue;
-    if (now - cl.seen > 15000) { hubLeave(id); continue; }
-    if (cl.out.length || now - cl.sent > 3000) {
-      cl.conn.pub(RN_RELAY.clientTopic(code, cl.rid), JSON.stringify(cl.out.length ? { k: 'd', b: cl.out } : { k: 'ping' }));
-      cl.out = []; cl.sent = now;
-    }
-  }
+  connect(); render();
 }
 function beaconInfo() {
   const hub = S.net;
-  return { v: VER, name: S.name + "'s game", players: hub ? hub.players.size : 1, map: settings.map, code: hub && hub.code };
+  return { v: VER, name: S.name + "'s game", players: hub ? hub.players.size : 1, map: settings.map };
 }
 function lobbyFor(id) {
   const hub = S.net;
@@ -222,17 +183,17 @@ function lobbyFor(id) {
 }
 function broadcastLobby() {
   const hub = S.net; if (!hub || !hub.isHost) return;
-  for (const id of hub.clients.keys()) hub.sendTo(id, lobbyFor(id));
-  if (APP) rn.hostUpdate(beaconInfo());
+  for (const id of hub.clients) hub.sendTo(id, lobbyFor(id));
+  if (APP && hub.kind === 'lan') rn.hostUpdate(beaconInfo());
   render();
 }
 function hubMsg(id, d) {
   const hub = S.net; if (!hub || !d) return;
   if (d.t === 'hello') {
-    if (d.v !== VER) { hub.sendTo(id, { t: 'closed', why: 'Version mismatch: the host has ' + VER + ', you have ' + d.v + '.' }); return; }
-    if (hub.players.size >= 6) { hub.sendTo(id, { t: 'closed', why: 'That game is full (6 drivers).' }); return; }
-    if (hub.players.has(id)) return;
-    hub.players.set(id, { id, name: String(d.name || 'Driver').slice(0, 16), car: d.car, paint: d.paint | 0, ready: false, via: (hub.clients.get(id) || {}).via });
+    if (d.v !== VER) { hub.sendTo(id, { t: 'closed', why: 'Version mismatch: the host has ' + VER + ', you have ' + d.v + '. Everyone needs the same version.' }); return; }
+    if (hub.players.size >= 6 && !hub.players.has(id)) { hub.sendTo(id, { t: 'closed', why: 'That game is full (6 drivers).' }); return; }
+    hub.clients.add(id);
+    if (!hub.players.has(id)) hub.players.set(id, { id, name: String(d.name || 'Driver').slice(0, 16), car: d.car, paint: d.paint | 0, ready: false });
     broadcastLobby();
   } else if (d.t === 'me') {
     const p = hub.players.get(id); if (!p) return;
@@ -240,15 +201,13 @@ function hubMsg(id, d) {
     broadcastLobby();
   } else if (d.t === 'loaded') {
     if (hub.race && d.race === hub.race.cfg.race) hubLoaded(id);
-  } else if (d.t === 'st' || d.t === 'fin' || d.t === 'ev') {
-    const out = Object.assign({}, d, { id: d.t === 'st' && d.id && d.id.startsWith('ai') ? d.id : id });
-    hub.broadcast(out, id); toGame(out);
-  }
+  } else if (d.t === 'st' || d.t === 'fin' || d.t === 'ev') toGame(stamp(id, d));   // the room already sent it to everyone
 }
+// a player's own news carries their room id; only the host speaks for the AI cars
+function stamp(from, d) { const out = Object.assign({}, d); if (from !== 'H') { out.id = from; delete out.ai; } return out; }
 function hubLeave(id) {
   const hub = S.net; if (!hub || !hub.clients.has(id)) return;
   hub.clients.delete(id); hub.players.delete(id);
-  if (hub.relayIds) for (const [rid, i] of hub.relayIds) if (i === id) hub.relayIds.delete(rid);
   hub.broadcast({ t: 'left', id }); toGame({ t: 'left', id });
   broadcastLobby(); checkGo(hub);
 }
@@ -270,7 +229,7 @@ function hostStart() {
   startLocal(cfg);
   broadcastLobby();
   // everyone loads the map, then the countdown starts for all at once. Re-send the start to anyone who hasn't
-  // reported in (a relayed message can be lost); after 25 s go anyway and let stragglers join when they're ready.
+  // reported in; after 25 s go anyway and let stragglers join when they're ready.
   const resend = setInterval(() => {
     if (hub.race !== race || race.go || S.net !== hub) return clearInterval(resend);
     for (const p of cfg.players) if (!p.ai && p.id !== 'H' && !race.loaded.has(p.id) && hub.clients.has(p.id)) hub.sendTo(p.id, { t: 'start', cfg });
@@ -290,100 +249,37 @@ function checkGo(hub) {
 }
 function raceGo(hub) { hub.race.go = true; hub.broadcast({ t: 'go' }); toGame({ t: 'go' }); }
 
-function joinLan(addr, label) {
-  const url = 'ws://' + (addr.includes(':') ? addr : addr + ':47800');
-  let ws; try { ws = new WebSocket(url); } catch (e) { return fail('That address doesn’t look right.'); }
-  const net = { isHost: false, myId: null, via: 'LAN', label };
-  net.send = d => ws.readyState === 1 && ws.send(JSON.stringify({ type: 'msg', data: d }));
-  net.close = () => ws.close();
-  S.net = net; S.lobby = null; S.msg = 'Connecting to ' + (label || addr) + '…'; S.err = false; go('lobby');
-  ws.onopen = () => ws.send(JSON.stringify({ type: 'hello', role: 'client' }));
-  ws.onmessage = e => {
-    const m = JSON.parse(e.data);
-    if (m.type === 'welcome') { net.myId = m.id; net.send(helloMsg()); }
-    else if (m.type === 'msg') clientMsg(m.data);
-    else if (m.type === 'error') fail(m.msg);
-  };
-  ws.onerror = () => fail('Couldn’t reach ' + (label || addr) + '. Check the address, and that the host’s firewall allows Redline Nights.');
-  ws.onclose = () => { if (S.net === net) fail('Disconnected from the host.'); };
-}
-// Online: try a direct WebRTC link first; if it hasn't opened within 6 s (or can't be made), go through the relay.
-function joinOnline(code) {
-  code = code.trim().toUpperCase();
-  if (!/^[A-Z0-9]{5}$/.test(code)) return fail('Room codes are 5 letters and numbers.');
-  const net = { isHost: false, myId: null, via: 'online', label: code, mode: null, cleanup: [] };
-  net.send = () => {};
-  net.close = () => net.cleanup.forEach(f => { try { f(); } catch (e) {} });
-  S.net = net; S.lobby = null; S.msg = 'Looking for room ' + code + '…'; S.err = false; go('lobby');
-  const live = () => S.net === net;
-  let relaying = false;
-  const toRelay = () => { if (relaying || net.mode || !live()) return; relaying = true; joinRelay(net, code); };
-  if (window.Peer) {
-    const peer = new Peer({ debug: 0 }); net.cleanup.push(() => peer.destroy());
-    peer.on('open', () => {
-      const conn = peer.connect(peerId(code), { reliable: true, serialization: 'json' });
-      conn.on('open', () => {
-        if (net.mode || !live()) return conn.close();
-        net.mode = 'direct'; net.send = d => conn.open && conn.send(d); net.send(helloMsg());
-        if (net.dropRelay) net.dropRelay();             // the direct link won after all: withdraw the relay request
-      });
-      conn.on('data', d => { if (net.mode === 'direct') clientMsg(d); });
-      conn.on('close', () => { if (net.mode === 'direct' && live()) fail('Disconnected from the host.'); });
-    });
-    peer.on('error', toRelay);
-    setTimeout(toRelay, 6000);
-  } else toRelay();
-}
-function joinRelay(net, code) {
-  const live = () => S.net === net && net.mode !== 'direct';
-  S.msg = 'Can’t link up directly with the host’s network. Connecting through the relay…'; render();
-  const rid = Math.random().toString(36).slice(2, 10), hostT = RN_RELAY.hostTopic(code), myT = RN_RELAY.clientTopic(code, rid);
-  const will = { topic: hostT, text: JSON.stringify({ f: rid, k: 'bye' }) };
-  const conns = []; let chosen = null;
-  net.cleanup.push(() => conns.forEach(c => c.close()));
-  net.dropRelay = () => { conns.forEach(c => { c.pub(hostT, will.text); c.close(); }); conns.length = 0; };
-  // ask on every broker at once; the host answers through whichever its first copy of the request came in on
-  for (const url of RN_RELAY.BROKERS) RN_RELAY.connect(url, { will }).then(c => {
-    if (chosen || !live()) return c.close();
-    conns.push(c);
-    c.onmsg = (topic, text) => {
-      if (topic !== myT || !live()) return;
-      let m; try { m = JSON.parse(text); } catch (e) { return; }
-      if (!chosen) { chosen = c; conns.filter(x => x !== c).forEach(x => x.close()); useRelay(net, c, rid, hostT); }
-      if (c !== chosen) return;
-      net.last = Date.now();
-      if (m.k === 'd' && Array.isArray(m.b)) m.b.forEach(clientMsg);
-    };
-    // relayed messages can be lost (say, the host's lobby only just started listening there), so ask until answered
-    const ask = () => { if (chosen || c.closed || !live()) return; c.pub(hostT, JSON.stringify({ f: rid, k: 'join', b: [helloMsg()] })); setTimeout(ask, 1200); };
-    c.sub(myT, () => { ask(); if (!asked) { asked = true; setTimeout(noRoom, 6000); } });
-  }, () => {});
-  // a host listens on every broker, so once one has carried our request an answer comes within a second or two
-  let asked = false;
-  const noRoom = () => { if (!chosen && live()) fail('No game with room code ' + code + '. Check the code with the host, and that they’re still in the lobby.'); };
-  setTimeout(noRoom, 15000);
-}
-function useRelay(net, c, rid, hostT) {
-  net.mode = 'relay'; net.via = 'relay'; net.last = Date.now();
-  const out = []; let sent = 0;
-  net.send = d => out.push(d);
-  const flush = () => { c.pub(hostT, JSON.stringify(out.length ? { f: rid, k: 'd', b: out.splice(0) } : { f: rid, k: 'ping' })); sent = Date.now(); };
-  const tick = setInterval(() => {
-    if (S.net !== net) return clearInterval(tick);
-    if (Date.now() - net.last > 15000) return fail('Lost the connection to the host.');
-    if (out.length || Date.now() - sent > 3000) flush();
-  }, 50);
-  c.onclose = () => { if (S.net === net) fail('Lost the connection to the relay.'); };
-  net.cleanup.unshift(() => { clearInterval(tick); c.pub(hostT, JSON.stringify({ f: rid, k: 'bye' })); });
+// joining: kind 'online' with a room code, or 'lan' with the host's address
+function joinRoom(kind, target, label) {
+  const online = kind === 'online';
+  if (online) { target = target.trim().toUpperCase(); if (!/^[A-Z0-9]{5}$/.test(target)) return fail('Room codes are 5 letters and numbers.'); }
+  const url = online ? SERVER + '/room/' + target : 'ws://' + (target.includes(':') ? target : target + ':47800');
+  const net = { isHost: false, myId: null, kind, label: online ? target : (label || target), room: null };
+  net.send = d => net.room && net.room.send('host', d);            // to the host
+  net.shout = d => net.room && net.room.send('*', d);              // to everyone (our car's news)
+  net.close = () => net.room && net.room.close();
+  S.net = net; S.lobby = null; S.err = false; S.msg = online ? 'Joining room ' + target + '…' : 'Connecting to ' + net.label + '…'; go('lobby');
+  net.room = openRoom(url, 'client', forNet(net, {
+    onWelcome: id => { net.myId = id; net.send(helloMsg()); },
+    onMsg: clientMsg,
+    onClosed: why => fail(why || 'The host closed the game.'),
+    onError: msg => fail(msg === 'no-room' ? (online ? 'No game with room code ' + target + '. Check the code with the host, and that they’re still in the lobby.' : 'That game has closed.')
+      : msg !== 'unreachable' ? msg
+      : online ? 'Couldn’t reach the game server. Check your internet connection and try again.'
+      : 'Couldn’t reach ' + net.label + '. Check the address, that you’re on the same network, and that the host’s firewall allows Redline Nights.'),
+    onDrop: () => fail(online ? 'Lost the connection to the game server.' : 'Lost the connection to the host.')
+  }));
 }
 const helloMsg = () => ({ t: 'hello', v: VER, name: S.name, car: S.car, paint: S.paint });
 function sendMe() { if (S.net && !S.net.isHost) S.net.send({ t: 'me', name: S.name, car: S.car, paint: S.paint, ready: S.ready }); }
-function clientMsg(d) {
+function clientMsg(from, d) {
   if (!d) return;
+  if (d.t === 'st' || d.t === 'fin' || d.t === 'ev') return toGame(stamp(from, d));
+  if (from !== 'H') return;                                     // everything else only comes from the host
   if (d.t === 'lobby') { S.net.myId = d.you; S.lobby = d; settings = Object.assign(settings, d.settings); S.msg = ''; if (S.screen === 'lobby') render(); }
   else if (d.t === 'start') { if (S.raceId === d.cfg.race) return; S.raceId = d.cfg.race; startLocal(d.cfg); }
   else if (d.t === 'go') toGame({ t: 'go' });
-  else if (d.t === 'st' || d.t === 'fin' || d.t === 'ev' || d.t === 'left') toGame(d);
+  else if (d.t === 'left') toGame(d);
   else if (d.t === 'closed') fail(d.why || 'The host closed the game.');
 }
 function fail(text) {
@@ -394,13 +290,13 @@ function fail(text) {
 }
 function leave() {
   const net = S.net; S.net = null; S.lobby = null; S.ready = false;
-  if (net) { if (net.isHost) net.close(); else net.close(); }
+  if (net) net.close();
   toGame({ t: 'menu' }); S.msg = ''; go('home');
 }
 
 // ---------------------------------------------------------------- starting a race on this machine
 function startLocal(cfg) {
-  const mine = Object.assign({}, cfg, { me: S.net.myId, host: S.net.isHost });
+  const mine = Object.assign({}, cfg, { me: S.net.myId, host: S.net.isHost, off: S.net.room ? S.net.room.off : 0 });
   S.screen = 'race'; show(false); frame.focus();
   if (cfg.map !== S.curMap || !S.mpLoaded) { S.pendingStart = mine; loadGame(cfg.map, true); }
   else toGame({ t: 'start', cfg: mine });
@@ -435,20 +331,26 @@ function homeHTML() {
   <div class="row" style="margin-top:18px"><button class="go" id="joinInvite">JOIN RACE</button><button id="noInvite">Not now</button></div>
   <div class="msg ${S.err ? 'err' : ''}">${esc(S.msg)}</div>`;
   return `<h1>Redline<span>Nights</span></h1>
-  <p class="tag">Race solo, or with friends on the same network or anywhere online.</p>
+  <p class="tag">Race solo, with friends anywhere online, or on the same network.</p>
   <div class="lbl">Your name</div>
   <div class="row"><input id="name" maxlength="16" value="${esc(S.name)}"></div>
-  <div class="row" style="margin-top:18px"><button class="go" id="solo">PLAY SOLO</button><button class="go" id="host" style="background:var(--perfect)">HOST A GAME</button></div>
+  <div class="row" style="margin-top:18px"><button class="go" id="solo">PLAY SOLO</button></div>
   <div class="msg ${S.err ? 'err' : ''}">${esc(S.msg)}</div>
   <div class="sep"></div>
-  <h2>Join friends</h2>
-  <div class="lbl">Online · room code</div>
+  <h2>Online</h2>
+  <p class="tag" style="margin-top:0">Friends anywhere, through the Redline Nights game server. Works in the browser and the app.</p>
+  <div class="row" style="margin-top:12px"><button class="go" id="hostOnline" style="background:var(--perfect)">HOST ONLINE</button></div>
+  <div class="lbl">Join with a room code</div>
   <div class="row"><input id="code" class="code" maxlength="5" placeholder="CODE"><button id="joinCode">Join</button></div>
-  ${APP ? `<div class="lbl">Games on your network</div><div class="list" id="lanList"></div>
+  <div class="sep"></div>
+  <h2>LAN</h2>
+  ${APP ? `<p class="tag" style="margin-top:0">Same Wi-Fi or network: you connect straight to each other, no internet needed.</p>
+  <div class="row" style="margin-top:12px"><button class="go" id="hostLan" style="background:var(--shock)">HOST LAN</button></div>
+  <div class="lbl">Games on your network</div><div class="list" id="lanList"></div>
   <div class="lbl">Or by address</div>
   <div class="row"><input id="addr" placeholder="192.168.1.20" style="width:220px"><button id="joinAddr">Join</button></div>
-  <p class="hint">By address also works over the internet if the host forwards port 47800, or through a virtual LAN such as Tailscale or ZeroTier.</p>`
-  : `<p class="hint">Friends on the same Wi-Fi can use the room code too. For LAN races without internet, get the <a href="${DOWNLOAD_URL}" target="_blank" rel="noopener" style="color:var(--perfect)">desktop app</a> (Windows, Mac, Linux).</p>`}
+  <p class="hint">By address also works through a virtual LAN such as Tailscale or ZeroTier.</p>`
+  : `<p class="tag" style="margin-top:0">LAN games (same network, no internet needed) run in the <a href="${DOWNLOAD_URL}" target="_blank" rel="noopener" style="color:var(--perfect)">desktop app</a> for Windows, Mac and Linux. Browser players can join anyone online.</p>`}
   <div class="sep"></div>
   <div class="row"><button id="fs">Full screen</button>${APP ? '<span class="hint" style="margin:0">or press F11</span>' : ''}</div>`;
 }
@@ -458,7 +360,7 @@ function renderLan() {
   el.innerHTML = list.length ? list.map(h => `<div class="item"><div class="grow"><b>${esc(h.name)}</b><small>${esc(h.ip)} · ${h.players}/6 drivers · ${esc(mapName(h.map))}${h.v !== VER ? ' · different version' : ''}</small></div>
     <button data-lan="${esc(h.ip + ':' + h.port)}">Join</button></div>`).join('')
     : '<div class="hint">Looking for games… a friend hosting on the same Wi-Fi or network shows up here.</div>';
-  el.querySelectorAll('[data-lan]').forEach(b => b.onclick = () => { const h = S.lan.get(b.dataset.lan); joinLan(b.dataset.lan, h && h.name); });
+  el.querySelectorAll('[data-lan]').forEach(b => b.onclick = () => { const h = S.lan.get(b.dataset.lan); joinRoom('lan', b.dataset.lan, h && h.name); });
 }
 function lobbyHTML() {
   const net = S.net; if (!net) return homeHTML();
@@ -470,14 +372,16 @@ function lobbyHTML() {
   const myCls = (cars.find(c => c.id === S.car) || {}).cls || 'A';
   const classes = [...new Set(cars.map(c => c.cls))];
   let head;
-  if (host) head = `<div class="lbl">Room code · friends online type this</div>
-    <div class="row"><span class="bigcode">${net.code ? esc(net.code) : '…'}</span>${net.code ? '<button id="copy">Copy code</button><button id="copyLink">Copy invite link</button>' : ''}</div>
-    ${net.code ? `<div class="hint">The invite link opens the game in a browser and joins this room. Players on the desktop app and in the browser can race together.</div>` : ''}
-    ${net.onlineErr ? `<div class="msg err">${esc(net.onlineErr)}</div>` : ''}
-    ${APP ? `<div class="lbl">On your network</div><div class="tag">${net.lanIPs.length ? 'Friends on the same Wi-Fi see this game in their list, or join at <b>' + net.lanIPs.map(esc).join('</b> or <b>') + '</b>' : 'Starting…'}</div>${net.lanErr ? `<div class="msg err">${esc(net.lanErr)}</div>` : ''}` : ''}`;
-  else head = `<div class="lbl">Joined ${esc(net.via === 'LAN' ? net.label || 'LAN game' : 'room ' + net.label)}${net.mode === 'relay' ? ' · through the relay' : ''}</div>`;
+  const ready = net.room && net.room.open;
+  const pingTag = `<span class="hint" style="margin:0">${net.kind === 'online' ? 'Server' : 'Host'} ping <b id="ping">${ready && net.room.rtt ? net.room.rtt + ' ms' : '…'}</b></span>`;
+  if (host && net.kind === 'online') head = `<div class="lbl">Online game · room code</div>
+    <div class="row"><span class="bigcode">${ready ? esc(net.code) : '…'}</span>${ready ? '<button id="copy">Copy code</button><button id="copyLink">Copy invite link</button>' : ''}</div>
+    <div class="row hint">${ready ? 'Friends type this code under Online, or open the invite link (it plays in the browser). ' + pingTag : 'Connecting to the game server…'}</div>`;
+  else if (host) head = `<div class="lbl">LAN game</div>
+    <div class="tag">${ready ? 'Friends on the same Wi-Fi or network see this game in their LAN list, or join at <b>' + net.lanIPs.map(esc).join('</b> or <b>') + '</b>' : 'Starting…'}</div>`;
+  else head = `<div class="lbl">${net.kind === 'online' ? 'Online · room ' + esc(net.label) : 'LAN · ' + esc(net.label)}</div><div class="row hint">${pingTag}</div>`;
   const plist = players.map(p => `<div class="item"><span class="sw" style="background:${paintHex(p.paint)}"></span>
-    <div class="grow"><b>${esc(p.name)}${p.id === net.myId ? ' (you)' : ''}</b><small>${esc(carName(p.car))}${p.via === 'relay' ? ' · through the relay' : ''}</small></div>
+    <div class="grow"><b>${esc(p.name)}${p.id === net.myId ? ' (you)' : ''}</b><small>${esc(carName(p.car))}</small></div>
     ${p.host ? '<span class="pill hosttag">HOST</span>' : p.ready ? '<span class="pill ready">READY</span>' : '<span class="pill wait">PICKING</span>'}</div>`).join('');
   const st = settings;
   const setHTML = host ? `<div class="lbl">Race</div>
@@ -505,10 +409,11 @@ function wire() {
   const on = (id, ev, fn) => { const el = $(id); if (el) el[ev] = fn; };
   on('name', 'oninput', e => { S.name = e.target.value.trim() || 'Driver'; store.set('rn-name', S.name); });
   on('solo', 'onclick', () => { S.msg = ''; show(false); S.screen = 'solo'; loadGame(store.get('rn-map') || 'city', false); });
-  on('host', 'onclick', () => { S.msg = ''; S.err = false; hostGame(); });
-  on('joinCode', 'onclick', () => joinOnline($('code').value));
-  on('code', 'onkeydown', e => { if (e.key === 'Enter') joinOnline(e.target.value); });
-  on('joinAddr', 'onclick', () => { const a = $('addr').value.trim(); if (a) joinLan(a, a); });
+  on('hostOnline', 'onclick', () => { S.msg = ''; S.err = false; hostGame('online'); });
+  on('hostLan', 'onclick', () => { S.msg = ''; S.err = false; hostGame('lan'); });
+  on('joinCode', 'onclick', () => joinRoom('online', $('code').value));
+  on('code', 'onkeydown', e => { if (e.key === 'Enter') joinRoom('online', e.target.value); });
+  on('joinAddr', 'onclick', () => { const a = $('addr').value.trim(); if (a) joinRoom('lan', a, a); });
   on('leave', 'onclick', leave);
   const copied = (id, text) => on(id, 'onclick', e => {
     const b = e.target, label = b.textContent;
@@ -517,7 +422,7 @@ function wire() {
   });
   copied('copy', () => S.net.code);
   copied('copyLink', () => inviteLink(S.net.code));
-  on('joinInvite', 'onclick', () => { const c = S.invite; S.invite = null; S.msg = ''; S.err = false; joinOnline(c); });
+  on('joinInvite', 'onclick', () => { const c = S.invite; S.invite = null; S.msg = ''; S.err = false; joinRoom('online', c); });
   on('noInvite', 'onclick', () => { S.invite = null; render(); });
   on('fs', 'onclick', () => {
     if (APP) return rn.toggleFullscreen();

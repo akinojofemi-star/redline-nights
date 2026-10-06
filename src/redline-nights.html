@@ -1571,7 +1571,9 @@ const rivals=RIVALS.map(([name,c])=>({name,spec:null,car:null,color:c,skill:80,d
   lane:0,laneCD:0,nitroT:0,finished:false,finishTime:0,yaw:0,roll:0,stunt:null,airT:0,forks:{}}));
 // rivals drive cars from the player's class (a car may appear twice in a small class, in a different colour)
 // multiplayer (desktop app): the game runs in a frame under the lobby, which owns the network connection
-const MP={on:/[?&]mp=1/.test(location.search),cfg:null,me:null,host:false,sendT:0};
+const MP={on:/[?&]mp=1/.test(location.search),cfg:null,me:null,host:false,sendT:0,off:0};
+// the room's shared clock (ms): the lobby measures our offset from it, so every player's timestamps line up
+const netNow=()=>performance.timeOrigin+performance.now()+MP.off;
 function assignRivals(){
   if(MP.cfg)return;
   const cls=player.spec.cls,pool=CARS.filter(c=>c.cls===cls&&c!==player.spec),list=pool.length?pool:[player.spec];
@@ -2179,7 +2181,7 @@ function updateRivals(dt){
   const racing=G.mode==='race'||G.mode==='finish';
   for(const r of rivals){
     if(r.out)continue;
-    if(r.remote){mpApply(r);continue;}
+    if(r.remote){mpApply(r,dt);continue;}
     if(r.wreck>0){
       r.wreck-=dt;r.speed=Math.max(18,r.speed-30*dt);const b=r.car.body;b.rotation.z+=8*dt;b.rotation.x+=3*dt;b.position.y=Math.abs(Math.sin(r.wreck*5))*1.4*r.wreck/1.9;
       if(r.wreck<=0){r.wreck=0;b.rotation.set(0,0,0);b.position.y=0;}
@@ -2528,9 +2530,9 @@ player.stats=newStats();
 // ---------------------------------------------------------------- multiplayer wiring
 // The lobby (shell.html) sends: start (who's racing, in which cars, laps, rules), go (everyone has loaded: start the
 // countdown), st (another car's state), ev
-// (a takedown aimed at us), fin (someone finished), left (someone dropped out). We send our car's state twenty times a
+// (a takedown aimed at us), fin (someone finished), left (someone dropped out). We send our car's state fifteen times a
 // second (and, on the host, the AI cars' states), our finish and takedowns we land on others.
-function mpReset(){mpHold(false);MP.cfg=null;rivals.forEach(r=>{r.remote=false;r.netRot=null;r.buf=[];});toMenu();$('menu').hidden=true;setViewShift(false);}
+function mpReset(){mpHold(false);MP.cfg=null;rivals.forEach(r=>{r.remote=false;r.netRot=null;r.buf=[];nameTag(r,null);});toMenu();$('menu').hidden=true;setViewShift(false);}
 function mpSend(m){if(MP.on&&MP.cfg)parent.postMessage(m,'*');}
 // a race waits on the grid (frozen) until the host says every driver has loaded it
 function mpHold(on){let el=$('mpWait');
@@ -2547,12 +2549,14 @@ function mpStart(cfg){
   startRace();
   G.rules={slip:!!cfg.rules.slip,contact:!!cfg.rules.contact,knock:!!(cfg.rules.contact&&cfg.rules.knock)};
   const others=cfg.players.filter(p=>p.id!==cfg.me);
-  rivals.forEach((r,i)=>{const o=others[i];r.buf=[];r.netRot=null;r.jit=0;r.lastT=0;
+  if(cfg.off!==undefined)MP.off=cfg.off;
+  rivals.forEach((r,i)=>{const o=others[i];r.buf=[];r.netRot=null;r.eased=false;nameTag(r,null);
     if(!o){r.out=true;r.remote=false;if(r.car)r.car.g.visible=false;return;}
     const spec=CARS[carIndex(o.car)],col=PAINTS[(o.paint|0)%PAINTS.length][1];
     if(r.spec!==spec||r.color!==col||!r.car){if(r.car)scene.remove(r.car.g);r.spec=spec;r.color=col;r.car=makeCar(col,{shape:spec.shape,flames:true});scene.add(r.car.g);}
     r.name=o.name;r.netId=o.id;r.ai=!!o.ai;r.remote=!(o.ai&&MP.host);r.out=false;r.car.g.visible=true;
-    if(r.ai&&MP.host)r.skill=(r.spec.top+player.spec.top)/2-1.2+i*.3;});
+    if(r.ai&&MP.host)r.skill=(r.spec.top+player.spec.top)/2-1.2+i*.3;
+    if(!r.ai)nameTag(r,o.name,col);});
   // grid order is the order the lobby lists the players in
   cfg.players.forEach((pl,k)=>{const g=GRID6[k%6],e=pl.id===cfg.me?player:rivals.find(r=>r.netId===pl.id&&!r.out);if(!e)return;
     e.dist=g[0];e.s=mod(e.dist);e.x=g[1];e.br=-1;e.bs=0;if(e===player)alignToTrack(player,0);else e.lane=LANES.indexOf(g[1]);});
@@ -2564,20 +2568,42 @@ function mpState(e){const b=e.car.body;return {dist:+e.dist.toFixed(2),br:e.br,b
   rot:[+b.rotation.x.toFixed(3),+b.rotation.y.toFixed(3),+b.rotation.z.toFixed(3)],by:+b.position.y.toFixed(2),spd:+e.speed.toFixed(1),
   nl:e.isPlayer?e.nitroLevel:(e.nitroT>0?1:0),fin:!!e.finished,ft:e.finishTime||0};}
 function mpTick(dt){
-  if(!MP.cfg)return;MP.sendT-=dt;if(MP.sendT>0)return;MP.sendT=.05;
-  mpSend({t:'st',id:MP.me,s:mpState(player)});
-  if(MP.host)for(const r of rivals)if(r.ai&&!r.remote&&!r.out)mpSend({t:'st',id:r.netId,s:mpState(r)});
+  if(!MP.cfg)return;MP.sendT-=dt;if(MP.sendT>0)return;MP.sendT=1/15;
+  const m={t:'st',id:MP.me,ts:Math.round(netNow()),s:mpState(player)};
+  if(MP.host){const ai=rivals.filter(r=>r.ai&&!r.remote&&!r.out).map(r=>({id:r.netId,s:mpState(r)}));if(ai.length)m.ai=ai;}
+  mpSend(m);
 }
-// draw a remote car 100 ms in the past, between the two states either side of that moment
-function mpApply(r){
-  // shown slightly in the past so there are two states to blend between; uneven arrival (a relayed link) needs more
-  const buf=r.buf;if(!buf||!buf.length)return;const now=performance.now()-clamp(100+3*(r.jit||0),100,300);
-  while(buf.length>2&&buf[1].t<=now)buf.shift();
-  let a=buf[0],b=buf[1]||buf[0];let k=b.t>a.t?clamp((now-a.t)/(b.t-a.t),0,1):1;
-  const A=a.s,B=b.s,ext=b===a||now>b.t?Math.min(.4,(now-b.t)/1000):0;
-  r.dist=lerp(A.dist,B.dist,k)+(ext>0?B.spd*ext:0);r.br=B.br;r.bs=A.br===B.br?lerp(A.bs,B.bs,k):B.bs;
-  if(r.br>=0&&ext>0)r.bs+=B.spd*ext*BR[r.br].len/BR[r.br].span;
-  r.s=mod(r.dist);r.x=lerp(A.x,B.x,k);r.y=lerp(A.y,B.y,k);r.speed=B.spd;r.nitroT=B.nl?1:0;r.wreck=0;r.air=r.y>.3;
+function mpPush(id,ts,s){const r=rivals.find(r=>r.netId===id&&r.remote);if(!r||!ts)return;
+  if(r.buf.length&&ts<=r.buf[r.buf.length-1].ts)return;r.buf.push({ts,s});if(r.buf.length>30)r.buf.shift();}
+// a floating name above another player's car, in their paint colour
+function nameTag(r,name,col){
+  if(r.tag){r.tag.parent&&r.tag.parent.remove(r.tag);r.tag.material.map.dispose();r.tag.material.dispose();r.tag=null;}
+  if(!name||!r.car)return;
+  const c=document.createElement('canvas');c.width=512;c.height=112;const x=c.getContext('2d');
+  x.font='italic 900 64px "Saira Condensed",Impact,sans-serif';x.textAlign='center';x.textBaseline='middle';
+  x.lineWidth=10;x.strokeStyle='rgba(8,6,14,.85)';x.strokeText(name.toUpperCase(),256,50);x.fillStyle='#f6efe4';x.fillText(name.toUpperCase(),256,50);
+  x.fillStyle='#'+(col||0xffffff).toString(16).padStart(6,'0');x.fillRect(196,94,120,10);
+  const t=new THREE.CanvasTexture(c),sp=new THREE.Sprite(new THREE.SpriteMaterial({map:t,depthTest:false,transparent:true}));
+  sp.scale.set(4.4,.96,1);sp.position.y=2.3;sp.renderOrder=10;r.car.g.add(sp);r.tag=sp;
+}
+// Remote cars are drawn where they are now, not where they were: each state carries the moment it was taken on the
+// room's shared clock. We blend between the states either side of now and, past the newest one (the usual case), carry the car
+// on along its road at its speed (a racing car's next half second is very predictable). New states then ease the drawn
+// car over rather than snapping it.
+function mpApply(r,dt){
+  const buf=r.buf;if(!buf||!buf.length)return;
+  const T=netNow();
+  while(buf.length>2&&buf[1].ts<=T)buf.shift();
+  const a=buf[0],b=buf[1]||buf[0],A=a.s,B=b.s;
+  let k=1,ext=0;
+  if(b!==a&&T<b.ts)k=clamp((T-a.ts)/(b.ts-a.ts),0,1);else ext=clamp((T-b.ts)/1000,0,.6);
+  let tDist=lerp(A.dist,B.dist,k)+B.spd*ext,tBs=A.br===B.br?lerp(A.bs,B.bs,k):B.bs,tX=lerp(A.x,B.x,k);const tBr=B.br;
+  if(tBr>=0&&ext>0)tBs+=B.spd*ext*BR[tBr].len/BR[tBr].span;
+  if(ext>0&&b!==a&&b.ts>a.ts)tX+=clamp((B.x-A.x)/((b.ts-a.ts)/1000),-10,10)*Math.min(ext,.25);
+  if(!r.eased||r.br!==tBr||Math.abs(tDist-r.dist)>25){r.dist=tDist;r.bs=tBs;r.x=tX;r.eased=true;}
+  else{const adv=B.spd*dt,e=1-Math.exp(-dt*7);r.dist+=adv;if(tBr>=0)r.bs+=adv*BR[tBr].len/BR[tBr].span;
+    r.dist+=(tDist-r.dist)*e;r.bs+=(tBs-r.bs)*e;r.x+=(tX-r.x)*e;}
+  r.br=tBr;r.s=mod(r.dist);r.y=lerp(A.y,B.y,k);r.speed=B.spd;r.nitroT=B.nl?1:0;r.wreck=0;r.air=r.y>.3;
   const ang=(p,q)=>{let d=q-p;d=Math.atan2(Math.sin(d),Math.cos(d));return p+d*k;};
   r.netRot=[ang(A.rot[0],B.rot[0]),ang(A.rot[1],B.rot[1]),ang(A.rot[2],B.rot[2])];r.netBy=lerp(A.by,B.by,k);
   if(B.fin&&!r.finished){r.finished=true;r.finishTime=B.ft;}
@@ -2586,7 +2612,8 @@ if(MP.on){
   addEventListener('message',e=>{const m=e.data;if(!m||typeof m!=='object')return;
     if(m.t==='start')mpStart(m.cfg);
     else if(m.t==='go'){if(MP.cfg&&G.paused){mpHold(false);try{window.focus();}catch(e){}}}
-    else if(m.t==='st'){const r=rivals.find(r=>r.netId===m.id&&r.remote);if(r){const t=performance.now();if(r.lastT)r.jit=(r.jit||0)*.92+Math.abs(t-r.lastT-50)*.08;r.lastT=t;r.buf.push({t,s:m.s});if(r.buf.length>30)r.buf.shift();}}
+    else if(m.t==='st'){mpPush(m.id,m.ts,m.s);if(m.ai)m.ai.forEach(x=>mpPush(x.id,m.ts,x.s));}
+    else if(m.t==='clock')MP.off=m.off;
     else if(m.t==='ev'&&m.type==='takedown'){
       if(m.target===MP.me&&player.wreck<=0&&G.mode==='race'){wreckPlayer();toast('TAKEN DOWN','danger','BY '+(m.byName||'RIVAL').toUpperCase());}
       else if(MP.host){const r=rivals.find(r=>r.netId===m.target&&r.ai&&!r.remote);if(r){r.wreck=1.9;r.speed*=.4;}}}

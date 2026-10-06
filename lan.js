@@ -1,11 +1,14 @@
 // LAN play: a WebSocket relay that friends connect to (port 47800), a UDP beacon so their lobbies find the game
-// (port 47801), and a listener for other hosts' beacons. The relay only passes messages between the host's lobby and
-// each client; the host's lobby page runs the game logic.
+// (port 47801), and a listener for other hosts' beacons. The relay only passes messages between the players; the
+// host's lobby page runs the game logic. It speaks the same protocol as the online game server (server/worker.js):
+//   member -> relay  {type:'hello', role:'host'|'client'}  {type:'send', to:'host'|'*'|id, except?, data}  {type:'ping', c}
+//   relay -> member  {type:'welcome', id}  {type:'msg', from, data}  {type:'pong', c, s}  {type:'join'|'leave', id}
+//                    {type:'closed', why}  {type:'error', msg}
 const dgram = require('dgram'), os = require('os');
 const { WebSocketServer } = require('ws');
-const GAME_PORT = 47800, BEACON_PORT = 47801;
-let relay = null, hostSock = null, clients = new Map(), nextId = 1, beacon = null, beaconTimer = null, beaconInfo = null;
-const send = (ws, m) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); };
+const GAME_PORT = 47800, BEACON_PORT = 47801, MAX_MEMBERS = 8;
+let relay = null, members = new Map(), nextId = 1, beacon = null, beaconTimer = null, beaconInfo = null;
+const send = (ws, m) => { if (ws && ws.readyState === 1) ws.send(typeof m === 'string' ? m : JSON.stringify(m)); };
 
 function localIPs() {
   const out = [];
@@ -28,28 +31,39 @@ function startRelay(info, hooks = {}) {
   relay = new WebSocketServer({ port: GAME_PORT });
   relay.on('error', err => { if (hooks.onError) hooks.onError(String(err.code || err.message)); });
   relay.on('connection', (ws, req) => {
-    let id = null, isHost = false;
+    let id = null;
+    const refuse = msg => { send(ws, { type: 'error', msg }); ws.close(); };
     ws.on('message', buf => {
       let m; try { m = JSON.parse(buf); } catch { return; }
-      if (m.type === 'hello') {
+      if (m.type === 'ping') return send(ws, { type: 'pong', c: m.c, s: Date.now() });
+      if (!id) {
+        if (m.type !== 'hello') return;
         const addr = req.socket.remoteAddress || '';
         const local = addr === '127.0.0.1' || addr === '::1' || addr === '::ffff:127.0.0.1';
-        if (m.role === 'host' && local && !hostSock) { hostSock = ws; isHost = true; send(ws, { type: 'welcome', id: 'H' }); return; }
-        if (!hostSock) { send(ws, { type: 'error', msg: 'That game has closed.' }); ws.close(); return; }
-        id = 'L' + (nextId++); clients.set(id, ws);
+        if (m.role === 'host') {
+          if (!local || members.has('H')) return refuse('taken');
+          id = 'H';
+        } else {
+          if (!members.has('H')) return refuse('no-room');
+          if (members.size >= MAX_MEMBERS) return refuse('That game is full.');
+          id = 'L' + (nextId++);
+        }
+        members.set(id, ws);
         send(ws, { type: 'welcome', id });
-        send(hostSock, { type: 'join', id });
+        if (id !== 'H') send(members.get('H'), { type: 'join', id });
         return;
       }
-      if (isHost && m.type === 'send') {
-        const out = { type: 'msg', data: m.data };
-        if (m.to === '*') clients.forEach(c => send(c, out)); else send(clients.get(m.to), out);
-        if (m.kick) { const c = clients.get(m.to); if (c) c.close(); }
-      } else if (id && m.type === 'msg') send(hostSock, { type: 'msg', from: id, data: m.data });
+      if (m.type === 'send') {
+        const out = JSON.stringify({ type: 'msg', from: id, data: m.data });
+        if (m.to === '*') { for (const [k, s] of members) if (k !== id && k !== m.except) send(s, out); }
+        else send(members.get(m.to === 'host' ? 'H' : m.to), out);
+      }
     });
     ws.on('close', () => {
-      if (isHost) { hostSock = null; clients.forEach(c => c.close()); clients.clear(); }
-      else if (id) { clients.delete(id); send(hostSock, { type: 'leave', id }); }
+      if (!id || members.get(id) !== ws) return;
+      members.delete(id);
+      if (id === 'H') { for (const s of members.values()) { send(s, { type: 'closed', why: 'The host closed the game.' }); s.close(); } members.clear(); }
+      else send(members.get('H'), { type: 'leave', id });
     });
   });
   // the beacon: a small JSON packet to every broadcast address once a second
@@ -67,7 +81,7 @@ function stopRelay() {
   clearInterval(beaconTimer); beaconTimer = null;
   if (beacon) { try { beacon.close(); } catch {} beacon = null; }
   if (relay) { relay.clients.forEach(c => c.terminate()); relay.close(); relay = null; }
-  hostSock = null; clients.clear();
+  members.clear();
 }
 
 // ---------------------------------------------------------------- LAN discovery: hear other hosts' beacons

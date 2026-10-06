@@ -1,12 +1,12 @@
 // Builds app/game.html from src/redline-nights.html for the desktop app: the CDN scripts become local copies so the
-// game runs without internet (LAN play), and the libraries the lobby needs are copied into app/lib.
+// game runs without internet (LAN play); they're copied into app/lib.
 const fs = require('fs'), path = require('path');
 const root = path.join(__dirname, '..'), lib = path.join(root, 'app', 'lib');
+fs.rmSync(lib, { recursive: true, force: true });
 fs.mkdirSync(lib, { recursive: true });
 const copy = (from, to) => fs.copyFileSync(path.join(root, 'node_modules', from), path.join(lib, to));
 copy('three/build/three.min.js', 'three.min.js');
 copy('three/examples/js/loaders/GLTFLoader.js', 'GLTFLoader.js');
-copy('peerjs/dist/peerjs.min.js', 'peerjs.min.js');
 
 let html = fs.readFileSync(path.join(root, 'src', 'redline-nights.html'), 'utf8');
 const swaps = [

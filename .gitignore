@@ -5,3 +5,4 @@ app/lib/
 app/game.html
 .DS_Store
 web/
+.wrangler/
