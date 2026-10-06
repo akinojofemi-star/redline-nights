@@ -742,16 +742,12 @@ if(GAPS.length){
       const top=P[k*3+1];f.scale.y=top-GROUND_Y;placeOnTrack(f,e,0,-(top-GROUND_Y)/2);scene.add(f);}}
 }
 // branch roads: surface a hair above the main road where they overlap (drawn on top of it), walls only where the roads
-// are apart, and a striped crash barrier at the nose where they split
+// are apart
 const branchRoadMat=road.material.clone();Object.assign(branchRoadMat,{polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-4});
-const goreTex=canvasTex(64,64,(g,w,h)=>{g.fillStyle='#ffc21a';g.fillRect(0,0,w,h);g.fillStyle='#16121c';for(let i=-w;i<w*2;i+=24){g.beginPath();g.moveTo(i,0);g.lineTo(i+12,0);g.lineTo(i+12-h,h);g.lineTo(i-h,h);g.fill();}});
-const goreMat=new THREE.MeshStandardMaterial({map:goreTex,roughness:.6,emissive:0x332200,emissiveIntensity:.6});
 for(const b of BR){
   const atB=(k,off,dy,o)=>{o[0]=b.P[k*3]+b.R[k*3]*off;o[1]=b.P[k*3+1]+dy;o[2]=b.P[k*3+2]+b.R[k*3+2]*off;};
   const all=[...Array(b.n).keys()],step=b.len/(b.n-1);
   scene.add(new THREE.Mesh(ribbonRun(all,(k,s,o)=>atB(k,s?ROAD_HALF:-ROAD_HALF,.03,o),24,step),branchRoadMat));
-  {let j=0;while(j<b.mN-1&&b.mSep[j]<GAP)j++;const d=j/(b.mN-1)*b.span,nose=new THREE.Mesh(new THREE.BoxGeometry(2.4,1.15,4),goreMat);
-    placeOnTrack(nose,b.s0+d+2,offM(b,d)/2,.58);scene.add(nose);}
   for(const side of [-1,1]){
     const e=side*ROAD_HALF;
     const ok=k=>{const bs=k/(b.n-1)*b.len;return !(Math.sign(offB(b,bs))===side&&sepB(b,bs)<GAP);};
@@ -824,6 +820,41 @@ for(const b of BR){
     m.position.y=.65;g.add(m);placeAt(g,b.i,bs,offB(b,bs)/2,.03);scene.add(g);}
 }
 function MAT_DARK(){return new THREE.MeshStandardMaterial({color:0x14121a,roughness:.6});}
+// at each split: a board over the nose saying which road is which, and the routes' names painted on the road before it
+const roadWord=(text,col)=>new THREE.MeshBasicMaterial({map:canvasTex(512,128,(c,w,h)=>{c.clearRect(0,0,w,h);c.fillStyle=col;c.font='italic 900 104px "Saira Condensed",Impact,sans-serif';
+  c.textAlign='center';c.textBaseline='middle';c.fillText(text,w/2,h/2+6);}),transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,polygonOffsetUnits:-8,opacity:.9});
+// flat on the road, stretched along it like real road markings so it reads from a driver's low angle, left to right
+const wordGeo=new THREE.PlaneGeometry(9,11).rotateX(-Math.PI/2).rotateY(Math.PI);
+for(const b of BR){
+  const what=b.kind==='short'?'SHORTCUT':'NITRO ROUTE',col=b.kind==='short'?'#ffb02e':'#3fc8ff';
+  let nose=0;for(let k=0;k<200;k++)if(sepB(b,k*2)>=GAP){nose=k*2;break;}
+  const label=b.side<0?ARROW_L+' '+what+'      MAIN ROAD '+ARROW_R:ARROW_L+' MAIN ROAD      '+what+' '+ARROW_R;
+  const tex=canvasTex(1024,160,(c,w,h)=>{c.fillStyle='#120c1c';c.fillRect(0,0,w,h);c.font='italic 900 76px "Saira Condensed",Impact,sans-serif';c.textBaseline='middle';
+    const [l,r]=label.split('      ');c.textAlign='left';c.fillStyle=b.side<0?col:'#f6efe4';c.fillText(l,24,h/2+4);c.textAlign='right';c.fillStyle=b.side<0?'#f6efe4':col;c.fillText(r,w-24,h/2+4);
+    c.fillStyle=col;c.fillRect(0,0,w,8);c.fillRect(0,h-8,w,8);});
+  const g=new THREE.Group(),pm=new THREE.MeshStandardMaterial({color:0x2a2532,roughness:.6});
+  const board=new THREE.Mesh(new THREE.PlaneGeometry(9,1.4),new THREE.MeshBasicMaterial({map:tex}));board.position.y=3.6;board.rotation.y=Math.PI;g.add(board);
+  for(const x of [-2.6,2.6]){const post=new THREE.Mesh(new THREE.BoxGeometry(.25,3,.25),pm);post.position.set(x,1.5,.2);g.add(post);}
+  placeAt(g,b.i,nose,offB(b,nose)/2,.03);scene.add(g);
+  const at=Math.max(0,nose-45),w1=new THREE.Mesh(wordGeo,roadWord(what,col));placeAt(w1,b.i,at,0,.08);scene.add(w1);
+  const w2=new THREE.Mesh(wordGeo,roadWord('MAIN','#f6efe4'));placeAt(w2,-1,msB(b,at),0,.06);scene.add(w2);
+}
+// chevron boards round the outside of every sharp bend (yellow) and hairpin (red), arrows pointing the way it turns
+const chevMats=[0,1,2,3].map(i=>{const hard=i>>1,right=i&1,col=hard?'#ff3d5a':'#ffc21a';
+  return new THREE.MeshBasicMaterial({map:canvasTex(128,96,(c,w,h)=>{c.fillStyle='#16121e';c.fillRect(0,0,w,h);c.fillStyle=col;
+    for(const x0 of [20,64]){c.beginPath();const X=right?x0:w-x0,d=right?1:-1;c.moveTo(X,12);c.lineTo(X+22*d,12);c.lineTo(X+44*d,48);c.lineTo(X+22*d,84);c.lineTo(X,84);c.lineTo(X+22*d,48);c.closePath();c.fill();}
+    c.strokeStyle=col;c.lineWidth=6;c.strokeRect(3,3,w-6,h-6);})});});
+const chevGeo=new THREE.PlaneGeometry(3.4,2.5),chevPost=new THREE.BoxGeometry(.2,1.4,.2),chevPostMat=new THREE.MeshStandardMaterial({color:0x2a2532,roughness:.6});
+function chevrons(br,len,place){
+  for(let s=8;s<len-8;s+=16){sampleAt(br,s);const c=TS.c,r=Math.abs(c)>1e-6?1/Math.abs(c):1e9;if(r>=85)continue;
+    const side=Math.sign(c),x=place(s,side);if(x===null)continue;                      // side: the outside of the bend
+    const g=new THREE.Group(),m=new THREE.Mesh(chevGeo,chevMats[(r<48?2:0)+(c<0?1:0)]);m.position.y=2.6;m.rotation.y=Math.PI;g.add(m);
+    const pst=new THREE.Mesh(chevPost,chevPostMat);pst.position.y=.7;g.add(pst);placeAt(g,br,s,side*x,0);scene.add(g);}
+}
+chevrons(-1,L,(s,side)=>{const k=kOf(s),e=(side>0?ER:EL)[k];
+  if(GAPK[k]||(wrapD(s,TUNNEL.s0)>-20&&wrapD(s,TUNNEL.s1)<20)||(!e&&!mainWallAt(k,side)))return null;
+  return HW[k]+(e===EDGE.kerb?VERGE[e]+.6:e===EDGE.cliff?1.1:.6);});
+for(const b of BR)chevrons(b.i,b.len,(s,side)=>Math.sign(offB(b,s))===side&&sepB(b,s)<GAP?null:ROAD_HALF+.6);
 
 // ---------------------------------------------------------------- scenery helpers
 // rail line for the freight train: an embankment beside a stretch of road with no branch on that side
