@@ -2365,7 +2365,7 @@ function updateHud(){
     setText(H.lap,'lap',fmt(p.finished?(p.lapTimes[p.lapTimes.length-1]||0):G.raceTime-p.lapStart));}
   else if(m==='rush'){setText(H.pos,'pos',String(p.stats.knock));setText(H.posOf,'po',' KO');setText(H.lapLbl,'ll','Left');setText(H.lap,'lap',fmt(G.rushT));}
   else{const alive=[player,...rivals].filter(e=>!e.out&&!e.elim).length;
-    setText(H.pos,'pos',String(standings().indexOf(p)+1));setText(H.posOf,'po','/'+(m==='elim'&&!p.elim?alive:6));setText(H.lapLbl,'ll','Lap');
+    setText(H.pos,'pos',String(standings().indexOf(p)+1));setText(H.posOf,'po','/'+(m==='elim'&&!p.elim?alive:1+rivals.filter(r=>!r.out).length));setText(H.lapLbl,'ll','Lap');
     setText(H.lap,'lap',m==='elim'?String(lapN):Math.min(G.laps,lapN)+'/'+G.laps);}
   const showLine=m==='elim'&&G.mode==='race';H.modeLine.hidden=!showLine;
   if(showLine){const st=standings().filter(e=>!e.elim),danger=st[st.length-1]===p;setText(H.modeLine,'ml',(danger?'YOU ARE LAST \u00b7 OUT IN ':'NEXT OUT IN ')+Math.ceil(G.elimT));H.modeLine.classList.toggle('warn',danger&&G.elimT<8);}
@@ -2443,7 +2443,11 @@ let last=performance.now();
 function frame(now){
   requestAnimationFrame(frame);
   let dt=Math.min(.05,(now-last)/1000);last=now;
+  step(dt);
+}
+function step(dt){
   if(!G.paused)update(dt);
+  else if(MP.hold){poseRacer(player,0);rivals.forEach(r=>!r.out&&poseRacer(r,0));cameraFollow(dt);if(!hud.hidden){updateHud();drawMap();}}
   sky.position.copy(camera.position);skyMat.uniforms.tm.value=G.t;
   updateAudio();
   renderer.render(scene,camera);
@@ -2522,11 +2526,17 @@ $('pauseBtn').onclick=()=>togglePause(true);
 updateBest();
 player.stats=newStats();
 // ---------------------------------------------------------------- multiplayer wiring
-// The lobby (shell.html) sends: start (who's racing, in which cars, laps, rules), st (another car's state), ev
+// The lobby (shell.html) sends: start (who's racing, in which cars, laps, rules), go (everyone has loaded: start the
+// countdown), st (another car's state), ev
 // (a takedown aimed at us), fin (someone finished), left (someone dropped out). We send our car's state twenty times a
 // second (and, on the host, the AI cars' states), our finish and takedowns we land on others.
-function mpReset(){MP.cfg=null;rivals.forEach(r=>{r.remote=false;r.netRot=null;r.buf=[];});toMenu();$('menu').hidden=true;setViewShift(false);}
+function mpReset(){mpHold(false);MP.cfg=null;rivals.forEach(r=>{r.remote=false;r.netRot=null;r.buf=[];});toMenu();$('menu').hidden=true;setViewShift(false);}
 function mpSend(m){if(MP.on&&MP.cfg)parent.postMessage(m,'*');}
+// a race waits on the grid (frozen) until the host says every driver has loaded it
+function mpHold(on){let el=$('mpWait');
+  if(!el){if(!on)return;el=document.createElement('div');el.id='mpWait';el.textContent='WAITING FOR DRIVERS…';
+    el.style.cssText='position:fixed;left:0;right:0;top:36%;text-align:center;font:900 italic 44px var(--f-display);letter-spacing:.04em;color:var(--hud);text-shadow:0 2px 20px rgba(0,0,0,.85);pointer-events:none;z-index:40';document.body.appendChild(el);}
+  el.hidden=!on;G.paused=on;MP.hold=on;}
 const GRID6=[[-6,-3.25],[-6,3.25],[-15,-3.25],[-15,3.25],[-24,-3.25],[-24,3.25]];
 function carIndex(id){const i=CARS.findIndex(c=>c.shape.model===id);return i<0?0:i;}
 function mpStart(cfg){
@@ -2547,6 +2557,8 @@ function mpStart(cfg){
   cfg.players.forEach((pl,k)=>{const g=GRID6[k%6],e=pl.id===cfg.me?player:rivals.find(r=>r.netId===pl.id&&!r.out);if(!e)return;
     e.dist=g[0];e.s=mod(e.dist);e.x=g[1];e.br=-1;e.bs=0;if(e===player)alignToTrack(player,0);else e.lane=LANES.indexOf(g[1]);});
   $('menu').hidden=true;try{window.focus();}catch(e){}
+  mpHold(true);parent.postMessage({t:'loaded'},'*');
+  const held=cfg;setTimeout(()=>{if(MP.cfg===held&&MP.hold)mpHold(false);},30000); // never wait forever on a lost "go"
 }
 function mpState(e){const b=e.car.body;return {dist:+e.dist.toFixed(2),br:e.br,bs:+(e.bs||0).toFixed(2),x:+e.x.toFixed(2),y:+e.y.toFixed(2),
   rot:[+b.rotation.x.toFixed(3),+b.rotation.y.toFixed(3),+b.rotation.z.toFixed(3)],by:+b.position.y.toFixed(2),spd:+e.speed.toFixed(1),
@@ -2573,6 +2585,7 @@ function mpApply(r){
 if(MP.on){
   addEventListener('message',e=>{const m=e.data;if(!m||typeof m!=='object')return;
     if(m.t==='start')mpStart(m.cfg);
+    else if(m.t==='go'){if(MP.cfg&&G.paused){mpHold(false);try{window.focus();}catch(e){}}}
     else if(m.t==='st'){const r=rivals.find(r=>r.netId===m.id&&r.remote);if(r){const t=performance.now();if(r.lastT)r.jit=(r.jit||0)*.92+Math.abs(t-r.lastT-50)*.08;r.lastT=t;r.buf.push({t,s:m.s});if(r.buf.length>30)r.buf.shift();}}
     else if(m.t==='ev'&&m.type==='takedown'){
       if(m.target===MP.me&&player.wreck<=0&&G.mode==='race'){wreckPlayer();toast('TAKEN DOWN','danger','BY '+(m.byName||'RIVAL').toUpperCase());}
@@ -2581,7 +2594,7 @@ if(MP.on){
     else if(m.t==='menu')mpReset();
   });
   $('menuBtn').textContent='LOBBY';$('againBtn').hidden=true;
-  window.__rn={G,player,rivals,MP,update}; // for testing multiplayer from the lobby page
+  window.__rn={G,player,rivals,MP,update,step:dt=>step(dt)}; // for testing multiplayer from the lobby page
 }
 // tell the lobby we're loaded, with what it needs to offer: cars, paints and maps
 function mpHello(){if(!MP.on)return;$('menu').hidden=true;setViewShift(false);

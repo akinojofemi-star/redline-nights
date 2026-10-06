@@ -57,7 +57,7 @@ button.on{background:var(--ok);color:var(--ink);border-color:var(--ok)}
 (() => {
 'use strict';
 // ---------------------------------------------------------------- state
-const VER = '1.0';
+const VER = '1.1';                           // multiplayer protocol: only matching versions can play together
 const $ = id => document.getElementById(id);
 const store = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
 const APP = !!window.rn;                     // inside the desktop app (LAN hosting available)
@@ -77,11 +77,14 @@ const S = {
 };
 if (S.invite) { S.invite = S.invite.toUpperCase(); history.replaceState(null, '', location.pathname + location.search); }
 let settings = { map: 'city', laps: 3, ai: 2, slip: true, contact: true, knock: true };
+window.__lobby = S;                         // for tests
 try { Object.assign(settings, JSON.parse(store.get('rn-mp-settings') || '{}')); } catch (e) {}
 
 // ---------------------------------------------------------------- the game frame
 const frame = $('game');
-function loadGame(map, mp) { S.curMap = map; S.mpLoaded = mp; frame.src = 'game.html' + (mp ? '?mp=1' : '') + '#' + map; }
+// a fresh query each time: changing only the #map part wouldn't reload the page, and the old map would stay up
+let loads = 0;
+function loadGame(map, mp) { S.curMap = map; S.mpLoaded = mp; frame.src = 'game.html?' + (mp ? 'mp=1&' : '') + 'n=' + (++loads) + '#' + map; }
 function toGame(m) { if (frame.contentWindow) frame.contentWindow.postMessage(m, '*'); }
 addEventListener('message', e => {
   if (e.source !== frame.contentWindow) return;
@@ -92,6 +95,10 @@ addEventListener('message', e => {
     if (S.pendingStart) { const c = S.pendingStart; S.pendingStart = null; toGame({ t: 'start', cfg: c }); }
     if (S.screen !== 'race') render();
   } else if (m.t === 'openLobby') { show(true); go('home'); }
+  else if (m.t === 'loaded') {                                   // our game has the race set up and is holding on the grid
+    if (!S.net) return;
+    if (S.net.isHost) hubLoaded('H'); else S.net.send({ t: 'loaded', race: S.raceId });
+  }
   else if (m.t === 'lobby') { S.screen = S.net ? 'lobby' : 'home'; show(true); if (S.net && S.net.isHost) { S.net.racing = false; broadcastLobby(); } render(); }
   else if (m.t === 'st' || m.t === 'fin' || m.t === 'ev') {      // our own car's news: share it
     if (!S.net) return;
@@ -231,6 +238,8 @@ function hubMsg(id, d) {
     const p = hub.players.get(id); if (!p) return;
     Object.assign(p, { name: String(d.name || p.name).slice(0, 16), car: d.car, paint: d.paint | 0, ready: !!d.ready });
     broadcastLobby();
+  } else if (d.t === 'loaded') {
+    if (hub.race && d.race === hub.race.cfg.race) hubLoaded(id);
   } else if (d.t === 'st' || d.t === 'fin' || d.t === 'ev') {
     const out = Object.assign({}, d, { id: d.t === 'st' && d.id && d.id.startsWith('ai') ? d.id : id });
     hub.broadcast(out, id); toGame(out);
@@ -241,7 +250,7 @@ function hubLeave(id) {
   hub.clients.delete(id); hub.players.delete(id);
   if (hub.relayIds) for (const [rid, i] of hub.relayIds) if (i === id) hub.relayIds.delete(rid);
   hub.broadcast({ t: 'left', id }); toGame({ t: 'left', id });
-  broadcastLobby();
+  broadcastLobby(); checkGo(hub);
 }
 function hostStart() {
   const hub = S.net; if (!hub || !hub.isHost) return;
@@ -254,11 +263,32 @@ function hostStart() {
     ai.push({ id: 'ai' + i, name: AI_NAMES[i], car: pool[(i + 1) % pool.length].id, paint: (i * 3 + 2) % S.info.paints.length, ai: true });
   const cfg = { map: settings.map, laps: settings.laps, rules: { slip: settings.slip, contact: settings.contact, knock: settings.knock },
     players: humans.map(p => ({ id: p.id, name: p.name, car: p.car, paint: p.paint })).concat(ai) };
+  cfg.race = Date.now();
+  const race = hub.race = { cfg, loaded: new Set(), go: false };
   hub.racing = true;
   hub.broadcast({ t: 'start', cfg });
   startLocal(cfg);
   broadcastLobby();
+  // everyone loads the map, then the countdown starts for all at once. Re-send the start to anyone who hasn't
+  // reported in (a relayed message can be lost); after 25 s go anyway and let stragglers join when they're ready.
+  const resend = setInterval(() => {
+    if (hub.race !== race || race.go || S.net !== hub) return clearInterval(resend);
+    for (const p of cfg.players) if (!p.ai && p.id !== 'H' && !race.loaded.has(p.id) && hub.clients.has(p.id)) hub.sendTo(p.id, { t: 'start', cfg });
+  }, 3000);
+  setTimeout(() => { if (hub.race === race && !race.go && S.net === hub) raceGo(hub); }, 25000);
 }
+function hubLoaded(id) {
+  const hub = S.net, race = hub && hub.race; if (!race) return;
+  race.loaded.add(id);
+  if (race.go) { if (id !== 'H') hub.sendTo(id, { t: 'go' }); return; }
+  checkGo(hub);
+}
+function checkGo(hub) {
+  const race = hub.race; if (!race || race.go) return;
+  const waiting = race.cfg.players.filter(p => !p.ai && (p.id === 'H' || hub.clients.has(p.id)) && !race.loaded.has(p.id));
+  if (!waiting.length) raceGo(hub);
+}
+function raceGo(hub) { hub.race.go = true; hub.broadcast({ t: 'go' }); toGame({ t: 'go' }); }
 
 function joinLan(addr, label) {
   const url = 'ws://' + (addr.includes(':') ? addr : addr + ':47800');
@@ -351,7 +381,8 @@ function sendMe() { if (S.net && !S.net.isHost) S.net.send({ t: 'me', name: S.na
 function clientMsg(d) {
   if (!d) return;
   if (d.t === 'lobby') { S.net.myId = d.you; S.lobby = d; settings = Object.assign(settings, d.settings); S.msg = ''; if (S.screen === 'lobby') render(); }
-  else if (d.t === 'start') startLocal(d.cfg);
+  else if (d.t === 'start') { if (S.raceId === d.cfg.race) return; S.raceId = d.cfg.race; startLocal(d.cfg); }
+  else if (d.t === 'go') toGame({ t: 'go' });
   else if (d.t === 'st' || d.t === 'fin' || d.t === 'ev' || d.t === 'left') toGame(d);
   else if (d.t === 'closed') fail(d.why || 'The host closed the game.');
 }
