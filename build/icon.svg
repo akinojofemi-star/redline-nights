@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <clipPath id="tile"><rect x="100" y="100" width="824" height="824" rx="184"/></clipPath>
+    <clipPath id="aboveHorizon"><rect x="0" y="0" width="1024" height="520"/></clipPath>
+    <linearGradient id="sky" x1="0" y1="100" x2="0" y2="520" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0b0819"/><stop offset=".55" stop-color="#26103f"/><stop offset="1" stop-color="#6b1747"/>
+    </linearGradient>
+    <linearGradient id="sun" x1="0" y1="330" x2="0" y2="520" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffd977"/><stop offset=".45" stop-color="#ffb02e"/><stop offset="1" stop-color="#ff3d5a"/>
+    </linearGradient>
+    <mask id="sunStripes">
+      <rect x="0" y="0" width="1024" height="1024" fill="#fff"/>
+      <rect x="0" y="430" width="1024" height="7" fill="#000"/>
+      <rect x="0" y="456" width="1024" height="10" fill="#000"/>
+      <rect x="0" y="484" width="1024" height="13" fill="#000"/>
+      <rect x="0" y="510" width="1024" height="16" fill="#000"/>
+    </mask>
+    <radialGradient id="horizonGlow" cx="512" cy="520" r="420" gradientUnits="userSpaceOnUse" gradientTransform="translate(0 520) scale(1 .45) translate(0 -520)">
+      <stop offset="0" stop-color="#ff3d5a" stop-opacity=".75"/><stop offset=".5" stop-color="#b6267a" stop-opacity=".3"/><stop offset="1" stop-color="#b6267a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ground" x1="0" y1="520" x2="0" y2="924" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1b0c2c"/><stop offset="1" stop-color="#07040c"/>
+    </linearGradient>
+    <linearGradient id="road" x1="0" y1="520" x2="0" y2="924" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2a1838"/><stop offset="1" stop-color="#140c1f"/>
+    </linearGradient>
+    <linearGradient id="body" x1="0" y1="600" x2="0" y2="830" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3a2552"/><stop offset=".35" stop-color="#1c1229"/><stop offset="1" stop-color="#0c0712"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="585" x2="0" y2="668" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ff9a4a" stop-opacity=".55"/><stop offset=".35" stop-color="#3a1640"/><stop offset="1" stop-color="#0a0610"/>
+    </linearGradient>
+    <linearGradient id="wing" x1="0" y1="626" x2="0" y2="652" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4a3366"/><stop offset="1" stop-color="#120b1c"/>
+    </linearGradient>
+    <radialGradient id="flame" cx=".5" cy=".5" r=".5">
+      <stop offset="0" stop-color="#ffffff"/><stop offset=".25" stop-color="#9fe6ff"/><stop offset=".6" stop-color="#3fc8ff" stop-opacity=".55"/><stop offset="1" stop-color="#3fc8ff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="redPool" cx=".5" cy=".5" r=".5">
+      <stop offset="0" stop-color="#ff3d5a" stop-opacity=".55"/><stop offset="1" stop-color="#ff3d5a" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="7"/>
+      <feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .07 0"/>
+    </filter>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="9"/></filter>
+    <filter id="bigGlow" x="-50%" y="-200%" width="200%" height="500%"><feGaussianBlur stdDeviation="22"/></filter>
+    <filter id="tileShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="14"/><feOffset dy="12"/>
+      <feComponentTransfer><feFuncA type="linear" slope=".45"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g filter="url(#tileShadow)">
+  <g clip-path="url(#tile)">
+    <!-- sky, stars -->
+    <rect x="100" y="100" width="824" height="420" fill="url(#sky)"/>
+    <rect x="100" y="100" width="824" height="420" filter="url(#grain)"/>
+    <g fill="#fff">
+      <circle cx="210" cy="190" r="2.5" opacity=".7"/><circle cx="300" cy="250" r="1.8" opacity=".5"/><circle cx="420" cy="170" r="2.2" opacity=".6"/>
+      <circle cx="640" cy="205" r="2" opacity=".55"/><circle cx="760" cy="160" r="2.6" opacity=".7"/><circle cx="830" cy="260" r="1.8" opacity=".5"/>
+      <circle cx="560" cy="140" r="1.6" opacity=".45"/><circle cx="180" cy="320" r="1.6" opacity=".4"/><circle cx="870" cy="350" r="1.6" opacity=".4"/>
+    </g>
+
+    <!-- striped sunset over the horizon -->
+    <rect x="0" y="300" width="1024" height="440" fill="url(#horizonGlow)"/>
+    <g clip-path="url(#aboveHorizon)" mask="url(#sunStripes)">
+      <circle cx="512" cy="520" r="196" fill="url(#sun)"/>
+    </g>
+
+    <!-- city skyline -->
+    <path fill="#0d0718" d="M100 520 V452 h38 v-30 h30 v58 h22 v-92 h46 v70 h20 v-40 h34 v84 h26 v-26 h30 v76 Z
+      M924 520 V440 h-34 v-46 h-40 v76 h-22 v-58 h-36 v92 h-24 v-34 h-30 v50 Z"/>
+    <g fill="#ffb02e" opacity=".55">
+      <rect x="196" y="400" width="7" height="7"/><rect x="212" y="420" width="7" height="7"/><rect x="196" y="440" width="7" height="7"/>
+      <rect x="858" y="410" width="7" height="7"/><rect x="872" y="430" width="7" height="7"/><rect x="782" y="450" width="7" height="7"/>
+    </g>
+    <g fill="#3fc8ff" opacity=".5">
+      <rect x="280" y="444" width="7" height="7"/><rect x="760" y="476" width="7" height="7"/><rect x="128" y="470" width="7" height="7"/>
+    </g>
+
+    <!-- ground with a faint perspective grid -->
+    <rect x="100" y="520" width="824" height="404" fill="url(#ground)"/>
+    <g stroke="#b678ff" stroke-opacity=".22" stroke-width="2">
+      <line x1="100" y1="534" x2="924" y2="534"/><line x1="100" y1="556" x2="924" y2="556"/>
+      <line x1="100" y1="590" x2="924" y2="590"/><line x1="100" y1="642" x2="924" y2="642"/>
+      <line x1="100" y1="720" x2="924" y2="720"/><line x1="100" y1="840" x2="924" y2="840"/>
+    </g>
+
+    <!-- road -->
+    <polygon points="488,520 536,520 1010,924 14,924" fill="url(#road)"/>
+    <g filter="url(#glow)" opacity=".9">
+      <polygon points="486,520 492,520 92,924 50,924" fill="#3fc8ff"/>
+      <polygon points="532,520 538,520 974,924 932,924" fill="#ff3d5a"/>
+    </g>
+    <polygon points="487,520 491,520 84,924 60,924" fill="#bdf0ff"/>
+    <polygon points="533,520 537,520 964,924 940,924" fill="#ffb3bf"/>
+    <g fill="#ffb02e">
+      <polygon points="510,532 514,532 515,546 509,546"/>
+      <polygon points="508,566 516,566 518,592 506,592"/>
+    </g>
+
+    <!-- speed streaks -->
+    <g stroke-linecap="round" opacity=".55">
+      <line x1="150" y1="610" x2="300" y2="575" stroke="#3fc8ff" stroke-width="4"/>
+      <line x1="120" y1="700" x2="250" y2="660" stroke="#3fc8ff" stroke-width="3"/>
+      <line x1="874" y1="610" x2="724" y2="575" stroke="#ff3d5a" stroke-width="4"/>
+      <line x1="904" y1="700" x2="774" y2="660" stroke="#ff3d5a" stroke-width="3"/>
+    </g>
+
+    <!-- car, seen from behind -->
+    <ellipse cx="512" cy="900" rx="300" ry="40" fill="url(#redPool)"/>
+    <ellipse cx="512" cy="862" rx="290" ry="20" fill="#000" opacity=".7"/>
+    <rect x="258" y="770" width="78" height="94" rx="16" fill="#050308"/>
+    <rect x="688" y="770" width="78" height="94" rx="16" fill="#050308"/>
+    <path d="M336 672 L384 602 Q392 590 410 590 L614 590 Q632 590 640 602 L688 672 Z" fill="url(#glass)"/>
+    <path d="M336 672 L384 602 Q392 590 410 590 L614 590 Q632 590 640 602 L688 672" fill="none" stroke="#5a3e7a" stroke-width="5"/>
+    <path d="M246 806 L246 724 Q248 684 292 670 L732 670 Q776 684 778 724 L778 806 Q778 826 756 828 L268 828 Q246 826 246 806 Z" fill="url(#body)"/>
+    <path d="M262 712 Q266 684 296 676 L728 676 Q758 684 762 712" fill="none" stroke="#7a5aa6" stroke-opacity=".7" stroke-width="3"/>
+    <!-- tail-light bar -->
+    <rect x="262" y="692" width="500" height="26" rx="13" fill="#ff3d5a" filter="url(#bigGlow)" opacity=".95"/>
+    <rect x="266" y="694" width="492" height="22" rx="11" fill="#ff3d5a"/>
+    <rect x="280" y="701" width="464" height="7" rx="3.5" fill="#ffd2d9"/>
+    <!-- diffuser and exhausts -->
+    <path d="M330 788 H694 L676 828 H348 Z" fill="#07040b"/>
+    <g stroke="#2a1d3a" stroke-width="5"><line x1="392" y1="792" x2="398" y2="826"/><line x1="512" y1="792" x2="512" y2="826"/><line x1="632" y1="792" x2="626" y2="826"/></g>
+    <circle cx="450" cy="808" r="62" fill="url(#flame)"/>
+    <circle cx="574" cy="808" r="62" fill="url(#flame)"/>
+    <circle cx="450" cy="808" r="15" fill="#e8fbff"/>
+    <circle cx="574" cy="808" r="15" fill="#e8fbff"/>
+    <!-- rear wing -->
+    <rect x="352" y="652" width="12" height="24" fill="#120b1c"/>
+    <rect x="660" y="652" width="12" height="24" fill="#120b1c"/>
+    <path d="M262 632 Q512 618 762 632 L758 654 Q512 642 266 654 Z" fill="url(#wing)"/>
+    <path d="M266 632 Q512 619 758 632" fill="none" stroke="#9a7ad0" stroke-opacity=".8" stroke-width="3"/>
+  </g>
+  <rect x="101.5" y="101.5" width="821" height="821" rx="183" fill="none" stroke="#fff" stroke-opacity=".1" stroke-width="3"/>
+  </g>
+</svg>

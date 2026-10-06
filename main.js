@@ -40,7 +40,7 @@ async function createWindow() {
   const port = await startStatic();
   win = new BrowserWindow({
     width: 1360, height: 820, minWidth: 900, minHeight: 600, backgroundColor: '#0e0a16', autoHideMenuBar: true,
-    title: 'Redline Nights',
+    title: 'Redline Nights', icon: path.join(APP_DIR, 'icon.png'),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, backgroundThrottling: false }
   });
   win.loadURL(`http://127.0.0.1:${port}/shell.html`);
