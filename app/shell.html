@@ -113,7 +113,7 @@ function show(on) { $('lobby').hidden = !on; }
 // worker.js, lan.js). The host's lobby is the hub: it keeps the player list and settings and starts races. Car states
 // go from each player straight to everyone else through the room; everything else goes to or from the host.
 const SERVER = (/[?&]server=([^&#]+)/.exec(location.search) || [])[1]
-  ? decodeURIComponent(/[?&]server=([^&#]+)/.exec(location.search)[1]) : 'wss://redline-nights.REPLACE-ME.workers.dev';
+  ? decodeURIComponent(/[?&]server=([^&#]+)/.exec(location.search)[1]) : 'wss://redline-nights.akinojofemi.workers.dev';
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const newCode = () => Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
 const clock = () => performance.timeOrigin + performance.now();

@@ -2085,7 +2085,7 @@ function carPhysics(p,dt,steer,brake,racing){
   const th=Math.atan2(hx*t.rx+hz*t.rz,hx*t.fx+hz*t.fz),tv=V>3?Math.atan2(p.vx,p.wvx*t.fx+p.wvz*t.fz):th;
   p.visYaw=-th;p.camYaw=-(tv*.7+th*.3);p.hoodYaw=-(th*.65+tv*.35);
   p.lat+=((p.air?0:latSum/N*(-Math.sin(p.psi)*t.rx+Math.cos(p.psi)*t.rz))-p.lat)*Math.min(1,6*dt);
-  p.lng+=((V-(p.lastSpeed||0))/dt-p.lng)*Math.min(1,5*dt);p.lastSpeed=V;
+  if(dt>0)p.lng+=((V-(p.lastSpeed||0))/dt-p.lng)*Math.min(1,5*dt);if(!isFinite(p.lng))p.lng=0;p.lastSpeed=V;
   // suspension: the body sits on a spring that landings and bumps compress (heavier cars sink further)
   p.sy=p.sy||0;p.svy=p.svy||0;p.svy+=(-120*p.sy-11*p.svy)*dt;p.sy+=p.svy*dt;
 }
@@ -2444,7 +2444,9 @@ addEventListener('resize',resize);resize();
 let last=performance.now();
 function frame(now){
   requestAnimationFrame(frame);
-  let dt=Math.min(.05,(now-last)/1000);last=now;
+  // a frame can arrive with the same (or an earlier) timestamp, e.g. when the window comes back into view; a zero
+  // step would divide by zero and leave NaN in the car's pose for good, so skip it
+  const dt=Math.min(.05,(now-last)/1000);if(dt<=0)return;last=now;
   step(dt);
 }
 function step(dt){
