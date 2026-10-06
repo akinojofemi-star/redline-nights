@@ -13,7 +13,8 @@
     "dist:mac": "node tools/prepare.js && electron-builder --mac",
     "dist:win": "node tools/prepare.js && electron-builder --win",
     "dist:linux": "node tools/prepare.js && electron-builder --linux",
-    "dist:all": "node tools/prepare.js && electron-builder --mac --win --linux"
+    "dist:all": "node tools/prepare.js && electron-builder --mac --win --linux",
+    "build:web": "node tools/build-web.js"
   },
   "build": {
     "appId": "com.redlinenights.game",

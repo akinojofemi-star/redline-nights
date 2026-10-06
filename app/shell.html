@@ -60,6 +60,9 @@ const VER = '1.0';
 const $ = id => document.getElementById(id);
 const store = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
 const APP = !!window.rn;                     // inside the desktop app (LAN hosting available)
+const WEB_URL = 'https://akinojofemi-star.github.io/redline-nights/';   // the browser version, for invite links
+const DOWNLOAD_URL = 'https://github.com/akinojofemi-star/redline-nights/releases/latest';
+const inviteLink = code => (APP ? WEB_URL : location.origin + location.pathname.replace(/index\.html$/, '')) + '#join=' + code;
 const AI_NAMES = ['Vega', 'Kaito', 'Rook', 'Mila', 'Dax'];
 const S = {
   screen: 'home', name: store.get('rn-name') || 'Driver' + Math.floor(100 + Math.random() * 900),
@@ -68,8 +71,10 @@ const S = {
   lan: new Map(),                             // LAN games heard on the network
   net: null,                                  // the connection (host hub or client)
   lobby: null,                                // {players, settings, racing} as the host last sent it
-  msg: '', err: false, curMap: null, mpLoaded: false, pendingStart: null
+  msg: '', err: false, curMap: null, mpLoaded: false, pendingStart: null,
+  invite: (/join=([A-Za-z0-9]{5})/.exec(location.hash) || [])[1] || null   // opened from an invite link
 };
+if (S.invite) { S.invite = S.invite.toUpperCase(); history.replaceState(null, '', location.pathname + location.search); }
 let settings = { map: 'city', laps: 3, ai: 2, slip: true, contact: true, knock: true };
 try { Object.assign(settings, JSON.parse(store.get('rn-mp-settings') || '{}')); } catch (e) {}
 
@@ -290,6 +295,12 @@ function render() {
   wire();
 }
 function homeHTML() {
+  if (S.invite) return `<h1>Redline<span>Nights</span></h1>
+  <p class="tag">You’ve been invited to race in room <b style="color:var(--nitro)">${esc(S.invite)}</b>.</p>
+  <div class="lbl">Your name</div>
+  <div class="row"><input id="name" maxlength="16" value="${esc(S.name)}"></div>
+  <div class="row" style="margin-top:18px"><button class="go" id="joinInvite">JOIN RACE</button><button id="noInvite">Not now</button></div>
+  <div class="msg ${S.err ? 'err' : ''}">${esc(S.msg)}</div>`;
   return `<h1>Redline<span>Nights</span></h1>
   <p class="tag">Race solo, or with friends on the same network or anywhere online.</p>
   <div class="lbl">Your name</div>
@@ -303,9 +314,10 @@ function homeHTML() {
   ${APP ? `<div class="lbl">Games on your network</div><div class="list" id="lanList"></div>
   <div class="lbl">Or by address</div>
   <div class="row"><input id="addr" placeholder="192.168.1.20" style="width:220px"><button id="joinAddr">Join</button></div>
-  <p class="hint">By address also works over the internet if the host forwards port 47800, or through a virtual LAN such as Tailscale or ZeroTier.</p>` : ''}
+  <p class="hint">By address also works over the internet if the host forwards port 47800, or through a virtual LAN such as Tailscale or ZeroTier.</p>`
+  : `<p class="hint">Friends on the same Wi-Fi can use the room code too. For LAN races without internet, get the <a href="${DOWNLOAD_URL}" target="_blank" rel="noopener" style="color:var(--perfect)">desktop app</a> (Windows, Mac, Linux).</p>`}
   <div class="sep"></div>
-  <p class="hint">F11 toggles full screen.</p>`;
+  <div class="row"><button id="fs">Full screen</button>${APP ? '<span class="hint" style="margin:0">or press F11</span>' : ''}</div>`;
 }
 function renderLan() {
   const el = $('lanList'); if (!el) return;
@@ -326,7 +338,8 @@ function lobbyHTML() {
   const classes = [...new Set(cars.map(c => c.cls))];
   let head;
   if (host) head = `<div class="lbl">Room code · friends online type this</div>
-    <div class="row"><span class="bigcode">${net.code ? esc(net.code) : '…'}</span>${net.code ? '<button id="copy">Copy</button>' : ''}</div>
+    <div class="row"><span class="bigcode">${net.code ? esc(net.code) : '…'}</span>${net.code ? '<button id="copy">Copy code</button><button id="copyLink">Copy invite link</button>' : ''}</div>
+    ${net.code ? `<div class="hint">The invite link opens the game in a browser and joins this room. Players on the desktop app and in the browser can race together.</div>` : ''}
     ${net.onlineErr ? `<div class="msg err">${esc(net.onlineErr)}</div>` : ''}
     ${APP ? `<div class="lbl">On your network</div><div class="tag">${net.lanIPs.length ? 'Friends on the same Wi-Fi see this game in their list, or join at <b>' + net.lanIPs.map(esc).join('</b> or <b>') + '</b>' : 'Starting…'}</div>${net.lanErr ? `<div class="msg err">${esc(net.lanErr)}</div>` : ''}` : ''}`;
   else head = `<div class="lbl">Joined ${esc(net.via === 'online' ? 'room ' + net.label : net.label || 'LAN game')}</div>`;
@@ -364,7 +377,19 @@ function wire() {
   on('code', 'onkeydown', e => { if (e.key === 'Enter') joinOnline(e.target.value); });
   on('joinAddr', 'onclick', () => { const a = $('addr').value.trim(); if (a) joinLan(a, a); });
   on('leave', 'onclick', leave);
-  on('copy', 'onclick', () => { navigator.clipboard && navigator.clipboard.writeText(S.net.code); });
+  const copied = (id, text) => on(id, 'onclick', e => {
+    const b = e.target, label = b.textContent;
+    const done = () => { b.textContent = 'Copied'; setTimeout(() => { b.textContent = label; }, 1400); };
+    if (navigator.clipboard) navigator.clipboard.writeText(text()).then(done, () => prompt('Copy this:', text())); else prompt('Copy this:', text());
+  });
+  copied('copy', () => S.net.code);
+  copied('copyLink', () => inviteLink(S.net.code));
+  on('joinInvite', 'onclick', () => { const c = S.invite; S.invite = null; S.msg = ''; S.err = false; joinOnline(c); });
+  on('noInvite', 'onclick', () => { S.invite = null; render(); });
+  on('fs', 'onclick', () => {
+    if (APP) return rn.toggleFullscreen();
+    if (document.fullscreenElement) document.exitFullscreen(); else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
+  });
   const setChanged = () => { store.set('rn-mp-settings', JSON.stringify(settings)); broadcastLobby(); };
   on('map', 'onchange', e => { settings.map = e.target.value; setChanged(); });
   on('laps', 'onchange', e => { settings.laps = +e.target.value; setChanged(); });

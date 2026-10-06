@@ -1748,7 +1748,11 @@ const KEYN=new Set(['Space','ArrowUp','KeyW','ShiftLeft','ShiftRight','KeyN']);
 const GAMEKEYS=new Set(['Space','Enter','ArrowUp','ArrowDown','ArrowLeft','ArrowRight']);
 const clearKeys=()=>{for(const k in keys)keys[k]=false;};
 const inRace=()=>G.mode==='race'||G.mode==='countdown'||G.mode==='finish';
+// a race started from the lobby has no click inside the game, so a browser may hold the sound until a key or tap here
+const wakeAudio=()=>{if(AU.ctx&&AU.ctx.state==='suspended')AU.ctx.resume();};
+addEventListener('pointerdown',wakeAudio);
 addEventListener('keydown',e=>{
+  wakeAudio();
   // a focused button would otherwise be "clicked" by Space/Enter (nitro), pausing or restarting the race
   if(GAMEKEYS.has(e.code)&&(inRace()||e.code!=='Enter'&&e.code!=='Space'))e.preventDefault();
   if(inRace()&&document.activeElement&&document.activeElement.tagName==='BUTTON')document.activeElement.blur();
