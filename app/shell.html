@@ -55,7 +55,7 @@ button.on{background:var(--ok);color:var(--ink);border-color:var(--ok)}
 (() => {
 'use strict';
 // ---------------------------------------------------------------- state
-const VER = '1.2';                           // multiplayer protocol: only matching versions can play together
+const VER = '1.3';                           // multiplayer protocol: only matching versions can play together
 const $ = id => document.getElementById(id);
 const store = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
 const APP = !!window.rn;                     // inside the desktop app (LAN hosting available)
@@ -239,7 +239,7 @@ function hostStart() {
 function hubLoaded(id) {
   const hub = S.net, race = hub && hub.race; if (!race) return;
   race.loaded.add(id);
-  if (race.go) { if (id !== 'H') hub.sendTo(id, { t: 'go' }); return; }
+  if (race.go) { if (id !== 'H') hub.sendTo(id, { t: 'go', at: race.at }); return; }
   checkGo(hub);
 }
 function checkGo(hub) {
@@ -247,7 +247,11 @@ function checkGo(hub) {
   const waiting = race.cfg.players.filter(p => !p.ai && (p.id === 'H' || hub.clients.has(p.id)) && !race.loaded.has(p.id));
   if (!waiting.length) raceGo(hub);
 }
-function raceGo(hub) { hub.race.go = true; hub.broadcast({ t: 'go' }); toGame({ t: 'go' }); }
+// the green light is a moment on the room's clock a little over three seconds away, so every countdown ends together
+function raceGo(hub) {
+  const at = Math.round(clock() + (hub.room ? hub.room.off : 0) + 3200);
+  hub.race.go = true; hub.race.at = at; hub.broadcast({ t: 'go', at }); toGame({ t: 'go', at });
+}
 
 // joining: kind 'online' with a room code, or 'lan' with the host's address
 function joinRoom(kind, target, label) {
@@ -278,7 +282,7 @@ function clientMsg(from, d) {
   if (from !== 'H') return;                                     // everything else only comes from the host
   if (d.t === 'lobby') { S.net.myId = d.you; S.lobby = d; settings = Object.assign(settings, d.settings); S.msg = ''; if (S.screen === 'lobby') render(); }
   else if (d.t === 'start') { if (S.raceId === d.cfg.race) return; S.raceId = d.cfg.race; startLocal(d.cfg); }
-  else if (d.t === 'go') toGame({ t: 'go' });
+  else if (d.t === 'go') toGame({ t: 'go', at: d.at });
   else if (d.t === 'left') toGame(d);
   else if (d.t === 'closed') fail(d.why || 'The host closed the game.');
 }

@@ -211,7 +211,7 @@ td.t{text-align:right}
         <span><kbd>↓ ↓</kbd></span><span>Double-tap brake for a 360 spin, on the road or in the air. A spin on the road costs speed; one in the air costs a little on landing. Stack it with a barrel roll for a combo: purple corkscrew ramps always roll you, and clipping the edge of any other ramp with one side of the car tips you into one.</span>
         <span><kbd>Space</kbd> <kbd>↑</kbd></span><span>Nitro. Tap again in the blue zone for Perfect. Double-tap a full bar for Shockwave.</span>
         <span><kbd>Forks</kbd></span><span>Where the road splits, the two roads overlap for a stretch: steer onto whichever one you want from any lane. The choice locks in at the striped barrier. The shortcut is shorter and tighter; the nitro route is longer but loaded with canisters, pads and ramps.</span>
-        <span><kbd>On track</kbd></span><span>Purple corkscrew ramps add speed for as long as you're in the air. Parked cars fly when hit on nitro; hit one without and you lose most of your speed, hit a bus and you wreck. Blue canisters add nitro. Green pads boost you for free. Barrels slow you; concrete roadblocks wreck you unless you're on nitro.</span>
+        <span><kbd>On track</kbd></span><span>Purple corkscrew ramps add speed for as long as you're in the air. Parked cars and buses go flying when you hit them: on nitro it barely slows you, without it you lose a chunk of speed (more for a bus). Blue canisters add nitro. Green pads boost you for free. Barrels slow you; concrete roadblocks wreck you unless you're on nitro.</span>
         <span><kbd>Corners</kbd></span><span>The top of the screen calls out sharp bends and hairpins ahead. Take one faster than the tyres can hold and the car runs wide into the wall: brake in a straight line first, or drift through it. A drift corners harder than grip but scrubs off speed. The inside line is the shorter way round.</span>
         <span><kbd>Edges</kbd></span><span>Walls keep you on the road; kerbed and cliff edges don't. Run wide onto the verge and you slow down, go over the edge and you're out of bounds: you're put back where you left the road, a lot slower. Jumps over gaps need speed: come up short and you drop in.</span>
         <span><kbd>Nitro</kbd></span><span>Fills from drifting, air time, near misses, knockdowns, stunts and slipstreams. The feed on the right counts drift distance and air time.</span>
@@ -528,9 +528,13 @@ const sepM=(b,d)=>tab(b.mSep,d/b.span,b.mN),offM=(b,d)=>tab(b.mOff,d/b.span,b.mN
 // build a branch from world points (from layoutBranches): its own sampled centreline, where it leaves and rejoins the
 // main road, and how far apart the two roads are along it
 function buildBranchPts(pts,kind){
-  const cv=new THREE.CatmullRomCurve3(pts.map(p=>new V3(p[0],p[1],p[2])),false,'centripetal'),len=cv.getLength(),nb=Math.max(80,Math.round(len/2));
   const nearS=(x,z)=>{let bi=0,bd=1e18;for(let i=0;i<NS;i++){const d=(P[i*3]-x)**2+(P[i*3+2]-z)**2;if(d<bd){bd=d;bi=i;}}return bi/NS*L;};
   const e=pts[pts.length-1],s0=nearS(pts[0][0],pts[0][2]),s1=nearS(e[0],e[2]),span=mod(s1-s0);
+  // level the branch with the main road wherever the two touch, easing into its own heights as they part, so the two
+  // surfaces meet flush and a car crossing from one to the other never steps up or down
+  pts=pts.map(q=>{let bd=1e18,bk=0;for(let d=-60;d<=span+60;d++){const k=Math.round(mod(s0+d)/L*NS)%NS,v=(P[k*3]-q[0])**2+(P[k*3+2]-q[2])**2;if(v<bd){bd=v;bk=k;}}
+    const u=clamp((Math.sqrt(bd)-2*ROAD_HALF)/40,0,1);return [q[0],lerp(P[bk*3+1],q[1],u*u*(3-2*u)),q[2]];});
+  const cv=new THREE.CatmullRomCurve3(pts.map(p=>new V3(p[0],p[1],p[2])),false,'centripetal'),len=cv.getLength(),nb=Math.max(80,Math.round(len/2));
   const b={s0,s1,span,kind,len,n:nb,P:new Float32Array(nb*3),F:new Float32Array(nb*3),R:new Float32Array(nb*3),C:new Float32Array(nb)};
   for(let i=0;i<nb;i++){const u=i/(nb-1),p=cv.getPointAt(u),t=cv.getTangentAt(u),l=Math.hypot(t.x,t.z);
     b.P.set([p.x,p.y,p.z],i*3);b.F.set([t.x,t.y,t.z],i*3);b.R.set([-t.z/l,0,t.x/l],i*3);}
@@ -578,7 +582,7 @@ function advance(e,d){
   else e.dist+=d;
   e.s=mod(e.dist);
 }
-const GAP=2*ROAD_HALF+2;
+const GAP=2*ROAD_HALF;     // two roads drive as one wide road exactly while their surfaces touch
 // the drivable span of x for a car: one road, or both while a branch and the main road overlap
 // returns [lo, hi, openLo, openHi]: a walled side stops the car at its line, an open side is the edge of the world
 function limits(e){let lo=-LIM,hi=LIM,oLo=false,oHi=false;
@@ -608,10 +612,12 @@ const _fa=new V3();
 function parallel(b,sMain,bs){sample(sMain);_fa.copy(TS.f);sampleB(b,bs);return _fa.x*TS.f.x+_fa.z*TS.f.z>.85;}
 function forkCheck(e){
   if(e.forkLock>0){e.forkLock-=1/60;return;}
-  if(e.br<0){for(const b of BR){const d=wrapD(e.s,b.s0);if(d<0||d>b.span||sepM(b,d)>=GAP)continue;
-      const o=offM(b,d);if(Math.abs(o)>3&&Math.abs(e.x-o)<Math.abs(e.x)-1.5&&parallel(b,e.s,bsM(b,d))){toBranch(e,b,bsM(b,d));e.forkLock=.4;return;}}}
-  else{const b=BR[e.br];if(sepB(b,e.bs)>=GAP)return;const o=offB(b,e.bs);
-    if(Math.abs(o)>3&&Math.abs(e.x-o)<Math.abs(e.x)-1.5&&parallel(b,msB(b,e.bs),e.bs)){toMain(e,b);e.forkLock=.4;}}
+  // (as the roads part, the margin goes: whichever road's centre the car is nearer is the one it ends up on, so no wall
+  // shoves it across when they split)
+  if(e.br<0){for(const b of BR){const d=wrapD(e.s,b.s0);if(d<0||d>b.span)continue;const sep=sepM(b,d);if(sep>=GAP)continue;
+      const o=offM(b,d),hy=sep>GAP-6?0:1.5;if(Math.abs(o)>3&&Math.abs(e.x-o)<Math.abs(e.x)-hy&&parallel(b,e.s,bsM(b,d))){toBranch(e,b,bsM(b,d));e.forkLock=.4;return;}}}
+  else{const b=BR[e.br],sep=sepB(b,e.bs);if(sep>=GAP)return;const o=offB(b,e.bs),hy=sep>GAP-6?0:1.5;
+    if(Math.abs(o)>3&&Math.abs(e.x-o)<Math.abs(e.x)-hy&&parallel(b,msB(b,e.bs),e.bs)){toMain(e,b);e.forkLock=.4;}}
 }
 // this map's alternative routes, laid out by hand in LAYOUTS
 for(const q of layoutBranches(LAYOUTS[MAP_ID])){const b=buildBranchPts(q.pts,q.kind);b.i=BR.length;BR.push(b);}
@@ -735,11 +741,17 @@ if(GAPS.length){
     for(const e of [g.s0,g.s1]){const k=kOf(e),f=new THREE.Mesh(new THREE.BoxGeometry(2*HW[k]+20,1,1.2),wallMat);
       const top=P[k*3+1];f.scale.y=top-GROUND_Y;placeOnTrack(f,e,0,-(top-GROUND_Y)/2);scene.add(f);}}
 }
-// branch roads: surface a hair above the main road where they overlap, walls only where the roads are apart
+// branch roads: surface a hair above the main road where they overlap (drawn on top of it), walls only where the roads
+// are apart, and a striped crash barrier at the nose where they split
+const branchRoadMat=road.material.clone();Object.assign(branchRoadMat,{polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-4});
+const goreTex=canvasTex(64,64,(g,w,h)=>{g.fillStyle='#ffc21a';g.fillRect(0,0,w,h);g.fillStyle='#16121c';for(let i=-w;i<w*2;i+=24){g.beginPath();g.moveTo(i,0);g.lineTo(i+12,0);g.lineTo(i+12-h,h);g.lineTo(i-h,h);g.fill();}});
+const goreMat=new THREE.MeshStandardMaterial({map:goreTex,roughness:.6,emissive:0x332200,emissiveIntensity:.6});
 for(const b of BR){
   const atB=(k,off,dy,o)=>{o[0]=b.P[k*3]+b.R[k*3]*off;o[1]=b.P[k*3+1]+dy;o[2]=b.P[k*3+2]+b.R[k*3+2]*off;};
   const all=[...Array(b.n).keys()],step=b.len/(b.n-1);
-  scene.add(new THREE.Mesh(ribbonRun(all,(k,s,o)=>atB(k,s?ROAD_HALF:-ROAD_HALF,.03,o),24,step),road.material));
+  scene.add(new THREE.Mesh(ribbonRun(all,(k,s,o)=>atB(k,s?ROAD_HALF:-ROAD_HALF,.03,o),24,step),branchRoadMat));
+  {let j=0;while(j<b.mN-1&&b.mSep[j]<GAP)j++;const d=j/(b.mN-1)*b.span,nose=new THREE.Mesh(new THREE.BoxGeometry(2.4,1.15,4),goreMat);
+    placeOnTrack(nose,b.s0+d+2,offM(b,d)/2,.58);scene.add(nose);}
   for(const side of [-1,1]){
     const e=side*ROAD_HALF;
     const ok=k=>{const bs=k/(b.n-1)*b.len;return !(Math.sign(offB(b,bs))===side&&sepB(b,bs)<GAP);};
@@ -1571,7 +1583,7 @@ const rivals=RIVALS.map(([name,c])=>({name,spec:null,car:null,color:c,skill:80,d
   lane:0,laneCD:0,nitroT:0,finished:false,finishTime:0,yaw:0,roll:0,stunt:null,airT:0,forks:{}}));
 // rivals drive cars from the player's class (a car may appear twice in a small class, in a different colour)
 // multiplayer (desktop app): the game runs in a frame under the lobby, which owns the network connection
-const MP={on:/[?&]mp=1/.test(location.search),cfg:null,me:null,host:false,sendT:0,off:0};
+const MP={on:/[?&]mp=1/.test(location.search),cfg:null,me:null,host:false,sendT:0,off:0,startAt:null};
 // the room's shared clock (ms): the lobby measures our offset from it, so every player's timestamps line up
 const netNow=()=>performance.timeOrigin+performance.now()+MP.off;
 function assignRivals(){
@@ -1590,8 +1602,9 @@ assignRivals();
 const rnd=Math.random;
 
 // ---------------------------------------------------------------- traffic: parked cars and buses that are part of the map
-// They never move. Hit one on nitro (or slam it sideways) and it goes flying; hit a car without nitro and you lose most of
-// your speed; hit a bus without nitro and you wreck. Knocked-over traffic is put back once you are well away from it.
+// They never move. Whatever hits one sends it flying: on nitro (or slamming it sideways, or landing on it) that's a
+// takedown that hardly slows you; without nitro you lose about a quarter of your speed (half for a bus). Knocked-over
+// traffic is put back once you are well away from it.
 const TRAFFIC_TYPES=['compact','coupe','hatchback','minivan','offroad','pickup','sedan','sport','suv','wagon'];
 const TRAFFIC_COLS=[0x8c8f99,0x5b6170,0xd9d4c7,0x3d4a5c,0x7a2f2f,0x2f4f3f,0xb8a46a,0xe9e6df,0x1d2230,0x9a3b2a,0x35607a,0x6b6b2e];
 const TSIZE={bus:[10.5,2.5],pickup:[5.2,2.0],minivan:[4.6,1.95],suv:[4.65,1.95]};
@@ -1600,9 +1613,13 @@ function makeTrafficCar(type,color){
   const car={g,body,wheels:[],fl:null,paint:paintMat(color)};
   const [len,w]=TSIZE[type]||[4.3,1.85];
   const sh=add(g,GEO.shadow,MAT.shadow,0,.04,0);sh.scale.set(w/2,1,len/4.5);
-  if(type==='bus')loadModel('bus').then(src=>body.add(src.clone(true))).catch(()=>{});
+  // a plain stand-in body until the model has downloaded, so a car is never there to hit but unseen
+  const ph=new THREE.Group(),bus=type==='bus',lo=new THREE.Mesh(new THREE.BoxGeometry(w,bus?2.6:.8,len),car.paint);lo.position.y=bus?1.6:.62;ph.add(lo);
+  if(!bus){const top=new THREE.Mesh(new THREE.BoxGeometry(w*.86,.5,len*.5),MAT.glass);top.position.set(0,1.27,-len*.05);ph.add(top);}
+  body.add(ph);
+  if(bus)loadModel('bus').then(src=>{body.remove(ph);body.add(src.clone(true));}).catch(()=>{});
   else loadModel('traffic').then(src=>{const n=src.getObjectByName('T_'+type);if(!n)return;const m=n.clone(true);m.position.set(0,0,0);
-    m.traverse(o=>{if(o.isMesh)o.material=Array.isArray(o.material)?o.material.map(x=>modelMat(x,car)):modelMat(o.material,car);});body.add(m);}).catch(()=>{});
+    m.traverse(o=>{if(o.isMesh)o.material=Array.isArray(o.material)?o.material.map(x=>modelMat(x,car)):modelMat(o.material,car);});body.remove(ph);body.add(m);}).catch(()=>{});
   return car;
 }
 const traffic=[];
@@ -1818,15 +1835,22 @@ function eliminateLast(){
   last.out=true;last.car.g.visible=false;sfx('crash');toast(last.name.toUpperCase()+' OUT','danger','ELIMINATED');
   if(rivals.every(r=>r.out))endRun('LAST ONE STANDING','nitro','ELIMINATION WON');
 }
+function resRow(cells,me){const tr=document.createElement('tr');if(me)tr.className='me';
+  cells.forEach((v,k)=>{const td=document.createElement('td');td.textContent=v;if(k===2)td.className='t';tr.appendChild(td);});$('resTable').appendChild(tr);}
+// the finishing order: everyone who has finished by their time, then those still racing by distance. Multiplayer times
+// are on the room's shared clock, so every screen shows the same numbers; it shows "Racing…" until a real time arrives
+// (and the table refreshes as it does) where a solo race estimates the rest.
+function classicTable(){
+  const p=player,total=G.laps*L,live=!!MP.cfg;$('resTable').textContent='';
+  const rows=standings().map(e=>({e,t:e.finished?e.finishTime:live?Infinity:G.raceTime+(total-e.dist)/Math.max(e.speed,45)})).sort((a,b)=>a.t-b.t||b.e.dist-a.e.dist);
+  rows.forEach((r,i)=>resRow([String(i+1),r.e.name+' \u00b7 '+r.e.spec.name,r.e.finished?fmt(r.t):live?'Racing\u2026':'~'+fmt(r.t)],r.e===p));
+  return rows.findIndex(r=>r.e===p)+1;
+}
 function showResults(){
   const m=G.modeSel,p=player,tb=$('resTable');tb.textContent='';let title,lbl;
-  const addRow=(cells,me)=>{const tr=document.createElement('tr');if(me)tr.className='me';
-    cells.forEach((v,k)=>{const td=document.createElement('td');td.textContent=v;if(k===2)td.className='t';tr.appendChild(td);});tb.appendChild(tr);};
+  const addRow=resRow;
   if(m==='classic'){
-    const total=G.laps*L;
-    const rows=standings().map(e=>({e,t:e.finished?e.finishTime:G.raceTime+(total-e.dist)/Math.max(e.speed,45)})).sort((a,b)=>a.t-b.t);
-    const place=rows.findIndex(r=>r.e===p)+1;title=ord(place)+' place';lbl=place===1?'Race won':'Race complete';
-    rows.forEach(r=>addRow([String(rows.indexOf(r)+1),r.e.name+' \u00b7 '+r.e.spec.name,(r.e.finished?'':'~')+fmt(r.t)],r.e===p));
+    const place=classicTable();title=ord(place)+' place';lbl=place===1?'Race won':'Race complete';
     const key='rn-best-'+MAP_ID+'-'+G.laps,best=+store.get(key)||0;
     if(!best||p.finishTime<best){store.set(key,String(p.finishTime));toast('NEW BEST','nitro',fmt(p.finishTime));}
   }else if(m==='elim'){
@@ -1987,14 +2011,14 @@ function carPhysics(p,dt,steer,brake,racing){
     const hx=Math.cos(p.psi),hz=Math.sin(p.psi),ang=Math.atan2(hx*az-hz*ax,hx*ax+hz*az);steer=clamp(ang*3,-1,1);}
   p.steerS+=(steer-p.steerS)*Math.min(1,(Math.abs(steer)>Math.abs(p.steerS)?7:10)*dt);
   // drift: tap brake while steering (or steer just after the tap). The rear tyres let go and the slide is held at the
-  // angle you steer for: into the turn holds or tightens it, letting go straightens it over about a second, counter-steer
-  // straightens it at once. It ends when the car is nearly straight, or on nitro, a jump, a hard wall hit or low speed.
+  // angle you steer for: into the turn holds or tightens it, letting go straightens it in about half a second, counter-
+  // steer ends it at once. It also ends on nitro, a jump, a hard wall hit or low speed.
   const u0=p.wvx*Math.cos(p.psi)+p.wvz*Math.sin(p.psi);
   if(racing&&!p.drift&&steer!==0&&u0>32&&!p.air&&!p.spin&&(brake||G.raceTime-p.driftArm<.3)){
     p.drift=true;p.driftDir=steer;p.driftT=0;p.driftArm=-9;p.betaT=-steer*.35;p.yawR+=steer*1.1;}
   const into=p.drift?steer*p.driftDir:0;
   if(p.drift){p.driftT+=dt;
-    const want=into>0?(brake?1.0:.8):into<0?0:Math.max(0,Math.abs(p.betaT)-.55*dt);
+    const want=into>0?(brake?1.0:.8):into<0?0:Math.max(0,Math.abs(p.betaT)-1.8*dt);
     p.betaT=-p.driftDir*(into>0?lerp(Math.abs(p.betaT),want,Math.min(1,3*dt)):want);}
   p.gripR+=((p.drift?.42:1)-p.gripR)*Math.min(1,(p.drift?6:2.5)*dt);
   // engine and brakes
@@ -2055,11 +2079,12 @@ function carPhysics(p,dt,steer,brake,racing){
     wx+=p.wvx*h;wz+=p.wvz*h;latSum+=fy;
   }
   if(p.drift){p.slipA=Math.min(1,Math.abs(beta)/.9);p.nitro=Math.min(1,p.nitro+.2*(.6+p.slipA)*dt);p.driftM=(p.driftM||0)+Math.hypot(p.wvx,p.wvz)*dt;
-    if(Math.hypot(p.wvx,p.wvz)<22||(p.driftT>.3&&into<=0&&Math.abs(beta)<.12))endDrift();}
+    if(Math.hypot(p.wvx,p.wvz)<22||(p.driftT>.25&&into<=0&&Math.abs(beta)<.22)||(p.driftT>.15&&into<-.3))endDrift();}
   if(!p.drift)p.slipA=0;
   // back onto the track
   projectTo(p,wx,wz);
-  // walls: the car bounces off, losing the speed it carried into the wall and some along it, and gets turned to follow it
+  // walls: the car bounces off, losing the speed it carried into the wall plus friction in proportion to that impact (a
+  // scrape costs a little, a slam a lot, but sliding along a wall doesn't bleed speed away), and gets turned to follow it
   const [lo,hi,oLo,oHi]=limits(p);t=trackFrame(p);
   // on the kerb and verge of an open edge: rumble and lose speed
   if(p.br<0&&!p.air){const hw=hwAt(-1,p.s),sd=Math.sign(p.x);if(Math.abs(p.x)>hw-.8&&(sd>0?oHi:oLo)){const k=1-dt*(Math.abs(p.x)>hw+1.4?.9:.25);p.wvx*=k;p.wvz*=k;G.shake=Math.max(G.shake,.12);}}
@@ -2069,7 +2094,7 @@ function carPhysics(p,dt,steer,brake,racing){
     // back onto its own road over a few frames instead of jumping
     p.x=Math.abs(p.x-lim)>1?p.x-side*Math.min(Math.abs(p.x-lim),25*dt):lim;
     const vr=p.wvx*t.rx+p.wvz*t.rz,vf=p.wvx*t.fx+p.wvz*t.fz,hit=Math.max(0,vr*side),V0=Math.hypot(vr,vf);
-    const vr2=hit>0?-vr*.2:vr,vf2=vf*(1-Math.min(.3,hit*.01))-Math.sign(vf)*(hit>0?0:1.5*dt);
+    const vr2=hit>0?-vr*.3:vr,vf2=vf-Math.sign(vf)*Math.min(Math.abs(vf),hit*.35+2*dt);
     p.wvx=t.fx*vf2+t.rx*vr2;p.wvz=t.fz*vf2+t.rz*vr2;
     const th=Math.atan2(Math.sin(p.psi)*t.fx-Math.cos(p.psi)*t.fz,Math.cos(p.psi)*t.fx+Math.sin(p.psi)*t.fz);
     if(th*side>0){p.psi-=th*(V0<6?1:.3);p.yawR*=.4;}
@@ -2253,13 +2278,11 @@ function collisions(){
     const side=Math.abs(c.dx)>c.wd-.85&&Math.abs(c.ds)<c.ln-.9;
     const slam=side&&Math.sign(p.vx)===Math.sign(c.dx)&&Math.abs(p.vx)>5/p.spec.mass;
     const landing=p.air&&p.vy<0;
-    if(!o.skill){ // parked car or bus
-      if(G.rules.knock&&(p.nitroLevel>0||slam||landing)){knockdown(o,landing?'air':'slam');continue;}
-      if(G.rules.knock&&!side&&c.ds>0){
-        if(o.big){wreckPlayer();toast('HIT A BUS','danger','NITRO SMASHES THROUGH');return;}
-        knockTraffic(o,p);p.speed*=.45;G.shake=Math.max(G.shake,.8);sfx('crash');toast('CRASHED THROUGH','danger','USE NITRO TO SMASH TRAFFIC');continue;}
+    if(!o.skill){ // parked car or bus: it always goes flying; ploughing into it without nitro costs speed, never a stop
+      if(p.nitroLevel>0||slam||landing){knockdown(o,landing?'air':'slam');continue;}
+      if(!side&&c.ds>0){knockTraffic(o,p);p.speed*=1-(o.big?.5:.28)/Math.sqrt(p.spec.mass);G.shake=Math.max(G.shake,o.big?1:.7);sfx('crash');
+        toast(o.big?'SMASHED A BUS':'CRASHED THROUGH','danger','NITRO SMASHES THROUGH CLEANLY');continue;}
       if(side){const ov=c.wd-Math.abs(c.dx),sg=Math.sign(c.dx)||1;p.x-=sg*ov;pushLat(p,-sg*4);p.speed*=.97;G.shake=Math.max(G.shake,.3);}
-      else if(c.ds>0){p.speed=Math.min(p.speed,4);nudge(p,-(c.ln-c.ds));G.shake=Math.max(G.shake,.6);}
       continue;
     }
     if(G.rules.knock){
@@ -2271,10 +2294,10 @@ function collisions(){
     else if(c.ds>0){const v0=p.speed;p.speed=Math.max(Math.min(p.speed,o.speed-1),p.speed*.9);o.speed=Math.max(o.speed,v0*.92);nudge(p,-(c.ln-c.ds));G.shake=Math.max(G.shake,.25);}
     else{o.speed=Math.min(o.speed,p.speed-1);nudge(o,-(c.ln+c.ds));}
   }
-  // rivals plough parked traffic out of the way (or squeeze past it when knockdowns are off)
+  // rivals plough parked traffic out of the way too
   for(const r of rivals){if(r.out||r.wreck>0||r.y>1.2)continue;
     for(const t of traffic){if(t.down||t.flying>0)continue;const c=overlap(r,t);if(!c||c.ds<=0)continue;
-      if(G.rules.knock){knockTraffic(t,r);r.speed*=t.big?.5:.8;}else{r.speed=Math.min(r.speed,8);nudge(r,-(c.ln-c.ds));r.laneCD=0;}}}
+      knockTraffic(t,r);r.speed*=t.big?.5:.75;}}
 }
 
 // ---------------------------------------------------------------- pose cars
@@ -2388,7 +2411,7 @@ function updateHud(){
   if(showC){const dir=tc<0?'RIGHT':'LEFT',ar=tc<0?' ▶▶':'◀◀ ';
     setText(cw,'cw',(tc<0?'':ar)+(rad<48?'HAIRPIN ':'SHARP ')+dir+(tc<0?ar:'')+'  '+Math.round(td/10)*10+' m');cw.classList.toggle('hard',rad<48);}
   fx.style.opacity=lvl?(.35+lvl*.15):p.drift?.15:0;fx.style.setProperty('--fxc',lvl===3?'#b678ff':lvl===2?'#3fc8ff':'#ffb02e');
-  if(G.mode==='countdown'){setText(H.cd,'cd',String(Math.ceil(G.countdown)));H.cd.style.opacity=1;}
+  if(G.mode==='countdown'){setText(H.cd,'cd',String(clamp(Math.ceil(G.countdown),1,3)));H.cd.style.opacity=1;}
   else if(G.goT>0){setText(H.cd,'cd','GO');H.cd.style.opacity=Math.min(1,G.goT*2);}
   else setText(H.cd,'cd','');
 }
@@ -2413,7 +2436,8 @@ function update(dt){
     return;
   }
   if(G.mode==='countdown'){
-    G.countdown-=dt;
+    // multiplayer counts down to a moment on the room's shared clock, so everyone gets the green light together
+    G.countdown=MP.startAt?(MP.startAt-netNow())/1000:G.countdown-dt;
     if(G.countdown<=0){G.mode='race';G.goT=.9;const p=player;
       if(p.startTap!==null&&p.startTap<.45){p.speed=45;p.nitroLevel=2;p.nitroStart=-1;toast('PERFECT START','perfect');sfx('perfect');}
       else if(p.startTap!==null){toast('TOO EARLY','plain');}
@@ -2421,11 +2445,15 @@ function update(dt){
   }
   if(G.goT>0)G.goT-=dt;
   if(G.mode==='race'||G.mode==='finish'){
-    if(G.mode==='race'){G.raceTime+=dt;
+    // the race clock keeps running after you finish, to time the cars still racing; in multiplayer it's the room's shared
+    // clock, so every screen times every racer alike
+    G.raceTime=MP.startAt?(netNow()-MP.startAt)/1000:G.raceTime+dt;
+    if(G.mode==='race'){
       if(G.modeSel==='elim'){G.elimT-=dt;if(G.elimT<=0){G.elimT=ELIM_EVERY;eliminateLast();}}
       if(G.modeSel==='rush'){G.rushT=Math.max(0,G.rushT-dt);if(G.rushT<=0)endRun('TIME UP','nitro',player.stats.knock+' KNOCKDOWNS');}}
     updatePlayer(dt);updateRivals(dt);mpTick(dt);
     if(G.mode==='finish'&&G.finishT>2.2&&$('results').hidden&&!G.resShown){G.resShown=true;showResults();}
+    if(MP.cfg&&G.resShown&&!$('results').hidden&&G.modeSel==='classic'&&(G.resT=(G.resT||0)-dt)<=0){G.resT=.5;const pl=classicTable();$('resTitle').textContent=ord(pl)+' place';}
   }
   updateTraffic(dt);collisions();updateFeatures(dt);updateWeather(dt);updateProps(dt);
   poseRacer(player,dt);rivals.forEach(r=>!r.out&&poseRacer(r,dt));poseTraffic();
@@ -2534,7 +2562,7 @@ player.stats=newStats();
 // countdown), st (another car's state), ev
 // (a takedown aimed at us), fin (someone finished), left (someone dropped out). We send our car's state fifteen times a
 // second (and, on the host, the AI cars' states), our finish and takedowns we land on others.
-function mpReset(){mpHold(false);MP.cfg=null;rivals.forEach(r=>{r.remote=false;r.netRot=null;r.buf=[];nameTag(r,null);});toMenu();$('menu').hidden=true;setViewShift(false);}
+function mpReset(){mpHold(false);MP.cfg=null;MP.startAt=null;rivals.forEach(r=>{r.remote=false;r.netRot=null;r.buf=[];nameTag(r,null);});toMenu();$('menu').hidden=true;setViewShift(false);}
 function mpSend(m){if(MP.on&&MP.cfg)parent.postMessage(m,'*');}
 // a race waits on the grid (frozen) until the host says every driver has loaded it
 function mpHold(on){let el=$('mpWait');
@@ -2544,7 +2572,7 @@ function mpHold(on){let el=$('mpWait');
 const GRID6=[[-6,-3.25],[-6,3.25],[-15,-3.25],[-15,3.25],[-24,-3.25],[-24,3.25]];
 function carIndex(id){const i=CARS.findIndex(c=>c.shape.model===id);return i<0?0:i;}
 function mpStart(cfg){
-  MP.cfg=cfg;MP.me=cfg.me;MP.host=!!cfg.host;
+  MP.cfg=cfg;MP.me=cfg.me;MP.host=!!cfg.host;MP.startAt=null;
   const me=cfg.players.find(p=>p.id===cfg.me)||cfg.players[0];
   G.paint=me.paint|0;setPlayerCar(carIndex(me.car));player.name=me.name;
   G.modeSel='classic';G.lapsSel=cfg.laps||3;G.resShown=false;
@@ -2613,7 +2641,7 @@ function mpApply(r,dt){
 if(MP.on){
   addEventListener('message',e=>{const m=e.data;if(!m||typeof m!=='object')return;
     if(m.t==='start')mpStart(m.cfg);
-    else if(m.t==='go'){if(MP.cfg&&G.paused){mpHold(false);try{window.focus();}catch(e){}}}
+    else if(m.t==='go'){if(MP.cfg&&m.at)MP.startAt=m.at;if(MP.cfg&&G.paused){mpHold(false);try{window.focus();}catch(e){}}}
     else if(m.t==='st'){mpPush(m.id,m.ts,m.s);if(m.ai)m.ai.forEach(x=>mpPush(x.id,m.ts,x.s));}
     else if(m.t==='clock')MP.off=m.off;
     else if(m.t==='ev'&&m.type==='takedown'){
@@ -2623,8 +2651,9 @@ if(MP.on){
     else if(m.t==='menu')mpReset();
   });
   $('menuBtn').textContent='LOBBY';$('againBtn').hidden=true;
-  window.__rn={G,player,rivals,MP,update,step:dt=>step(dt)}; // for testing multiplayer from the lobby page
+  window.__rn={G,player,rivals,MP,update,step:dt=>step(dt),L}; // for testing multiplayer from the lobby page
 }
+if(/[?&]test=1/.test(location.search))window.__ev=src=>eval(src);   // test pages read the game's state through this
 // tell the lobby we're loaded, with what it needs to offer: cars, paints and maps
 function mpHello(){if(!MP.on)return;$('menu').hidden=true;setViewShift(false);
   parent.postMessage({t:'ready',map:MAP_ID,cars:CARS.map(c=>({id:c.shape.model,name:c.name,cls:c.cls})),
