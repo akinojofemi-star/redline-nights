@@ -2537,7 +2537,7 @@ function mpStart(cfg){
   startRace();
   G.rules={slip:!!cfg.rules.slip,contact:!!cfg.rules.contact,knock:!!(cfg.rules.contact&&cfg.rules.knock)};
   const others=cfg.players.filter(p=>p.id!==cfg.me);
-  rivals.forEach((r,i)=>{const o=others[i];r.buf=[];r.netRot=null;
+  rivals.forEach((r,i)=>{const o=others[i];r.buf=[];r.netRot=null;r.jit=0;r.lastT=0;
     if(!o){r.out=true;r.remote=false;if(r.car)r.car.g.visible=false;return;}
     const spec=CARS[carIndex(o.car)],col=PAINTS[(o.paint|0)%PAINTS.length][1];
     if(r.spec!==spec||r.color!==col||!r.car){if(r.car)scene.remove(r.car.g);r.spec=spec;r.color=col;r.car=makeCar(col,{shape:spec.shape,flames:true});scene.add(r.car.g);}
@@ -2558,7 +2558,8 @@ function mpTick(dt){
 }
 // draw a remote car 100 ms in the past, between the two states either side of that moment
 function mpApply(r){
-  const buf=r.buf;if(!buf||!buf.length)return;const now=performance.now()-100;
+  // shown slightly in the past so there are two states to blend between; uneven arrival (a relayed link) needs more
+  const buf=r.buf;if(!buf||!buf.length)return;const now=performance.now()-clamp(100+3*(r.jit||0),100,300);
   while(buf.length>2&&buf[1].t<=now)buf.shift();
   let a=buf[0],b=buf[1]||buf[0];let k=b.t>a.t?clamp((now-a.t)/(b.t-a.t),0,1):1;
   const A=a.s,B=b.s,ext=b===a||now>b.t?Math.min(.4,(now-b.t)/1000):0;
@@ -2572,7 +2573,7 @@ function mpApply(r){
 if(MP.on){
   addEventListener('message',e=>{const m=e.data;if(!m||typeof m!=='object')return;
     if(m.t==='start')mpStart(m.cfg);
-    else if(m.t==='st'){const r=rivals.find(r=>r.netId===m.id&&r.remote);if(r){r.buf.push({t:performance.now(),s:m.s});if(r.buf.length>30)r.buf.shift();}}
+    else if(m.t==='st'){const r=rivals.find(r=>r.netId===m.id&&r.remote);if(r){const t=performance.now();if(r.lastT)r.jit=(r.jit||0)*.92+Math.abs(t-r.lastT-50)*.08;r.lastT=t;r.buf.push({t,s:m.s});if(r.buf.length>30)r.buf.shift();}}
     else if(m.t==='ev'&&m.type==='takedown'){
       if(m.target===MP.me&&player.wreck<=0&&G.mode==='race'){wreckPlayer();toast('TAKEN DOWN','danger','BY '+(m.byName||'RIVAL').toUpperCase());}
       else if(MP.host){const r=rivals.find(r=>r.netId===m.target&&r.ai&&!r.remote);if(r){r.wreck=1.9;r.speed*=.4;}}}
