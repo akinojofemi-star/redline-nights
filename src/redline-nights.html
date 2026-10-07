@@ -1146,7 +1146,7 @@ if(MAP.scenery==='canyon'){
   }
   instanced(new THREE.CylinderGeometry(1,1.12,1,8,1).translate(0,.5,0),rockMat,mesas);
   instanced(new THREE.DodecahedronGeometry(1,0),rockMat,boulders);
-  const cactus=new THREE.MeshStandardMaterial({color:0x4f7a3e,roughness:.8,flatShading:true});
+  const cactus=rnTex(new THREE.MeshStandardMaterial({color:0xffffff,roughness:.8,flatShading:true}),{tex:'grass',scale:2,tint:new THREE.Color(1.2,1.7,1)});
   instanced(new THREE.CylinderGeometry(.32,.38,1,7).translate(0,.5,0),cactus,trunks);
   instanced(new THREE.CylinderGeometry(.22,.22,1,6).translate(0,.5,0),cactus,arms);
   const far=new THREE.MeshBasicMaterial({color:0xc06e45,fog:false}),fg=new THREE.CylinderGeometry(1,1.12,1,7).translate(0,.5,0);
@@ -1160,9 +1160,9 @@ if(MAP.scenery==='alpine'){
     const h=8+SR()*12,r=h*.3,yaw=SR()*6;trunks.push([x,GROUND_Y,z,.9,2.2,.9,yaw]);pines.push([x,GROUND_Y+1.6,z,r,h,r,yaw]);caps.push([x,GROUND_Y+1.6+h*.55,z,r*.48,h*.45,r*.48,yaw]);
   }
   const cone=new THREE.ConeGeometry(1,1,7).translate(0,.5,0);
-  instanced(new THREE.CylinderGeometry(.3,.4,1,5).translate(0,.5,0),new THREE.MeshStandardMaterial({color:0x4a3426,roughness:.9}),trunks);
-  instanced(cone,new THREE.MeshStandardMaterial({color:0x1f3d2e,roughness:.85,flatShading:true}),pines);
-  instanced(cone,new THREE.MeshStandardMaterial({color:0xf2f6ff,roughness:.7,flatShading:true}),caps);
+  instanced(new THREE.CylinderGeometry(.3,.4,1,5).translate(0,.5,0),rnTex(new THREE.MeshStandardMaterial({roughness:.9}),{tex:'dirt',scale:1.5,tint:0x6a4a36}),trunks);
+  instanced(cone,rnTex(new THREE.MeshStandardMaterial({roughness:.85,flatShading:true}),{tex:'grass',scale:2.5,tint:new THREE.Color(.8,1.3,.9)}),pines);
+  instanced(cone,rnTex(new THREE.MeshStandardMaterial({roughness:.7,flatShading:true}),{tex:'snow',scale:3}),caps);
   const rockF=new THREE.MeshBasicMaterial({color:0x2c3756,fog:false}),snowF=new THREE.MeshBasicMaterial({color:0xe6eeff,fog:false});
   const peaks=[],tops=[];for(let i=0;i<34;i++){const a=i/34*Math.PI*2+SR()*.12,r=3000+SR()*700,h=650+SR()*800,w=420+SR()*380;
     peaks.push([Math.cos(a)*r,GROUND_Y-20,Math.sin(a)*r,w,h,w,SR()*6]);tops.push([Math.cos(a)*r,GROUND_Y-20+h*.68,Math.sin(a)*r,w*.33,h*.32,w*.33,0]);}
@@ -1171,7 +1171,7 @@ if(MAP.scenery==='alpine'){
 if(MAP.scenery==='coast'){
   const sandTex=canvasTex(128,128,(g,w,h)=>{g.fillStyle='#e2c48e';g.fillRect(0,0,w,h);const r=mulberry32(8);for(let i=0;i<900;i++){g.fillStyle=`rgba(150,110,60,${r()*.18})`;g.fillRect(r()*w,r()*h,2,2);}});
   sandTex.wrapS=sandTex.wrapT=THREE.RepeatWrapping;sandTex.repeat.set(10,1);
-  scene.add(new THREE.Mesh(ribbon((k,s,o)=>atY(k,s?76:-76,GROUND_Y+.08,o),40),new THREE.MeshStandardMaterial({map:sandTex,roughness:1})));
+  scene.add(new THREE.Mesh(ribbon((k,s,o)=>atY(k,s?76:-76,GROUND_Y+.08,o),40),rnTex(new THREE.MeshStandardMaterial({roughness:1}),{tex:'sand',scale:5,tint:0xf4dcb0})));
   const trunks=[],crowns=[],v=new V3();
   for(let i=0;i<NS;i+=9)for(const side of [-1,1]){
     if(SR()>.75)continue;const [x,z]=spot(i,side*(18+SR()*16));if(trackDist(x,z)<17)continue;
@@ -1179,8 +1179,8 @@ if(MAP.scenery==='coast'){
     v.set(0,h,0).applyEuler(_eu.set(tilt,yaw,0));crowns.push([x+v.x,GROUND_Y+v.y,z+v.z,1,1,1,SR()*6]);
   }
   const blades=[];for(let i=0;i<8;i++){const b=new THREE.BoxGeometry(.55,.07,3.6).translate(0,0,1.8);b.rotateX(.42);b.rotateY(i/8*Math.PI*2);blades.push(b.toNonIndexed());}
-  instanced(new THREE.CylinderGeometry(.22,.38,1,6).translate(0,.5,0),new THREE.MeshStandardMaterial({color:0x7a5a3c,roughness:.9}),trunks);
-  instanced(mergeNI(blades),new THREE.MeshStandardMaterial({color:0x2f7a3e,roughness:.8,side:THREE.DoubleSide,flatShading:true}),crowns);
+  instanced(new THREE.CylinderGeometry(.22,.38,1,6).translate(0,.5,0),rnTex(new THREE.MeshStandardMaterial({roughness:.9}),{tex:'dirt',scale:1.2,tint:0xa88a6a}),trunks);
+  instanced(mergeNI(blades),rnTex(new THREE.MeshStandardMaterial({roughness:.8,side:THREE.DoubleSide,flatShading:true}),{tex:'grass',scale:2,tint:new THREE.Color(1.3,1.9,1.2)}),crowns);
   const isl=new THREE.MeshBasicMaterial({color:0x4a3a6a,fog:false}),ring=[];
   for(let i=0;i<14;i++){const a=i/14*Math.PI*2+SR()*.3,r=3200+SR()*600,h=80+SR()*220,w=300+SR()*400;ring.push([Math.cos(a)*r,GROUND_Y-10,Math.sin(a)*r,w,h,w*.7,SR()*6]);}
   instanced(new THREE.SphereGeometry(1,8,5,0,Math.PI*2,0,Math.PI/2),isl,ring);
@@ -1201,8 +1201,8 @@ if(MAP.scenery==='jungle'){
   }
   for(let i=0;i<NS;i+=4)for(const side of [-1,1]){if(SR()>.6)continue;const [x,z]=spot(i,side*(ROAD_HALF+3+SR()*10));if(trackDist(x,z)<ROAD_HALF+2)continue;
     const s=1.2+SR()*2;bushes.push([x,GROUND_Y+s*.3,z,s,s*.7,s,SR()*6,col.setHSL(.22+SR()*.12,.55,.04+SR()*.05).getHex()]);}
-  instanced(new THREE.CylinderGeometry(.35,.55,1,7).translate(0,.5,0),new THREE.MeshStandardMaterial({color:0x24170e,roughness:.9}),trunks);
-  const leaf=new THREE.MeshStandardMaterial({color:0xffffff,roughness:.85,flatShading:true});
+  instanced(new THREE.CylinderGeometry(.35,.55,1,7).translate(0,.5,0),rnTex(new THREE.MeshStandardMaterial({roughness:.9}),{tex:'dirt',scale:1.5,tint:0x5a4232}),trunks);
+  const leaf=rnTex(new THREE.MeshStandardMaterial({color:0xffffff,roughness:.85,flatShading:true}),{tex:'grass',scale:2.5,tint:new THREE.Color(3,3.2,2.6)});
   instanced(new THREE.IcosahedronGeometry(1,0),leaf,crowns);instanced(new THREE.DodecahedronGeometry(1,0),leaf,bushes);
   // stepped temple ruins
   const stoneTex=canvasTex(128,64,(g,w,h)=>{g.fillStyle='#8a8a74';g.fillRect(0,0,w,h);const r=mulberry32(12);
@@ -1214,13 +1214,13 @@ if(MAP.scenery==='jungle'){
     if(trackDist(x,z)<base*.75+20)continue;const n=4+(SR()*3|0),th=base*.16,yaw=SR()*6;
     for(let t=0;t<n;t++){const s=base*(1-t/(n+1.2));tiers.push([x,GROUND_Y+t*th,z,s,th,s,yaw]);}
     tiers.push([x,GROUND_Y+n*th,z,base*.22,th*1.4,base*.22,yaw]);}
-  instanced(new THREE.BoxGeometry(1,1,1).translate(0,.5,0),new THREE.MeshStandardMaterial({map:stoneTex,roughness:.95}),tiers);
+  instanced(new THREE.BoxGeometry(1,1,1).translate(0,.5,0),rnTex(new THREE.MeshStandardMaterial({roughness:.95}),{tex:'stonewall',scale:3,tint:0xc8c8a8}),tiers);
   const hills=[];for(let i=0;i<30;i++){const a=i/30*Math.PI*2+SR()*.15,r=2800+SR()*700,w=400+SR()*500;hills.push([Math.cos(a)*r,GROUND_Y-10,Math.sin(a)*r,w,180+SR()*360,w,SR()*6]);}
   instanced(new THREE.SphereGeometry(1,10,6,0,Math.PI*2,0,Math.PI/2),new THREE.MeshBasicMaterial({color:0x26402a,fog:false}),hills);
 }
 let SMOKE=null;
 if(MAP.scenery==='volcano'){
-  const rock=new THREE.MeshStandardMaterial({color:0x080607,roughness:.95,flatShading:true});
+  const rock=rnTex(new THREE.MeshStandardMaterial({roughness:.95,flatShading:true}),{tex:'rockDark',scale:8,tint:0x5a4444});
   const spires=[],boulders=[];
   for(let i=0;i<NS;i+=6)for(const side of [-1,1]){
     if(SR()<.45){const r=3+SR()*10,[x,z]=spot(i,side*(r+20+SR()*220));if(trackDist(x,z)>r+16)spires.push([x,GROUND_Y-1,z,r,12+SR()*45,r,SR()*6,undefined,(SR()-.5)*.25]);}
@@ -1244,8 +1244,8 @@ if(MAP.scenery==='volcano'){
     sp.userData={t:k/10,x:vx,y:GROUND_Y-30+VH,z:vz};scene.add(sp);SMOKE.push(sp);}
 }
 if(MAP.scenery==='arctic'){
-  const ice=new THREE.MeshStandardMaterial({color:0xaee4ff,roughness:.08,metalness:.1,emissive:0x0a3a5a,emissiveIntensity:.7,flatShading:true});
-  const snow=new THREE.MeshStandardMaterial({color:0xf2f8ff,roughness:.75,flatShading:true});
+  const ice=rnTex(new THREE.MeshStandardMaterial({roughness:.15,metalness:.1,emissive:0x0a3a5a,emissiveIntensity:.7,flatShading:true}),{tex:'ice',scale:6,tint:0xc8ecff});
+  const snow=rnTex(new THREE.MeshStandardMaterial({roughness:.75,flatShading:true}),{tex:'snow',scale:4});
   const spires=[],drifts=[],blocks=[];
   for(let i=0;i<NS;i+=7)for(const side of [-1,1]){
     if(SR()<.4){const off=side*(22+Math.pow(SR(),1.3)*240),[x,z]=spot(i,off);if(trackDist(x,z)>20){const n=1+(SR()*4|0);
