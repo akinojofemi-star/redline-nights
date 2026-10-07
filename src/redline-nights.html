@@ -5,7 +5,7 @@
 /* Layout: full-bleed WebGL canvas; HUD pinned to corners like a cockpit cluster; menus slide in from the left over the live scene. */
 :root{
   --ink:#0e0a16; --hud:#f6efe4; --dim:rgba(246,239,228,.62);
-  --nitro:#ffb02e; --perfect:#3fc8ff; --shock:#b678ff; --danger:#ff3d5a; --panel:rgba(14,10,22,.72);
+  --nitro:#ffb02e; --perfect:#3fc8ff; --shock:#b678ff; --pulse:#ff6a1a; --danger:#ff3d5a; --panel:rgba(14,10,22,.72);
   --f-display:"Saira Condensed","Arial Narrow",Impact,sans-serif;
   --f-ui:"Chakra Petch","Segoe UI",system-ui,sans-serif;
   color-scheme:dark;
@@ -43,7 +43,7 @@ html,body{height:100%;margin:0;background:var(--ink);color:var(--hud);overflow:h
 .toast{font-family:var(--f-display);font-style:italic;font-weight:900;font-size:34px;letter-spacing:.04em;white-space:nowrap;
   text-shadow:0 0 16px currentColor,0 2px 0 rgba(0,0,0,.5);animation:pop 1.3s ease-out forwards}
 .toast small{display:block;text-align:center;font-family:var(--f-ui);font-style:normal;font-size:12px;letter-spacing:.2em;color:var(--hud);text-shadow:none}
-.toast.nitro{color:var(--nitro)}.toast.perfect{color:var(--perfect)}.toast.shock{color:var(--shock)}.toast.danger{color:var(--danger)}.toast.plain{color:var(--hud)}
+.toast.nitro{color:var(--nitro)}.toast.perfect{color:var(--perfect)}.toast.shock{color:var(--shock)}.toast.pulse{color:var(--pulse)}.toast.danger{color:var(--danger)}.toast.plain{color:var(--hud)}
 @keyframes pop{0%{transform:scale(1.6) skewX(-8deg);opacity:0}12%{transform:scale(1) skewX(-8deg);opacity:1}75%{opacity:1}100%{transform:translateY(-24px) skewX(-8deg);opacity:0}}
 #feed{position:absolute;right:max(16px,env(safe-area-inset-right));top:calc(266px + env(safe-area-inset-top,0px));display:flex;flex-direction:column;align-items:flex-end;gap:4px;pointer-events:none}
 .fd{font:800 italic 14px var(--f-display);letter-spacing:.04em;background:rgba(20,14,30,.8);color:var(--hud);padding:3px 12px;border-right:3px solid var(--shock);transform:skewX(-10deg);transition:opacity .4s}
@@ -225,8 +225,8 @@ td.t{text-align:right}
       <details class="ctrls"><summary class="lbl">Controls</summary><div class="keys">
         <span><kbd>← →</kbd> <kbd>A D</kbd></span><span>Steer. The car accelerates by itself and turns with the road on its own (as far as its tyres can grip); steering points it across the road, and it straightens up when you let go.</span>
         <span><kbd>↓</kbd> <kbd>S</kbd></span><span>Brake. Tap brake while steering to start a drift, on a bend or a straight. Steer into it to tighten, steer the other way to swing into a drift the other way (chain them left-right down a straight), let go to ease out. Nitro ends a drift, and starting one turns nitro off. Drifting charges nitro.</span>
-        <span><kbd>↓ ↓</kbd></span><span>Double-tap brake for a 360 spin, on the road or in the air. A spin on the road costs speed; one in the air costs a little on landing. Stack it with a barrel roll for a combo: purple corkscrew ramps always roll you, and clipping the edge of any other ramp with one side of the car tips you into one.</span>
-        <span><kbd>Space</kbd> <kbd>↑</kbd></span><span>Nitro. Tap again in the blue zone for Perfect. Double-tap a full bar for Shockwave. Tap it once more, or brake, to turn it off: what's left stays in the tank.</span>
+        <span><kbd>↓ ↓</kbd></span><span>Double-tap brake for a 360 spin, on the road or in the air: it fills nitro. Hit nitro during the spin to keep your speed up. Stack it with a barrel roll for a combo: purple corkscrew ramps always roll you, and clipping the edge of any other ramp with one side of the car tips you into one.</span>
+        <span><kbd>Space</kbd> <kbd>↑</kbd></span><span>Nitro. One tap: yellow nitro, long and steady. Quick double tap: orange pulse, a hard push that works in the air but burns fast. Tap, then tap again in the blue zone: Perfect nitro, the highest top speed (it builds slowly), lasts longest and loses nothing in turns or on rough ground. Double-tap a full bar: Shockwave, the biggest punch for a second and a half, and nobody can knock you down. Tap once more, or brake, to turn nitro off.</span>
         <span><kbd>Forks</kbd></span><span>Where the road splits, the two roads overlap for a stretch: steer onto whichever one you want from any lane. The choice locks in at the striped barrier. The shortcut is shorter and tighter; the nitro route is longer but loaded with canisters, pads and ramps.</span>
         <span><kbd>On track</kbd></span><span>Purple corkscrew ramps add speed for as long as you're in the air. Parked cars and buses go flying when you hit them: on nitro it barely slows you, without it you lose a chunk of speed (more for a bus). Blue canisters add nitro. Green pads boost you for free. Barrels slow you; concrete roadblocks wreck you unless you're on nitro.</span>
         <span><kbd>Corners</kbd></span><span>The top of the screen calls out sharp bends and hairpins ahead. Take one faster than the tyres can hold and the car runs wide into the wall: brake in a straight line first, or drift through it. A drift corners harder than grip but scrubs off speed. The inside line is the shorter way round.</span>
@@ -331,6 +331,54 @@ scene.fog=new THREE.Fog(MAP.fog[0],MAP.fog[1],MAP.fog[2]);
 const camera=new THREE.PerspectiveCamera(64,1,0.3,6000);
 scene.add(camera);
 
+// ---------------------------------------------------------------- real surface textures
+// Photo-scanned CC0 materials (ambientCG) in tex/<name>_c|n|r|e.jpg: colour, normal, roughness, and lit windows for the
+// night facades. They are mapped by world position, not by the mesh's UVs, so a road ribbon, a wall, an instanced
+// building or the ground all get the texture at its real size (scale = metres per tile) with no unwrapping: vertical
+// faces take it side-on, flat faces from above. A material can keep its own map as an overlay drawn on top (the lane
+// markings on a road, say).
+const TEXL=new THREE.TextureLoader(),PTEX={};
+function ptex(name,kind){const k=name+kind;if(!PTEX[k]){const t=TEXL.load('tex/'+name+'_'+kind+'.jpg');t.wrapS=t.wrapT=THREE.RepeatWrapping;
+  t.anisotropy=MAXANISO;PTEX[k]=t;}return PTEX[k];}
+const TEX_HAS={facadeNight:'e',facadeBrick:'e'};
+function rnTex(mat,o){
+  const name=o.tex,em=o.emissive&&TEX_HAS[name]==='e';
+  mat.extensions=Object.assign(mat.extensions||{},{derivatives:true});
+  const U={uRnC:{value:ptex(name,'c')},uRnN:{value:ptex(name,'n')},uRnR:{value:ptex(name,'r')},uRnE:{value:em?ptex(name,'e'):null},
+    uRnS:{value:o.scale||4},uRnT:{value:new THREE.Color(o.tint===undefined?0xffffff:o.tint)},uRnNS:{value:o.normal===undefined?1:o.normal},
+    uRnEI:{value:o.emissive||0},uRnRoof:{value:o.roof===undefined?-1:o.roof}};
+  const two=!!o.tex2;
+  if(two)Object.assign(U,{uR2C:{value:ptex(o.tex2,'c')},uR2N:{value:ptex(o.tex2,'n')},uR2R:{value:ptex(o.tex2,'r')},uR2S:{value:o.scale2||o.scale||4},
+    uR2T:{value:new THREE.Color(o.tint2===undefined?0xffffff:o.tint2)},uR2K:{value:new THREE.Vector2(...(o.slope||[.7,.88]))}});
+  const ov=!!o.overlay&&!!mat.map,mul=!!o.mul&&!!mat.map;
+  mat.onBeforeCompile=sh=>{
+    Object.assign(sh.uniforms,U);
+    sh.vertexShader='varying vec3 vRnW;varying vec3 vRnN;\n'+sh.vertexShader.replace('#include <project_vertex>',`#include <project_vertex>
+      vec4 rnW=vec4(transformed,1.0);vec3 rnN=objectNormal;
+      #ifdef USE_INSTANCING
+        rnW=instanceMatrix*rnW;rnN=mat3(instanceMatrix)*rnN;
+      #endif
+      rnW=modelMatrix*rnW;vRnW=rnW.xyz;vRnN=normalize(mat3(modelMatrix)*rnN);`);
+    sh.fragmentShader=`varying vec3 vRnW;varying vec3 vRnN;uniform sampler2D uRnC,uRnN,uRnR;uniform float uRnS,uRnNS,uRnEI,uRnRoof;uniform vec3 uRnT;
+      ${em?'uniform sampler2D uRnE;':''}
+      vec2 rnUV(){vec3 a=abs(vRnN);vec2 q=a.y>max(a.x,a.z)?vRnW.xz:(a.x>a.z?vec2(vRnW.z,vRnW.y):vRnW.xy);return q/uRnS;}
+      float rnRoof(){return uRnRoof>=0.0&&abs(vRnN.y)>.7?1.0:0.0;}
+      ${two?'uniform sampler2D uR2C,uR2N,uR2R;uniform float uR2S;uniform vec3 uR2T;uniform vec2 uR2K;float rnK(){return smoothstep(uR2K.x,uR2K.y,vRnN.y);}vec2 rnUV2(){return vRnW.xz/uR2S;}':''}\n`+sh.fragmentShader
+      .replace('#include <map_fragment>',`vec2 rnuv=rnUV();vec3 rnc=pow(texture2D(uRnC,rnuv).rgb,vec3(2.2))*uRnT;rnc=mix(rnc,vec3(uRnRoof),rnRoof());
+        ${two?'float rnk=rnK();vec2 rnuv2=rnUV2();rnc=mix(rnc,pow(texture2D(uR2C,rnuv2).rgb,vec3(2.2))*uR2T,rnk);':''}
+        ${ov?'vec4 rnov=mapTexelToLinear(texture2D(map,vUv));diffuseColor.rgb*=mix(rnc,rnov.rgb,rnov.a);':mul?'diffuseColor.rgb*=rnc*mapTexelToLinear(texture2D(map,vUv)).rgb*2.2;':'diffuseColor.rgb*=rnc;'}`)
+      .replace('#include <roughnessmap_fragment>','float roughnessFactor=roughness*mix(texture2D(uRnR,rnuv).g*1.25,1.0,rnRoof());'+(two?'roughnessFactor=mix(roughnessFactor,roughness*texture2D(uR2R,rnuv2).g*1.25,rnk);':''))
+      .replace('#include <normal_fragment_maps>',`#include <normal_fragment_maps>
+        {vec3 tn=texture2D(uRnN,rnuv).xyz*2.0-1.0;tn.xy*=uRnNS*(1.0-rnRoof());${two?'tn=mix(tn,texture2D(uR2N,rnuv2).xyz*2.0-1.0,rnk);':''}
+         vec3 q0=dFdx(-vViewPosition),q1=dFdy(-vViewPosition);vec2 st0=dFdx(rnuv),st1=dFdy(rnuv);
+         vec3 q1p=cross(q1,normal),q0p=cross(normal,q0);vec3 T=q1p*st0.x+q0p*st1.x,B=q1p*st0.y+q0p*st1.y;
+         float det=max(dot(T,T),dot(B,B)),sc=det==0.0?0.0:inversesqrt(det);normal=normalize(T*(tn.x*sc)+B*(tn.y*sc)+normal*tn.z);}`)
+      .replace('#include <emissivemap_fragment>',em?`totalEmissiveRadiance*=pow(texture2D(uRnE,rnuv).rgb,vec3(2.2))*uRnEI*(1.0-rnRoof());`:'#include <emissivemap_fragment>');
+  };
+  mat.customProgramCacheKey=()=>'rn|'+name+'|'+ov+'|'+mul+'|'+em+'|'+(o.tex2||'');
+  if(em){mat.emissive=new THREE.Color(0xffffff);}
+  mat.needsUpdate=true;return mat;
+}
 function canvasTex(w,h,draw,srgb=true){
   const c=document.createElement('canvas'); c.width=w; c.height=h;
   draw(c.getContext('2d'),w,h);
@@ -749,9 +797,19 @@ const laneX=(e,i)=>fitX(e.br,posOf(e),LANES[i]);
 // road surfaces
 // skip: leave off the edge lines on that side (-1 left, 1 right, 'both'); plain: no lane lines either, for the stretch
 // where two roads overlap and read as one wide road (lane lines from both, at an angle, look like driving into a road)
+// what each map's surfaces are made of: road tint (darker at night), verge, ground, walls (texture, metres per tile, tint)
+const LOOK=Object.assign({
+  city:{road:.36,verge:['paving',3,0x9a90a4],ground:['concrete',7,0x6a6274],wall:['concrete',3,0xb4acc4]},
+  tokyo:{road:.3,verge:['paving',3,0x6a6680],ground:['concrete',7,0x4a4658],wall:['concrete',3,0x9a96b4]},
+  canyon:{road:.5,verge:['sand',4,0xd09868],ground:['sand',9,0xc88a5a],wall:['rockLayer',6,0xe0905a],dirt:'sand',dirtTint:0x9a7458},
+  alpine:{road:.5,verge:['snow',4,0xffffff],ground:['snow',9,0xf2f6ff],wall:['concrete',3,0xc4c8d4]},
+  coast:{road:.55,verge:['sand',4,0xf4dcb0],wall:['concrete',3,0xeae2d6]},
+  jungle:{road:.55,verge:['grass',3,0xbcd8a0],ground:['dirt',7,0x9aa874],wall:['stonewall',3,0xd0d0b4],dirt:'dirt'},
+  volcano:{road:.36,verge:['rockDark',4,0x9a7070],wall:['rockDark',4,0xb08a8a]},
+  arctic:{road:.5,verge:['snow',4,0xffffff],wall:['concrete',3,0xccd6e4]}
+}[MAP.scenery],MAP_ID==='industrial'?{wall:['metal',3,0xc8b8a8],ground:['concrete',7,0x6a6460]}:{});
 const roadTexOf=(skip,plain)=>canvasTex(512,512,(g,w,h)=>{
-  g.fillStyle=MAP.asphalt;g.fillRect(0,0,w,h);
-  const r=mulberry32(11);for(let i=0;i<9000;i++){const v=30+r()*40|0;g.fillStyle=`rgba(${v},${v-4},${v+6},.5)`;g.fillRect(r()*w,r()*h,2,2);}
+  g.clearRect(0,0,w,h);
   const ux=x=>(x+ROAD_HALF)/(2*ROAD_HALF)*w,keep=x=>skip!=='both'&&Math.sign(x)!==skip;
   g.fillStyle='#f2e8d5';[-12.6*RW,12.6*RW].filter(keep).forEach(x=>g.fillRect(ux(x)-4,0,8,h));
   g.fillStyle='#ffbf3a';[-13.2*RW,13.2*RW].filter(keep).forEach(x=>g.fillRect(ux(x)-2,0,4,h));
@@ -759,21 +817,20 @@ const roadTexOf=(skip,plain)=>canvasTex(512,512,(g,w,h)=>{
   g.fillStyle='rgba(242,232,213,.85)';[-6.5*RW,0,6.5*RW].forEach(x=>{for(let y=0;y<h;y+=h/2)g.fillRect(ux(x)-3,y,6,h/4);});
   g.fillStyle='rgba(0,0,0,.18)';LANES.forEach(x=>g.fillRect(ux(x)-26,0,52,h));
 }),roadTex=roadTexOf(0);
-const dirtTex=canvasTex(512,512,(g,w,h)=>{g.fillStyle='#7a5a42';g.fillRect(0,0,w,h);const r=mulberry32(12);
-  for(let i=0;i<14000;i++){const v=r();g.fillStyle=v>.5?`rgba(150,110,80,${r()*.5})`:`rgba(60,40,28,${r()*.5})`;g.fillRect(r()*w,r()*h,2+r()*3,2+r()*3);}
+const dirtTex=canvasTex(512,512,(g,w,h)=>{g.clearRect(0,0,w,h);
   g.fillStyle='rgba(40,26,18,.28)';for(const x of [.3,.7])g.fillRect(x*w-22,0,44,h);});        // worn wheel tracks
-const stoneTex=canvasTex(512,512,(g,w,h)=>{const r=mulberry32(13);const c=60;
-  for(let y=0;y<h;y+=c/2)for(let x=-(y/(c/2)%2)*c/2;x<w;x+=c){const v=110+r()*40|0;g.fillStyle=`rgb(${v},${v-4},${v-10})`;g.fillRect(x+2,y+2,c-4,c/2-4);}
+const stoneTex=canvasTex(512,512,(g,w,h)=>{g.clearRect(0,0,w,h);
   g.fillStyle='rgba(255,255,255,.55)';for(const x of [-6.5*RW,0,6.5*RW]){const ux=(x+ROAD_HALF)/(2*ROAD_HALF)*w;for(let y=0;y<h;y+=h/2)g.fillRect(ux-3,y,6,h/4);}});
 for(const t of [roadTex,dirtTex,stoneTex])t.wrapS=t.wrapT=THREE.RepeatWrapping;
-const asphaltMat=tex=>new THREE.MeshStandardMaterial({map:tex,roughness:MAP.wet?.38:.82,metalness:MAP.wet?.25:0});
+const asphaltMat=tex=>rnTex(new THREE.MeshStandardMaterial({map:tex,transparent:false,roughness:MAP.wet?.55:.9,metalness:MAP.wet?.06:0}),{tex:'asphalt',scale:5,tint:new THREE.Color(LOOK.road,LOOK.road,LOOK.road),overlay:true});
 const roadMats=[asphaltMat(roadTex),
-  new THREE.MeshStandardMaterial({map:dirtTex,roughness:.95}),new THREE.MeshStandardMaterial({map:stoneTex,roughness:.8})];
+  rnTex(new THREE.MeshStandardMaterial({map:dirtTex,roughness:.95}),{tex:LOOK.dirt||'dirt',scale:4,overlay:true,tint:LOOK.dirtTint||0xb89a80}),
+  rnTex(new THREE.MeshStandardMaterial({map:stoneTex,roughness:.85}),{tex:'paving',scale:3,overlay:true,tint:0xc8c0b8})];
 const road={material:roadMats[0]};
 // barriers + skirts + neon rails
 const wallTex=canvasTex(64,256,(g,w,h)=>{g.fillStyle=MAP.wall[0];g.fillRect(0,0,w,h);g.fillStyle=MAP.wall[1];for(let y=0;y<h;y+=32)g.fillRect(0,y,w,3);},true);
 wallTex.wrapS=wallTex.wrapT=THREE.RepeatWrapping;
-const wallMat=new THREE.MeshStandardMaterial({map:wallTex,roughness:.9,side:THREE.DoubleSide});
+const wallMat=rnTex(new THREE.MeshStandardMaterial({map:wallTex,roughness:.9,side:THREE.DoubleSide}),{tex:LOOK.wall[0],scale:LOOK.wall[1],tint:LOOK.wall[2]});
 // strip of quads along a run of sample indices; pt(k,side,out) gives the two edge points at index k
 function ribbonRun(ks,pt,vLen,step){
   const n=ks.length,pos=new Float32Array(n*6),uv=new Float32Array(n*4),idx=[],a=[0,0,0];
@@ -800,7 +857,7 @@ const kerbTex=canvasTex(32,128,(g,w,h)=>{for(let y=0;y<4;y++){g.fillStyle=y%2?'#
 const kerbMat=new THREE.MeshStandardMaterial({map:kerbTex,roughness:.7});
 const VERGE_COL={city:'#2a2430',canyon:'#a8714a',alpine:'#e8eef8',coast:'#d8c08c',tokyo:'#2c2c34',jungle:'#3f6a2c',volcano:'#2a1612',arctic:'#e4eef8'}[MAP.scenery];
 const vergeTex=canvasTex(128,128,(g,w,h)=>{g.fillStyle=VERGE_COL;g.fillRect(0,0,w,h);const r=mulberry32(14);for(let i=0;i<1500;i++){g.fillStyle=`rgba(${r()>.5?'255,255,255':'0,0,0'},${r()*.12})`;g.fillRect(r()*w,r()*h,3,3);}});
-vergeTex.wrapS=vergeTex.wrapT=THREE.RepeatWrapping;const vergeMat=new THREE.MeshStandardMaterial({map:vergeTex,roughness:1});
+vergeTex.wrapS=vergeTex.wrapT=THREE.RepeatWrapping;const vergeMat=rnTex(new THREE.MeshStandardMaterial({map:vergeTex,roughness:1}),{tex:LOOK.verge[0],scale:LOOK.verge[1],tint:LOOK.verge[2]});
 const outer=(k,side)=>HW[k]+VERGE[(side>0?ER:EL)[k]];
 for(const side of [-1,1]){
   const E=side>0?ER:EL;
@@ -848,7 +905,7 @@ if(GAPS.length){
 }
 // branch roads: where they overlap the main road their surface runs just underneath it (the main road's markings stay on
 // top, so it reads as one road widening), rising to their own level as they part; walls only where the roads are apart
-const branchRoadMat=road.material.clone();Object.assign(branchRoadMat,{polygonOffset:true,polygonOffsetFactor:1,polygonOffsetUnits:4});
+const branchRoadMat=asphaltMat(roadTex);Object.assign(branchRoadMat,{polygonOffset:true,polygonOffsetFactor:1,polygonOffsetUnits:4});
 const branchPlainMat=asphaltMat(roadTexOf('both',true));Object.assign(branchPlainMat,{polygonOffset:true,polygonOffsetFactor:1,polygonOffsetUnits:4});
 for(const b of BR){
   const atB=(k,off,dy,o)=>{o[0]=b.P[k*3]+b.R[k*3]*off;o[1]=b.P[k*3+1]+dy;o[2]=b.P[k*3+2]+b.R[k*3+2]*off;};
@@ -899,7 +956,37 @@ const groundTex=canvasTex(256,256,(g,w,h)=>{g.fillStyle=GROUND_LOOK.base;g.fillR
 groundTex.wrapS=groundTex.wrapT=THREE.RepeatWrapping;groundTex.repeat.set(160,160);
 const ground=new THREE.Mesh(new THREE.PlaneGeometry(9000,9000).rotateX(-Math.PI/2),new THREE.MeshStandardMaterial({map:groundTex,roughness:GROUND_LOOK.rough,metalness:MAP.scenery==='coast'||MAP.scenery==='arctic'?.15:0,
   ...(MAP.scenery==='volcano'?{emissive:0xffffff,emissiveMap:groundTex,emissiveIntensity:.9}:{})}));
+if(LOOK.ground){ground.material.metalness=0;ground.material.roughness=1;rnTex(ground.material,{tex:LOOK.ground[0],scale:LOOK.ground[1],tint:LOOK.ground[2]});}
 ground.position.y=GROUND_Y;scene.add(ground);
+// terrain for the open-country maps: flat for a band either side of every road (where the roadside scenery stands),
+// then rising into hills or mountains that fade into the haze. Heights come from a distance-to-road field (a chamfer
+// distance transform on a grid) times layered noise, so no slope ever reaches the road.
+const TERRAIN={alpine:{clear:150,ramp:420,h:700,rock:'rockLayer',top:'snow',tint:0x8a8a94,tint2:0xffffff,slope:[.74,.9],sc:24},
+  canyon:{clear:170,ramp:300,h:150,terrace:28,rock:'rockLayer',top:'sand',tint:0xf0a070,tint2:0xd09060,slope:[.8,.92],sc:18},
+  jungle:{clear:110,ramp:380,h:110,rock:'dirt',top:'grass',tint:0x8a9a6a,tint2:0x9ac080,slope:[.55,.8],sc:10},
+  volcano:{clear:150,ramp:400,h:420,rock:'rockDark',top:'rockDark',tint:0x6a4a44,tint2:0x4a3434,slope:[.7,.9],sc:20},
+  arctic:{clear:200,ramp:520,h:90,rock:'ice',top:'snow',tint:0xa8c8e8,tint2:0xf4f8ff,slope:[.6,.85],sc:16}}[MAP.scenery];
+if(TERRAIN){
+  const T=TERRAIN,pts=[];for(let k=0;k<NS;k+=2)pts.push(P[k*3],P[k*3+2]);for(const b of BR)for(let i=0;i<b.n;i+=2)pts.push(b.P[i*3],b.P[i*3+2]);
+  let x0=1e9,x1=-1e9,z0=1e9,z1=-1e9;for(let i=0;i<pts.length;i+=2){x0=Math.min(x0,pts[i]);x1=Math.max(x1,pts[i]);z0=Math.min(z0,pts[i+1]);z1=Math.max(z1,pts[i+1]);}
+  const M=1500,cs=22;x0-=M;x1+=M;z0-=M;z1+=M;const nx=Math.ceil((x1-x0)/cs)+1,nz=Math.ceil((z1-z0)/cs)+1,D=new Float32Array(nx*nz).fill(1e9);
+  for(let i=0;i<pts.length;i+=2){const gx=Math.round((pts[i]-x0)/cs),gz=Math.round((pts[i+1]-z0)/cs);D[gz*nx+gx]=0;}
+  const a=cs,b=cs*Math.SQRT2;
+  for(let z=0;z<nz;z++)for(let x=0;x<nx;x++){const i=z*nx+x;let v=D[i];if(x>0)v=Math.min(v,D[i-1]+a);if(z>0){v=Math.min(v,D[i-nx]+a);if(x>0)v=Math.min(v,D[i-nx-1]+b);if(x<nx-1)v=Math.min(v,D[i-nx+1]+b);}D[i]=v;}
+  for(let z=nz-1;z>=0;z--)for(let x=nx-1;x>=0;x--){const i=z*nx+x;let v=D[i];if(x<nx-1)v=Math.min(v,D[i+1]+a);if(z<nz-1){v=Math.min(v,D[i+nx]+a);if(x<nx-1)v=Math.min(v,D[i+nx+1]+b);if(x>0)v=Math.min(v,D[i+nx-1]+b);}D[i]=v;}
+  const nr=mulberry32(91),perm=new Float32Array(512);for(let i=0;i<512;i++)perm[i]=nr();
+  const hsh=(x,z)=>perm[((x*73856093)^(z*19349663))&511],vn=(x,z)=>{const xi=Math.floor(x),zi=Math.floor(z),fx=x-xi,fz=z-zi,u=fx*fx*(3-2*fx),w=fz*fz*(3-2*fz);
+    return lerp(lerp(hsh(xi,zi),hsh(xi+1,zi),u),lerp(hsh(xi,zi+1),hsh(xi+1,zi+1),u),w);};
+  const fbm=(x,z)=>{let s=0,am=.5,f=1/420;for(let o=0;o<5;o++){s+=am*vn(x*f,z*f);f*=2.03;am*=.5;}return s/.97;};
+  const geo=new THREE.PlaneGeometry((nx-1)*cs,(nz-1)*cs,nx-1,nz-1).rotateX(-Math.PI/2),pos=geo.attributes.position;
+  for(let i=0;i<pos.count;i++){const gx=i%nx,gz=Math.floor(i/nx),x=x0+gx*cs,z=z0+gz*cs;pos.setX(i,x);pos.setZ(i,z);
+    const d=D[gz*nx+gx],rise=clamp((d-T.clear)/T.ramp,0,1),r=rise*rise*(3-2*rise),edge=Math.min(gx,gz,nx-1-gx,nz-1-gz)/12;
+    let h=r*T.h*(.25+.95*fbm(x,z))*Math.min(1,edge);if(T.terrace)h=Math.floor(h/T.terrace)*T.terrace+Math.min(T.terrace,(h%T.terrace)*3);
+    pos.setY(i,GROUND_Y-.4+h);}
+  geo.computeVertexNormals();
+  const tm=rnTex(new THREE.MeshStandardMaterial({roughness:1}),{tex:T.rock,scale:T.sc,tint:T.tint,tex2:T.top,scale2:T.sc*.6,tint2:T.tint2,slope:T.slope});
+  const terr=new THREE.Mesh(geo,tm);scene.add(terr);
+}
 
 // checkered line + gantry
 const checker=canvasTex(256,32,(g,w,h)=>{for(let x=0;x<16;x++)for(let y=0;y<2;y++){g.fillStyle=(x+y)%2?'#111':'#f4f0e8';g.fillRect(x*16,y*16,16,16);}});
@@ -1034,10 +1121,11 @@ if(MAP.scenery==='city'||MAP.scenery==='coast'||MAP.scenery==='tokyo'){
   const reps=[[2,3],[2,6],[3,11]],bg=new THREE.BoxGeometry(1,1,1).translate(0,.5,0);
   classes.forEach((list,ci)=>{
     if(!list.length)return;
-    const t=(coast?hotelTex:winTex).clone();t.needsUpdate=true;t.repeat.set(...reps[ci]);
-    const mat=coast?new THREE.MeshStandardMaterial({map:t,roughness:.8}):new THREE.MeshStandardMaterial({map:t,emissive:0xffffff,emissiveMap:t,emissiveIntensity:1.1,roughness:.7,metalness:.2});
+    // photo facades: brick, office and glass towers by height; at night their windows are lit
+    const F=coast?[['facadeBrick',14],['facadeOffice',22],['facadeOffice',22]][ci]:[['facadeBrick',14],['facadeNight',18],['facadeNight',18]][ci];
+    const mat=rnTex(new THREE.MeshStandardMaterial({roughness:.75,metalness:.1}),{tex:F[0],scale:F[1],emissive:coast?0:1.6,roof:.06});
     const col=new THREE.Color();
-    instanced(bg,mat,list.map(([x,z,w,h,d,yaw,c])=>[x,GROUND_Y,z,w,h,d,yaw,(coast?col.setHSL(.02+c*.6,.5,.82):col.setHSL(.72+c*.15,.25,.35+c*.25)).getHex()]));
+    instanced(bg,mat,list.map(([x,z,w,h,d,yaw,c])=>[x,GROUND_Y,z,w,h,d,yaw,(coast?col.setHSL(.05+c*.1,.35,.85):col.setHSL(.6+c*.2,.12,.62+c*.3)).getHex()]));
   });
 }
 if(MAP.scenery==='city'){
@@ -1048,7 +1136,7 @@ if(MAP.scenery==='canyon'){
   const strata=canvasTex(64,256,(g,w,h)=>{const cols=['#b85a34','#c9733f','#a54a2c','#d48a52','#b4603a','#9a4428','#e0a070'];let y=0;const r=mulberry32(4);
     while(y<h){const t=6+r()*26;g.fillStyle=cols[(r()*cols.length)|0];g.fillRect(0,y,w,t);y+=t;}});
   strata.wrapS=strata.wrapT=THREE.RepeatWrapping;strata.repeat.set(3,1);
-  const rockMat=new THREE.MeshStandardMaterial({map:strata,roughness:.95,flatShading:true});
+  const rockMat=rnTex(new THREE.MeshStandardMaterial({map:strata,roughness:.95,flatShading:true}),{tex:'rockLayer',scale:14,mul:true});
   const mesas=[],boulders=[],trunks=[],arms=[];
   for(let i=0;i<NS;i+=10)for(const side of [-1,1]){
     if(SR()<.55){const rad=10+SR()*38,[x,z]=spot(i,side*(rad+28+SR()*260));if(trackDist(x,z)>rad+22)mesas.push([x,GROUND_Y,z,rad,25+SR()*95,rad*(.7+SR()*.5),SR()*6]);}
@@ -1224,7 +1312,8 @@ const RAMPS=[[.06,'hump',0],[.12,'kicker',-6.5],[.18,'twist',6.5,1],[.30,'mega',
   [.55,'hump',0],[.62,'mega',3.25],[.69,'kicker',-3.25],[.80,'twist',9.75,-1],[.87,'kicker',6.5],[.94,'mega',-6.5]]
   .map(([u,type,x,flip])=>{const s=flatS(u,RUNOUT[type],1/150);return s===null?null:{s,x:fitX(-1,s,x*RW),T:RAMP_TYPES[type],flip:flip||1,br:-1};}).filter(Boolean);
 // every gap has a full-width jump ramp running right up to its edge
-for(const g of GAPS){const w=2*hwAt(-1,g.s0);RAMPS.push({s:mod(g.s0-RAMP_TYPES.gap.len),x:0,T:Object.assign({},RAMP_TYPES.gap,{w}),flip:1,br:-1});}
+// (as wide as the road and its run-off: running wide onto the verge still launches you)
+for(const g of GAPS){const w=2*(hwAt(-1,g.s0)+VERGE[EDGE.cliff]);RAMPS.push({s:mod(g.s0-RAMP_TYPES.gap.len),x:0,T:Object.assign({},RAMP_TYPES.gap,{w}),flip:1,br:-1});}
 // route goodies: the long way round gets ramps; the shortcut gets a speed hump
 for(const b of BR){
   // tried at a few spots along the route; never where its flight would carry a car over the route's canister rows
@@ -1649,7 +1738,21 @@ function setMuted(m){AU.muted=m;store.set('rn-muted',m?'1':'0');if(AU.master)AU.
 
 // ---------------------------------------------------------------- entities
 const CAR_LEN=4.5,CAR_W=2.0;
-const NB=[0,14,21,30],BURN=[0,.2,.22,.3],GRAV=24;
+// the four nitros, Asphalt style (index = p.nitroLevel):
+//  1 yellow  single tap: lasts long, gentle push; hard steering or rough ground costs speed
+//  2 blue    Perfect (second tap in the blue zone): the highest top speed of all but the slowest to build, lasts the
+//            longest, and steering or rough ground cost nothing; next to no push in the air
+//  3 shockwave  double tap on a full bar: the hardest punch, gone in about a second and a half, the least steering,
+//            and nobody can knock you down while it burns
+//  4 orange  quick double tap anywhere else: a strong pulse that also works in the air, burns fast, steering a bit heavier
+// top: extra top speed (m/s); push: thrust; burn: tank per second; turn: speed lost per second at full steering lock;
+// handle: steering authority; air: thrust in the air
+const NT=[{top:0,push:0,burn:0,turn:0,handle:1,air:0},
+  {top:14,push:20,burn:.17,turn:5,handle:1,air:6,name:'NITRO',col:'var(--nitro)'},
+  {top:24,push:11,burn:.13,turn:0,handle:1,air:1,name:'PERFECT NITRO',col:'var(--perfect)'},
+  {top:18,push:70,burn:.65,turn:9,handle:.7,air:24,name:'SHOCKWAVE',col:'var(--shock)'},
+  {top:16,push:46,burn:.36,turn:7,handle:.88,air:18,name:'PULSE NITRO',col:'var(--pulse)'}];
+const NB=NT.map(n=>n.top),BURN=NT.map(n=>n.burn),GRAV=24;
 // Real-world cars: published top speed (km/h), 0-100 km/h (s) and kerb weight (kg), squeezed into the game's speed range
 // so a hypercar stays drivable on this track. Handling and nitro are judgement calls. Cars race within their class.
 // top: base top speed in m/s. accel, handling, nitro (tank efficiency) and mass are multipliers around 1.
@@ -2073,7 +2176,7 @@ function rampStep(e,dt){
 function startSpin(dir){
   const p=player;if(p.spin||p.wreck>0||G.mode!=='race')return;
   p.spin={dir:dir||1,t:0,dur:p.air?.55:.7};
-  if(!p.air){p.speed*=.96;endDrift(true);}
+  if(!p.air){if(!p.nitroLevel)p.speed*=.98;endDrift(true);}
 }
 function brakeTap(){
   const p=player;if(G.mode!=='race'||G.paused)return;const now=G.raceTime;
@@ -2084,7 +2187,7 @@ function trickPayout(list,T){
   const p=player,spins=list.filter(x=>x==='360').length,roll=list.includes('BARREL ROLL'),n=list.length;
   if(spins)feed('PERFORM 360'+(spins>1?' \u00d7'+spins:''));if(roll)feed('BARREL ROLL');
   const parts=[];if(roll)parts.push('BARREL ROLL');if(spins)parts.push(String(spins*360));
-  const mult=1+.5*(n-1),base=(roll?.22:0)+spins*(T?.2:.12),gain=base*mult*(T===RAMP_TYPES.mega?1.25:1);
+  const mult=1+.5*(n-1),base=(roll?.22:0)+spins*(T?.2:.18),gain=base*mult*(T===RAMP_TYPES.mega?1.25:1);
   p.nitro=Math.min(1,p.nitro+gain);p.stats.stunts+=n;
   toast(parts.join(' + '),n>1?'perfect':'nitro',(n>1?'COMBO ×'+mult.toFixed(1)+' · ':'')+'+'+Math.round(gain*100)+'% NITRO');
   sfx(n>1?'perfect':'ping');
@@ -2094,7 +2197,7 @@ function knockdown(o,how){
   const p=player;
   if(o.remote){mpSend({t:'ev',type:'takedown',target:o.netId,how});toast('TAKEDOWN','nitro',o.name.toUpperCase());}
   else if(o.lane!==undefined&&o.skill){ // rival
-    o.wreck=1.9;o.speed*=.4;o.air=false;o.y=0;toast('KNOCKDOWN','nitro',o.name.toUpperCase());
+    o.wreck=1.4;o.speed*=.5;o.air=false;o.y=0;toast('KNOCKDOWN','nitro',o.name.toUpperCase());
   }else{ // parked traffic
     knockTraffic(o,p);toast(how==='air'?'AIR TAKEDOWN':o.big?'BUS TAKEDOWN':'TAKEDOWN','nitro');
   }
@@ -2108,7 +2211,7 @@ function knockTraffic(t,src){
   t.ang.set((rnd()-.5)*10,(rnd()-.5)*8,(rnd()-.5)*12).multiplyScalar(t.big?.4:1);t.flying=2.4;
 }
 function wreckPlayer(){
-  const p=player;p.wreck=1.6;p.drift=false;p.nitroLevel=0;p.speed*=.35;p.stats.wrecks++;
+  const p=player;p.wreck=1.1;p.drift=false;p.nitroLevel=0;p.spin=null;p.speed*=.5;p.stats.wrecks++;
   toast('WRECKED','danger');G.shake=1.2;sfx('crash');
 }
 function shockwave(){
@@ -2132,8 +2235,9 @@ function pressNitro(){
   }else if(p.nitroLevel===1){
     const e=G.raceTime-p.nitroStart;
     if(e<.3&&p.fullAtStart){p.nitroLevel=3;toast('SHOCKWAVE','shock');sfx('shock');shockwave();}
-    else if(e>=PW0&&e<=PW1){p.nitroLevel=2;p.stats.perfect++;toast('PERFECT NITRO','perfect');sfx('perfect');}
-    else if(e>PW1)nitroOff();
+    else if(e>=PW0&&e<=PW1){p.nitroLevel=2;p.stats.perfect++;toast('PERFECT NITRO','perfect','TOP SPEED UP · NO LOSS IN TURNS');sfx('perfect');}
+    else if(e<PW0){p.nitroLevel=4;toast('PULSE NITRO','pulse','HARD PUSH · BURNS FAST');sfx('ping');}
+    else nitroOff();
   }else nitroOff(); // tapping again while it burns turns it off; what's left stays in the tank
 }
 function nitroOff(){const p=player;if(!p.nitroLevel)return;p.nitroLevel=0;toast('NITRO OFF','plain');}
@@ -2184,12 +2288,18 @@ function updateOOB(p,dt){
 function assistRoad(p,t){
   const hx=Math.cos(p.psi),hz=Math.sin(p.psi),rel=(fx,fz,rx,rz)=>Math.atan2(hx*rx+hz*rz,hx*fx+hz*fz);
   sampleE(p);const own={th:rel(t.fx,t.fz,t.rx,t.rz),c:TS.c/Math.max(.4,1+TS.c*p.x)};
-  let x=null;
-  if(p.br<0){for(const b of BR){const d=wrapD(p.s,b.s0);if(d<0||d>b.span||sepM(b,d)>=GAP)continue;sampleB(b,bsM(b,d));x=p.x-offM(b,d);break;}}
-  else{const b=BR[p.br];if(sepB(b,p.bs)<GAP){sample(msB(b,p.bs));x=p.x-offB(b,p.bs);}}
-  if(x===null)return own;
-  own.fork=true;const l=Math.hypot(TS.f.x,TS.f.z),th=rel(TS.f.x/l,TS.f.z/l,TS.r.x,TS.r.z);
-  return Math.abs(th)<Math.abs(own.th)-.02?{th,c:TS.c/Math.max(.4,1+TS.c*x),fork:true}:own;
+  // where two roads share the tarmac before a split (or after a merge), the assist never picks a road for you: it keeps
+  // following the road you came in on, whichever lane you're in, and only switches when you steer across the middle
+  // onto the other one. So you choose the path, as late as you like, and nothing pulls you into a road you didn't pick.
+  let x=null,xo=0,bz=null;
+  if(p.br<0){for(const b of BR){const d=wrapD(p.s,b.s0);if(d<0||d>b.span||sepM(b,d)>=GAP)continue;sampleB(b,bsM(b,d));xo=offM(b,d);x=p.x-xo;bz=b;break;}}
+  else{const b=BR[p.br];if(sepB(b,p.bs)<GAP){sample(msB(b,p.bs));xo=offB(b,p.bs);x=p.x-xo;bz=b;}}
+  if(x===null){p.forkZone=null;p.freeBr=p.br;return own;}
+  const ownId=p.br,l=Math.hypot(TS.f.x,TS.f.z),other={th:rel(TS.f.x/l,TS.f.z/l,TS.r.x,TS.r.z),c:TS.c/Math.max(.4,1+TS.c*x),fork:true};
+  if(p.forkZone!==bz.i){p.forkZone=bz.i;p.forkRef=p.freeBr!==undefined?p.freeBr:ownId;} // the road you were on before
+  // now nearest the other road: that only counts as a choice if you're steering that way
+  if(p.forkRef!==ownId&&p.steerS*-Math.sign(xo)>.2)p.forkRef=ownId;
+  return p.forkRef===ownId?Object.assign(own,{fork:true}):other;
 }
 function carPhysics(p,dt,steer,brake,racing){
   const sp=p.spec,hand=sp.handling;
@@ -2201,7 +2311,7 @@ function carPhysics(p,dt,steer,brake,racing){
   // controls: steering eases in and out; the autopilot (race finished) steers itself back to a lane
   if(G.mode==='finish'){const look=20+Math.hypot(p.wvx,p.wvz)*.4;sampleAt(p.br,posOf(p)+look);const ax=TS.p.x+TS.r.x*(p.autoX||0)-wx,az=TS.p.z+TS.r.z*(p.autoX||0)-wz;
     const hx=Math.cos(p.psi),hz=Math.sin(p.psi),ang=Math.atan2(hx*az-hz*ax,hx*ax+hz*az);steer=clamp(ang*3,-1,1);}
-  p.steerS+=(steer-p.steerS)*Math.min(1,(Math.abs(steer)>Math.abs(p.steerS)?7*(.6+.4*STEER):10)*dt);
+  p.steerS+=(steer-p.steerS)*Math.min(1,(Math.abs(steer)>Math.abs(p.steerS)?12*(.6+.4*STEER):14)*dt);
   // drift: tap brake while steering (or steer just after the tap). The rear tyres let go and the slide is held at the
   // angle you steer for, on a bend or a straight alike: into the slide holds or tightens it, steering the other way swings
   // the car into a drift the other way (so you can chain left-right-left down a straight), and letting go eases it out
@@ -2220,7 +2330,7 @@ function carPhysics(p,dt,steer,brake,racing){
   const top=sp.top+NB[p.nitroLevel]+(p.padT>0?14:0)+p.slip*4,fin=G.mode==='finish';
   // the road's own turn rate at the car's line, and the car's heading relative to the road
   // in a fork the steering is sharper and may point further across, so a driver can still switch roads late
-  const ar=assistRoad(p,t),cRoad=ar.c,stK=ar.fork?1.9:1,capA=ar.fork?.62:.38;let thRel=ar.th;
+  const ar=assistRoad(p,t),cRoad=ar.c,inFork=!!ar.fork,stK=inFork?1.9:1,capA=inFork?.62:.38;let thRel=ar.th;
   const N=4,h=dt/N;let latSum=0,beta=0;
   for(let i=0;i<N;i++){
     const hx=Math.cos(p.psi),hz=Math.sin(p.psi),nx=-hz,nz=hx;
@@ -2228,14 +2338,16 @@ function carPhysics(p,dt,steer,brake,racing){
     let fx=0,fy=0,yawAcc=0;
     if(fin){const tgt=55;fx=clamp((tgt-u)*1.2,-20,12);}
     else if(brake&&!p.drift&&p.brakeT>.14)fx=-46*(1.12-.12*sp.mass)*Math.sign(u||1);
-    else if((p.drift?V:u)<top){const uu=p.drift?V:u;fx=(p.nitroLevel||p.padT>0?34:(uu<40?24:3+21*(1-uu/top)))*sp.accel;}
+    else if((p.drift?V:u)<top){const uu=p.drift?V:u;fx=(p.nitroLevel?NT[p.nitroLevel].push:p.padT>0?34:(uu<40?24:3+21*(1-uu/top)))*sp.accel;}
     else if(!(p.air&&p.purple))fx=-(u-top)*1.4;
     if(p.air){ // no tyres in the air: hold course, a little air control
-      if(p.purple)fx=5;else fx=0;
+      fx=(p.purple?5:0)+NT[p.nitroLevel].air*sp.accel;
       // in the air the car eases round to face where it's flying (no spin carried over from a drift) with a touch of air control
       // the flight bends with the road below it (Asphalt's jump assist), so a jump off a ramp before a bend lands on the road
       // at the same offset instead of flying straight on into the barrier
       const om=-cRoad*u*h,co=Math.cos(om),so=Math.sin(om),vx0=p.wvx;p.wvx=vx0*co-p.wvz*so;p.wvz=vx0*so+p.wvz*co;p.psi+=om;
+      // and sideways drift across the road fades away in flight, so a long jump holds its line (Asphalt's air stability)
+      {const vl=p.wvx*t.rx+p.wvz*t.rz,k=vl*(1-Math.exp(-1.6*h));p.wvx-=t.rx*k;p.wvz-=t.rz*k;}
       let dpsi=Math.atan2(p.wvz,p.wvx)-p.psi;dpsi=Math.atan2(Math.sin(dpsi),Math.cos(dpsi));p.yawR=dpsi*3+p.steerS*.4;
       p.wvx+=hx*fx*h;p.wvz+=hz*fx*h;p.psi+=p.yawR*h;wx+=p.wvx*h;wz+=p.wvz*h;continue;}
     // steering angle: finer as speed rises, and wider in a drift so you can counter-steer
@@ -2267,10 +2379,11 @@ function carPhysics(p,dt,steer,brake,racing){
       // its own that gets gentler with speed, and with no input it straightens up to the road. The car rotates toward
       // that rate quickly but not instantly, never faster than the tyres can carry it; the tyres then decide how well
       // the car's path follows its nose, so a bend taken too fast still runs wide.
-      const rRoad=-cRoad*u,rIn=Math.abs(p.steerS)>.05?p.steerS*1.7*STEER*stK*(1.15-.15*sp.mass)/(1+Math.max(0,u)/22)*clamp(1-thRel*Math.sign(p.steerS)/capA,0,1)-(Math.abs(thRel)>capA?2*(thRel-Math.sign(thRel)*capA):0):-2*thRel;
+      const rRoad=-cRoad*u,rIn=Math.abs(p.steerS)>.05?p.steerS*2.2*STEER*NT[p.nitroLevel].handle*stK*(1.15-.15*sp.mass)/(1+Math.max(0,u)/30)*(inFork?1:clamp(1-thRel*Math.sign(p.steerS)/capA,0,1))-(Math.abs(thRel)>capA?2*(thRel-Math.sign(thRel)*capA):0):-2*thRel;
       const lim=(mu*1.05)/Math.max(u,4),rT=clamp(rRoad+rIn,-lim,lim);p.rTp=rT;
-      yawAcc=11/(.55+.45*sp.mass)*(rT-p.yawR)+10*(beta-clamp(beta,-.12,.12));
+      yawAcc=15/(.55+.45*sp.mass)*(rT-p.yawR)+10*(beta-clamp(beta,-.12,.12));
     }
+    if(p.nitroLevel&&!p.drift)fx-=NT[p.nitroLevel].turn*clamp((Math.abs(p.steerS)-.3)/.7,0,1); // hard steering on nitro bleeds speed (not on Perfect)
     if(u<4){p.yawR=u*Math.tan(p.delta)/(2*PH.ab);yawAcc=0;}
     p.wvx+=(hx*fx+nx*fy+pathAx)*h;p.wvz+=(hz*fx+nz*fy+pathAz)*h;
     p.yawR+=yawAcc*h;p.psi+=p.yawR*h;thRel+=(p.yawR+cRoad*u)*h;
@@ -2285,7 +2398,7 @@ function carPhysics(p,dt,steer,brake,racing){
   // scrape costs a little, a slam a lot, but sliding along a wall doesn't bleed speed away), and gets turned to follow it
   const [lo,hi,oLo,oHi]=limits(p);t=trackFrame(p);
   // on the kerb and verge of an open edge: rumble and lose speed
-  if(p.br<0&&!p.air){const hw=hwAt(-1,p.s),sd=Math.sign(p.x);if(Math.abs(p.x)>hw-.8&&(sd>0?oHi:oLo)){const k=1-dt*(Math.abs(p.x)>hw+1.4?.45:.2);p.wvx*=k;p.wvz*=k;G.shake=Math.max(G.shake,.12);}}
+  if(p.br<0&&!p.air&&p.nitroLevel!==2){const hw=hwAt(-1,p.s),sd=Math.sign(p.x);if(Math.abs(p.x)>hw-.8&&(sd>0?oHi:oLo)){const k=1-dt*(Math.abs(p.x)>hw+1.4?.45:.2);p.wvx*=k;p.wvz*=k;G.shake=Math.max(G.shake,.12);}}
   // past the barrier at the end of a run-off: in the air the car flies on; landing more than a few metres beyond it (it
   // can't get there on the ground) is out of bounds; otherwise the barrier is a wall like any other
   const open=(p.x<lo&&oLo)||(p.x>hi&&oHi);
@@ -2331,7 +2444,7 @@ function updatePlayer(dt){
   }
   if(p.oob){updateOOB(p,dt);return;}
   if(p.ghost>0)p.ghost-=dt;
-  if(p.spin){p.spin.t+=dt;if(!p.air)p.speed=Math.max(20,p.speed-24*dt);
+  if(p.spin){p.spin.t+=dt;if(!p.air&&!p.nitroLevel)p.speed=Math.max(20,p.speed-12*dt); // nitro hit mid-spin keeps the speed up
     if(!p.air&&rnd()<.7){sampleE(p);emit(TS.p.clone().addScaledVector(TS.r,p.x).addScaledVector(TS.u,.4),new V3((rnd()-.5)*3,1.5,(rnd()-.5)*3).addScaledVector(TS.f,p.speed*.3),.8,1,4,0xd8d0e0,false);}
     if(p.spin.t>=p.spin.dur){p.spin=null;if(p.air)p.tricks.push('360');else trickPayout(['360'],null);}}
 
@@ -2342,7 +2455,7 @@ function updatePlayer(dt){
   // slipstream: sit 3-28 m behind a car in the same lane to charge nitro and pick up a little speed
   p.slip=0;
   if(G.rules.slip&&racing&&!p.air&&p.speed>30){
-    let best=99;const chk=o=>{if(o.br!==p.br)return;const d=dAlong(p.br,posOf(o),posOf(p));if(d>3.5&&d<28&&d<best&&Math.abs(o.x-p.x)<2.3)best=d;};
+    let best=99;p.slipFrom=null;const chk=o=>{if(o.br!==p.br)return;const d=dAlong(p.br,posOf(o),posOf(p));if(d>3.5&&d<28&&d<best&&Math.abs(o.x-p.x)<2.3){best=d;p.slipFrom=o;}};
     for(const r of rivals)if(!r.out&&r.wreck<=0&&r.y<1)chk(r);
     if(best<99){p.slipT+=dt;if(p.slipT>.35)p.slip=1-(best-3.5)/24.5*.6;}else p.slipT=Math.max(0,p.slipT-dt*3);
   }else p.slipT=0;
@@ -2492,6 +2605,10 @@ function collisions(){
     const side=Math.abs(c.dx)>c.wd-.85&&Math.abs(c.ds)<c.ln-.9;
     const slam=side&&Math.sign(p.vx)===Math.sign(c.dx)&&Math.abs(p.vx)>5/p.spec.mass;
     const landing=p.air&&p.vy<0;
+    // a takedown on a rival needs intent: on nitro, either ramming it from behind clearly faster or swiping into its side
+    // hard, or landing on it from a jump. Anything else is a bump (racing side by side, tapping a bumper) and nobody
+    // wrecks, which keeps close online racing fair
+    const ram=!side&&c.ds>0&&p.speed-o.speed>7,swipe=side&&Math.sign(p.vx)===Math.sign(c.dx)&&Math.abs(p.vx)>7/p.spec.mass;
     if(!o.skill){ // parked car or bus: it always goes flying; ploughing into it without nitro costs speed, never a stop
       if(p.nitroLevel>0||slam||landing){knockdown(o,landing?'air':'slam');continue;}
       if(!side&&c.ds>0){knockTraffic(o,p);p.speed*=1-(o.big?.5:.28)/Math.sqrt(p.spec.mass);G.shake=Math.max(G.shake,o.big?1:.7);sfx('crash');
@@ -2499,13 +2616,10 @@ function collisions(){
       if(side){const ov=c.wd-Math.abs(c.dx),sg=Math.sign(c.dx)||1;p.x-=sg*ov;pushLat(p,-sg*4);p.speed*=.97;G.shake=Math.max(G.shake,.3);}
       continue;
     }
-    if(G.rules.knock){
-      if(p.nitroLevel>0||slam||landing){knockdown(o,landing?'air':'slam');continue;}
-      if(c.ds>0&&p.speed-o.speed>18*p.spec.mass&&Math.abs(c.dx)<1.5){wreckPlayer();return;}
-    }
+    if(G.rules.knock&&(landing||p.nitroLevel>0&&(ram||swipe))){knockdown(o,landing?'air':'slam');continue;}
     // bump a rival
-    if(side){const ov=c.wd-Math.abs(c.dx),sg=Math.sign(c.dx)||1;const pw=clamp(.6/p.spec.mass,.3,.75);p.x-=sg*ov*pw;o.x+=sg*ov*(1-pw);pushLat(p,-sg*3);o.laneCD=.3;G.shake=Math.max(G.shake,.25);}
-    else if(c.ds>0){const v0=p.speed;p.speed=Math.max(Math.min(p.speed,o.speed-1),p.speed*.9);o.speed=Math.max(o.speed,v0*.92);nudge(p,-(c.ln-c.ds));G.shake=Math.max(G.shake,.25);}
+    if(side){const ov=c.wd-Math.abs(c.dx),sg=Math.sign(c.dx)||1;const pw=clamp(.6/p.spec.mass,.3,.75);p.x-=sg*ov*pw;if(!o.remote)o.x+=sg*ov*(1-pw)+(slam?sg*.6:0);pushLat(p,-sg*3);o.laneCD=.3;G.shake=Math.max(G.shake,.25);}
+    else if(c.ds>0){const v0=p.speed;p.speed=Math.max(Math.min(p.speed,o.speed-1),p.speed*.94);o.speed=Math.max(o.speed,v0*.92);nudge(p,-(c.ln-c.ds));G.shake=Math.max(G.shake,.25);}
     else{o.speed=Math.min(o.speed,p.speed-1);nudge(o,-(c.ln+c.ds));}
   }
   // rivals plough parked traffic out of the way too
@@ -2547,6 +2661,42 @@ function poseRacer(e,dt){
 }
 function poseTraffic(){} // parked traffic is placed once (placeTraffic) and only moves when knocked flying
 
+// ---------------------------------------------------------------- slipstream trails
+// Every car at speed drags a trail of wind streaks behind it, as long as its slipstream (28 m) and as wide as the zone
+// that charges your nitro. The one you're tucked into lights up while it fills your tank.
+const SLIP_N=14,SLIP_LEN=28;
+const slipMat=()=>new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,
+  uniforms:{uT:{value:0},uK:{value:0},uC:{value:new THREE.Color(0xbfe4ff)}},
+  vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+  fragmentShader:`varying vec2 vUv;uniform float uT,uK;uniform vec3 uC;
+    void main(){float c=vUv.x*10.,cell=floor(c),r=fract(sin(cell*91.7)*437.5);
+      float line=pow(1.-abs(fract(c)-.5)*2.,5.);
+      float f=fract(vUv.y*2.2-uT*(1.4+r)+r),dash=smoothstep(0.,.12,f)*smoothstep(.7,.35,f);
+      float edge=smoothstep(0.,.3,vUv.x)*smoothstep(1.,.7,vUv.x),fade=smoothstep(0.,.08,vUv.y)*pow(1.-vUv.y,1.3);
+      gl_FragColor=vec4(uC,(line*dash*.85+.12)*edge*fade*uK);}`});
+function slipGeo(){const g=new THREE.BufferGeometry(),n=SLIP_N+1,uv=new Float32Array(n*4),idx=[];
+  for(let i=0;i<n;i++){uv.set([0,i/SLIP_N,1,i/SLIP_N],i*4);if(i<SLIP_N){const q=i*2;idx.push(q,q+1,q+2,q+1,q+3,q+2);}}
+  g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(n*6),3));g.setAttribute('uv',new THREE.BufferAttribute(uv,2));g.setIndex(idx);return g;}
+const _sp=new V3();
+function updateSlipTrails(dt){
+  const on=G.rules&&G.rules.slip&&(G.mode==='race'||G.mode==='finish');
+  for(const r of rivals){
+    if(!r.slipT){r.slipT=new THREE.Mesh(slipGeo(),slipMat());r.slipT.frustumCulled=false;scene.add(r.slipT);}
+    const m=r.slipT,show=on&&!r.out&&r.car&&r.car.g.visible&&r.wreck<=0&&!r.air&&r.y<1&&r.speed>30&&Math.abs(wrapD(r.s,player.s))<220;
+    m.visible=show;if(!show)continue;
+    const mine=player.slipFrom===r&&player.slip>0,k=mine?1:.38;
+    const u=m.material.uniforms;u.uT.value+=dt*(r.speed/40);u.uK.value+=(k*clamp((r.speed-30)/20,0,1)-u.uK.value)*Math.min(1,6*dt);
+    u.uC.value.setHex(mine?0x7fd8ff:0xbfe4ff);
+    const pos=m.geometry.attributes.position.array,b0=posOf(r);
+    for(let i=0;i<=SLIP_N;i++){const d=2.4+i/SLIP_N*(SLIP_LEN-2.4);sampleAt(r.br,b0-d);
+      // a little narrower at the car, full zone width further back
+      const hw=1.6+.8*i/SLIP_N,h=.75;
+      _sp.copy(TS.p).addScaledVector(TS.r,r.x).addScaledVector(TS.u,h);
+      pos[i*6]=_sp.x-TS.r.x*hw;pos[i*6+1]=_sp.y-TS.r.y*hw;pos[i*6+2]=_sp.z-TS.r.z*hw;
+      pos[i*6+3]=_sp.x+TS.r.x*hw;pos[i*6+4]=_sp.y+TS.r.y*hw;pos[i*6+5]=_sp.z+TS.r.z*hw;}
+    m.geometry.attributes.position.needsUpdate=true;
+  }
+}
 // ---------------------------------------------------------------- camera
 const camPos=new V3(),camLook=new V3(),camOff=new V3(),_v=new V3(),_d=new V3();let camInit=false;
 // something knocked flying that comes within r of the camera is hidden for those frames rather than filling the screen
@@ -2570,7 +2720,7 @@ function cameraFollow(dt){
     camLook.copy(camPos).addScaledVector(_d,30).addScaledVector(u,C.fp==='hood'?-2.2:-.6);
     camInit=false;
   }else{
-    const dm=playerCar.dim;let back=(C.back||9.2)+clamp(dm.front-2.2,-.6,1.5)+clamp(p.speed/90,0,1)*.5+p.nitroLevel*.7,up=(C.up||3.3)+clamp(dm.h-1.25,-.2,1.2)*.8; // sized to the car
+    const dm=playerCar.dim;let back=(C.back||9.2)+clamp(dm.front-2.2,-.6,1.5)+clamp(p.speed/90,0,1)*.5+NT[p.nitroLevel].push/60,up=(C.up||3.3)+clamp(dm.h-1.25,-.2,1.2)*.8; // sized to the car
     if(camera.aspect<.8){back+=1.3;up+=.3;} // portrait phone: a step further back so the car doesn't fill the width
     const cy=(p.camYaw||0)*.85;_d.copy(f).multiplyScalar(Math.cos(cy)).addScaledVector(r,-Math.sin(cy));
     if(G.mode==='finish'){G.finishT+=dt;const a=G.finishT*.5;_v.copy(base).addScaledVector(f,Math.cos(a)*-10).addScaledVector(r,Math.sin(a)*10).addScaledVector(u,3.5);}
@@ -2583,11 +2733,11 @@ function cameraFollow(dt){
   }
   camera.position.copy(camPos);
   // shake is a smooth wobble (a fresh random jolt every frame reads as the screen glitching)
-  const sh=Math.min(G.shake,1)*.16+.025*p.nitroLevel,wt=G.t*31;
+  const sh=Math.min(G.shake,1)*.16+NT[p.nitroLevel].push/1500,wt=G.t*31;
   if(sh>0){camera.position.addScaledVector(r,(Math.sin(wt*1.07)+Math.sin(wt*.61+1.3))*sh*.5).addScaledVector(u,(Math.sin(wt*.93+.4)+Math.sin(wt*.53+2.1))*sh*.4);}
   G.shake=Math.max(0,G.shake-dt*2.2);
   camera.lookAt(camLook);
-  let fov=(C.fp?66:62)+clamp(p.speed/100,0,1.2)*14+p.nitroLevel*4+(p.padT>0?3:0);
+  let fov=(C.fp?66:62)+clamp(p.speed/100,0,1.2)*14+NT[p.nitroLevel].top/3.5+(p.padT>0?3:0);
   // a tall (portrait phone) screen keeps the side-to-side view of a 1.3:1 one, so the road isn't cropped to the car
   if(camera.aspect<1.15)fov=Math.min(96,2*Math.atan(Math.tan(fov*Math.PI/360)*1.15/camera.aspect)*180/Math.PI);camera.fov=lerp(camera.fov,fov,1-Math.exp(-dt*4));camera.updateProjectionMatrix();
 }
@@ -2623,9 +2773,9 @@ function updateHud(){
   setText(H.time,'time',fmt(p.finished?p.finishTime:G.raceTime));
   setText(H.spd,'spd',String(Math.round(p.speed*3.6)));
   H.nfill.style.width=(p.nitro*100).toFixed(1)+'%';
-  const lvl=p.nitroLevel,col=lvl===3?'var(--shock)':lvl===2?'var(--perfect)':'var(--nitro)';
+  const lvl=p.nitroLevel,col=lvl?NT[lvl].col:'var(--nitro)';
   H.nfill.style.background=lvl>=2?col:'linear-gradient(90deg,#ff7a18,var(--nitro))';H.nfill.style.boxShadow='0 0 18px '+col;
-  setText(H.nlabel,'nl',lvl===3?'SHOCKWAVE':lvl===2?'PERFECT NITRO':lvl===1?'NITRO':p.nitro>=.97?'FULL \u00b7 DOUBLE-TAP FOR SHOCKWAVE':p.slip>0?'SLIPSTREAM \u00b7 CHARGING':'NITRO');
+  setText(H.nlabel,'nl',lvl?NT[lvl].name:p.nitro>=.97?'FULL \u00b7 DOUBLE-TAP FOR SHOCKWAVE':p.slip>0?'SLIPSTREAM \u00b7 CHARGING':'NITRO');
   H.nlabel.style.color=!lvl&&p.slip>0&&p.nitro<.97?'var(--perfect)':col;
   const e=G.raceTime-p.nitroStart,show=lvl===1&&e<1.05;H.ptimer.hidden=!show;if(show)H.pmark.style.left=(e/1.05*100).toFixed(1)+'%';
   H.hint.hidden=!(p.air&&!p.spin&&p.airMax-p.airT>.6&&G.mode==='race');
@@ -2683,9 +2833,9 @@ function update(dt){
   }
   updateTraffic(dt);collisions();updateFeatures(dt);updateWeather(dt);updateProps(dt);
   poseRacer(player,dt);rivals.forEach(r=>!r.out&&poseRacer(r,dt));poseTraffic();
-  cameraFollow(dt);updateParts(dt);
+  cameraFollow(dt);updateParts(dt);updateSlipTrails(dt);
   // speed lines
-  const k=player.nitroLevel?.35+player.nitroLevel*.12:player.padT>0||player.slip>0?.3:clamp((player.speed-60)/40,0,1)*.12;slMat.opacity=lerp(slMat.opacity,k,.15);
+  const k=player.nitroLevel?.35+NT[player.nitroLevel].push/180:player.padT>0||player.slip>0?.3:clamp((player.speed-60)/40,0,1)*.12;slMat.opacity=lerp(slMat.opacity,k,.15);
   if(slMat.opacity>.01){const v=player.speed*1.6*dt;slData.forEach((l,i)=>{l.z+=v;if(l.z>-3)l.z-=80;slPos.set([l.x,l.y,l.z,l.x,l.y,l.z-l.len],i*6);});slGeo.attributes.position.needsUpdate=true;}
   // ring
   if(ringT>0){ringT-=dt;const q=1-ringT/.7;sampleE(player);ring.position.copy(TS.p).addScaledVector(TS.r,player.x).addScaledVector(TS.u,.5);ring.scale.setScalar(2+q*40);ring.material.opacity=(1-q)*.9;}else ring.material.opacity=0;
@@ -2873,8 +3023,8 @@ if(MP.on){
     else if(m.t==='st'){mpPush(m.id,m.ts,m.s);if(m.ai)m.ai.forEach(x=>mpPush(x.id,m.ts,x.s));}
     else if(m.t==='clock')MP.off=m.off;
     else if(m.t==='ev'&&m.type==='takedown'){
-      if(m.target===MP.me&&player.wreck<=0&&G.mode==='race'){wreckPlayer();toast('TAKEN DOWN','danger','BY '+(m.byName||'RIVAL').toUpperCase());}
-      else if(MP.host){const r=rivals.find(r=>r.netId===m.target&&r.ai&&!r.remote);if(r){r.wreck=1.9;r.speed*=.4;}}}
+      if(m.target===MP.me&&player.wreck<=0&&player.nitroLevel!==3&&G.mode==='race'){wreckPlayer();toast('TAKEN DOWN','danger','BY '+(m.byName||'RIVAL').toUpperCase());}
+      else if(MP.host){const r=rivals.find(r=>r.netId===m.target&&r.ai&&!r.remote);if(r){r.wreck=1.4;r.speed*=.5;}}}
     else if(m.t==='left'){const r=rivals.find(r=>r.netId===m.id);if(r){r.out=true;r.remote=false;r.car.g.visible=false;toast(r.name.toUpperCase()+' LEFT','plain');}}
     else if(m.t==='menu')mpReset();
   });
