@@ -1,7 +1,7 @@
 {
   "name": "redline-nights",
   "productName": "Redline Nights",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Arcade street racer with LAN and online multiplayer",
   "main": "main.js",
   "author": "Redline Nights",

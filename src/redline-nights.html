@@ -692,7 +692,8 @@ const atY=(k,off,y,o)=>{o[0]=P[k*3]+R[k*3]*off;o[1]=y;o[2]=P[k*3+2]+R[k*3+2]*off
 // (kerb, then a run-off verge, then the drop) or 'cliff' (kerb, then straight over the edge). Off an open edge is out
 // of bounds. LAYOUTS[map].gaps: [u, length] stretches with no road at all, crossed by a full-width jump ramp.
 // Forks, the tunnel and the start stay full width and walled.
-const EDGE={wall:0,kerb:1,cliff:2},VERGE=[0,7,1.4],SURFS={asphalt:0,dirt:1,stone:2};
+// run-off past an open edge before it's out of bounds: room to run wide, land a jump or a flip off line, and get back on
+const EDGE={wall:0,kerb:1,cliff:2},VERGE=[0,12,5],SURFS={asphalt:0,dirt:1,stone:2};
 const HW=new Float32Array(NS).fill(ROAD_HALF),EL=new Uint8Array(NS),ER=new Uint8Array(NS),SURF=new Uint8Array(NS),GAPK=new Uint8Array(NS);
 {
   const spec=LAYOUTS[MAP_ID],secs=(spec.sec||[]).map(([i,j,o])=>[MARKS.apex[i],MARKS.apex[j],o]);
@@ -701,7 +702,7 @@ const HW=new Float32Array(NS).fill(ROAD_HALF),EL=new Uint8Array(NS),ER=new Uint8
   const tw=new Float32Array(NS);
   for(let k=0;k<NS;k++){const u=k/NS,s=u*L;let w=ROAD_HALF,el=0,er=0,sf=SURFS[spec.surf||'asphalt'];
     for(const [a,b,o] of secs)if(inU(u,a,b)){if(o.w)w=o.w*RW;if(o.l)el=EDGE[o.l];if(o.r)er=EDGE[o.r];if(o.surf)sf=SURFS[o.surf];}
-    if(forced(s)){w=ROAD_HALF;el=0;er=0;}
+    if(forced(s)){w=ROAD_HALF;el=0;er=0;if(BR.some(b=>{const d=wrapD(s,b.s0);return d>-90&&d<b.span+90;}))sf=SURFS.asphalt;}
     tw[k]=w;EL[k]=el;ER[k]=er;SURF[k]=sf;}
   const n=Math.round(40/L*NS); // ease width changes over ~80 m
   for(let k=0;k<NS;k++){let t=0;for(let j=-n;j<=n;j++)t+=tw[(k+j+NS)%NS];HW[k]=t/(2*n+1);}
@@ -715,13 +716,15 @@ const fitX=(br,s,x)=>br<0?x*hwAt(-1,s)/ROAD_HALF:x;          // lane positions s
 const laneX=(e,i)=>fitX(e.br,posOf(e),LANES[i]);
 
 // road surfaces
-// skip: leave off the edge lines on that side (-1 left, 1 right), for where a branch widens the road on that side
-const roadTexOf=skip=>canvasTex(512,512,(g,w,h)=>{
+// skip: leave off the edge lines on that side (-1 left, 1 right, 'both'); plain: no lane lines either, for the stretch
+// where two roads overlap and read as one wide road (lane lines from both, at an angle, look like driving into a road)
+const roadTexOf=(skip,plain)=>canvasTex(512,512,(g,w,h)=>{
   g.fillStyle=MAP.asphalt;g.fillRect(0,0,w,h);
   const r=mulberry32(11);for(let i=0;i<9000;i++){const v=30+r()*40|0;g.fillStyle=`rgba(${v},${v-4},${v+6},.5)`;g.fillRect(r()*w,r()*h,2,2);}
-  const ux=x=>(x+ROAD_HALF)/(2*ROAD_HALF)*w,keep=x=>Math.sign(x)!==skip;
+  const ux=x=>(x+ROAD_HALF)/(2*ROAD_HALF)*w,keep=x=>skip!=='both'&&Math.sign(x)!==skip;
   g.fillStyle='#f2e8d5';[-12.6*RW,12.6*RW].filter(keep).forEach(x=>g.fillRect(ux(x)-4,0,8,h));
   g.fillStyle='#ffbf3a';[-13.2*RW,13.2*RW].filter(keep).forEach(x=>g.fillRect(ux(x)-2,0,4,h));
+  if(plain)return;
   g.fillStyle='rgba(242,232,213,.85)';[-6.5*RW,0,6.5*RW].forEach(x=>{for(let y=0;y<h;y+=h/2)g.fillRect(ux(x)-3,y,6,h/4);});
   g.fillStyle='rgba(0,0,0,.18)';LANES.forEach(x=>g.fillRect(ux(x)-26,0,52,h));
 }),roadTex=roadTexOf(0);
@@ -757,7 +760,7 @@ const padRun=r=>{const a=(r[0]-1+NS)%NS,b=(r[r.length-1]+1)%NS;return [a,...r,b]
 // which side of the main road a branch overlaps at each sample (0: neither): there the asphalt drops its edge lines and
 // the branch's surface runs underneath, so the two read as one wider road until they split
 const OV=new Int8Array(NS);for(let k=0;k<NS;k++)OV[k]=!mainWallAt(k,-1)?-1:!mainWallAt(k,1)?1:0;
-const openMats={'-1':asphaltMat(roadTexOf(-1)),'1':asphaltMat(roadTexOf(1))};
+const openMats={'-1':asphaltMat(roadTexOf(-1,true)),'1':asphaltMat(roadTexOf(1,true))};
 for(let sf=0;sf<3;sf++)for(const ov of sf?[0]:[0,-1,1])for(const run of runs(NS,k=>SURF[k]===sf&&!GAPK[k]&&(sf>0||OV[k]===ov),true))
   scene.add(new THREE.Mesh(ribbonRun(padRun(run),(k,s,o)=>at(k,s?HW[k]:-HW[k],0,o),24,L/NS),ov?openMats[ov]:roadMats[sf]));
 const railMats=[new THREE.MeshBasicMaterial({color:MAP.rails[0],side:THREE.DoubleSide}),new THREE.MeshBasicMaterial({color:MAP.rails[1],side:THREE.DoubleSide})];
@@ -812,11 +815,15 @@ if(GAPS.length){
 // branch roads: where they overlap the main road their surface runs just underneath it (the main road's markings stay on
 // top, so it reads as one road widening), rising to their own level as they part; walls only where the roads are apart
 const branchRoadMat=road.material.clone();Object.assign(branchRoadMat,{polygonOffset:true,polygonOffsetFactor:1,polygonOffsetUnits:4});
+const branchPlainMat=asphaltMat(roadTexOf('both',true));Object.assign(branchPlainMat,{polygonOffset:true,polygonOffsetFactor:1,polygonOffsetUnits:4});
 for(const b of BR){
   const atB=(k,off,dy,o)=>{o[0]=b.P[k*3]+b.R[k*3]*off;o[1]=b.P[k*3+1]+dy;o[2]=b.P[k*3+2]+b.R[k*3+2]*off;};
   const all=[...Array(b.n).keys()],step=b.len/(b.n-1);
   const lift=all.map(k=>{const u=clamp((sepB(b,k*step)-(GAP-4))/8,0,1);return lerp(-.06,.03,u*u*(3-2*u));});
-  scene.add(new THREE.Mesh(ribbonRun(all,(k,s,o)=>atB(k,s?ROAD_HALF:-ROAD_HALF,lift[k],o),24,step),branchRoadMat));
+  // plain where it overlaps the main road, its own markings once the two have parted
+  for(const shared of [true,false])for(const run of runs(b.n,k=>(sepB(b,k*step)<GAP)===shared,false)){
+    const r=[Math.max(0,run[0]-1),...run,Math.min(b.n-1,run[run.length-1]+1)];
+    scene.add(new THREE.Mesh(ribbonRun(r,(k,s,o)=>atB(k,s?ROAD_HALF:-ROAD_HALF,lift[k],o),24,step),shared?branchPlainMat:branchRoadMat));}
   for(const side of [-1,1]){
     const e=side*ROAD_HALF;
     const ok=k=>{const bs=k/(b.n-1)*b.len;return !(Math.sign(offB(b,bs))===side&&sepB(b,bs)<GAP);};
@@ -941,10 +948,13 @@ const RAIL=(()=>{
 const COARSE=[];for(let i=0;i<NS;i+=6)COARSE.push(P[i*3],P[i*3+2]);
 if(RAIL)for(const p of RAIL.pts)COARSE.push(p.x,p.z);
 for(const b of BR)for(let i=0;i<b.n;i+=6)COARSE.push(b.P[i*3],b.P[i*3+2]);
-function trackDist(x,z){let m=1e12;for(let i=0;i<COARSE.length;i+=2){const dx=COARSE[i]-x,dz=COARSE[i+1]-z,d=dx*dx+dz*dz;if(d<m)m=d;}return Math.sqrt(m);}
+function trackDist(x,z){let m=1e12;for(let i=0;i<COARSE.length;i+=2){const dx=COARSE[i]-x,dz=COARSE[i+1]-z,d=dx*dx+dz*dz;if(d<m)m=d;}return Math.sqrt(m)-SX;}
 // true if main-road distance s on the given side is inside a branch's span (no lamps or boards there)
 const onBranchSide=(s,side)=>BR.some(b=>b.side===side&&wrapD(s,b.s0)>-30&&wrapD(s,b.s0)<b.span+30);
-const spot=(i,off)=>[P[i*3]+R[i*3]*off,P[i*3+2]+R[i*3+2]*off];
+// scenery offsets were laid out for the original road (13.6 m half width) and 7 m run-off: push everything out by the
+// difference, and measure clearances from that much further out too, so nothing stands on the road or its run-off
+const SX=(ROAD_HALF-13.6)+(VERGE[1]-7);
+const spot=(i,off)=>{off+=Math.sign(off)*SX;return [P[i*3]+R[i*3]*off,P[i*3+2]+R[i*3+2]*off];};
 const _eu=new THREE.Euler(0,0,0,'YXZ');
 // list entries: [x,y,z, sx,sy,sz, yaw, colour?, tilt?]
 function instanced(geo,mat,list){
@@ -1427,7 +1437,7 @@ const U=u=>u*L;
     const tex=canvasTex(512,256,(g,w,h)=>{g.fillStyle='#120c1c';g.fillRect(0,0,w,h);g.strokeStyle=ad[2];g.lineWidth=10;g.strokeRect(8,8,w-16,h-16);
       g.fillStyle=ad[2];g.textAlign='center';g.font='italic 900 88px "Saira Condensed",Impact,sans-serif';g.fillText(ad[0],w/2,138);
       g.fillStyle='#f6efe4';g.font='700 32px "Chakra Petch",sans-serif';g.fillText(ad[1],w/2,198);});
-    const grp=new THREE.Group();placeOnTrack(grp,U(u),side*24,0);sample(U(u));const rise=TS.p.y-GROUND_Y;
+    const grp=new THREE.Group();placeOnTrack(grp,U(u),side*(24+SX),0);sample(U(u));const rise=TS.p.y-GROUND_Y;
     const board=new THREE.Mesh(new THREE.PlaneGeometry(16,8),new THREE.MeshBasicMaterial({map:tex,side:THREE.DoubleSide}));
     board.position.y=13;board.rotation.y=Math.PI-side*.35;grp.add(board);
     for(const px of [-5,5]){const post=new THREE.Mesh(new THREE.CylinderGeometry(.25,.3,9+rise,8),postMat);post.position.set(px,9-(9+rise)/2,0);grp.add(post);}
@@ -1453,7 +1463,7 @@ const lampMat=new THREE.MeshBasicMaterial({color:0xffb02e});
       OBST.push({kind:'block',s:z.s+30,x:fitX(-1,z.s+30,lx),w:6,len:1.4,mesh:blk});});
     const side=z.lanes.reduce((a,l)=>a+LANES[l],0)>0?1:-1,g=new THREE.Group();
     const board=new THREE.Mesh(new THREE.PlaneGeometry(6,3),new THREE.MeshBasicMaterial({map:signTex,side:THREE.DoubleSide}));board.position.y=3.4;board.rotation.y=Math.PI;g.add(board);
-    add(g,new THREE.BoxGeometry(.15,2,.15),MAT.dark,0,1,0);placeOnTrack(g,z.s-90,side*15.6,0);scene.add(g);
+    add(g,new THREE.BoxGeometry(.15,2,.15),MAT.dark,0,1,0);placeOnTrack(g,z.s-90,side*(hwAt(-1,z.s-90)+2),0);scene.add(g);
   });
   OBST.forEach(o=>o.br=-1);
   for(const b of BR)if(b.kind==='short')for(const [f,x] of [[.3,0],[.3,3],[.42,1],[.62,2],[.7,0],[.7,3]].map(([f,i])=>[f,LANES[i]]))
@@ -2184,7 +2194,7 @@ function carPhysics(p,dt,steer,brake,racing){
   // scrape costs a little, a slam a lot, but sliding along a wall doesn't bleed speed away), and gets turned to follow it
   const [lo,hi,oLo,oHi]=limits(p);t=trackFrame(p);
   // on the kerb and verge of an open edge: rumble and lose speed
-  if(p.br<0&&!p.air){const hw=hwAt(-1,p.s),sd=Math.sign(p.x);if(Math.abs(p.x)>hw-.8&&(sd>0?oHi:oLo)){const k=1-dt*(Math.abs(p.x)>hw+1.4?.9:.25);p.wvx*=k;p.wvz*=k;G.shake=Math.max(G.shake,.12);}}
+  if(p.br<0&&!p.air){const hw=hwAt(-1,p.s),sd=Math.sign(p.x);if(Math.abs(p.x)>hw-.8&&(sd>0?oHi:oLo)){const k=1-dt*(Math.abs(p.x)>hw+1.4?.45:.2);p.wvx*=k;p.wvz*=k;G.shake=Math.max(G.shake,.12);}}
   if((p.x<lo&&oLo)||(p.x>hi&&oHi)){if(racing&&!p.air)goOOB(p,p.x>hi?1:-1,Math.hypot(p.wvx,p.wvz));}
   else if(p.x<lo||p.x>hi){const side=p.x>hi?1:-1,lim=side>0?hi:lo;
     // normally a wall stops you dead on its line; where the overlap of two roads ends under a car (the gore), it is eased
