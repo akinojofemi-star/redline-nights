@@ -193,7 +193,7 @@ td.t{text-align:right}
   <div id="menu" class="overlay">
     <div class="card">
       <h1>Redline<span>Nights</span></h1>
-      <p class="tag">Eight tracks with split routes, thirty-three real cars in five classes, four modes, five camera views. Drift to fill nitro, hit it again on the beat for Perfect Nitro, and double-tap a full tank for a Shockwave that clears the road.</p>
+      <p class="tag">Eight tracks with split routes, forty-three real cars in five classes, four modes, five camera views. Drift to fill nitro, hit it again on the beat for Perfect Nitro, and double-tap a full tank for a Shockwave that clears the road.</p>
       <div class="garage">
         <div class="lbl">Track</div>
         <div class="row seg" id="mapSeg"></div>
@@ -1482,7 +1482,7 @@ function makeCar(color,{shape=SEDAN,flames=false}={}){
   return car;
 }
 // Blender-modelled bodies (models/<id>.glb). Materials are matched by name so paint colour and lighting stay consistent.
-const MODEL_CACHE={},MODEL_VER=8; // bump when the Blender models are re-exported
+const MODEL_CACHE={},MODEL_VER=9; // bump when the Blender models are re-exported
 function loadModel(id){
   if(!THREE.GLTFLoader)return Promise.reject(new Error('no loader'));
   return MODEL_CACHE[id]||(MODEL_CACHE[id]=new Promise((res,rej)=>new THREE.GLTFLoader().load('models/'+id+'.json?v='+MODEL_VER,g=>res(g.scene),undefined,rej)));
@@ -1765,16 +1765,23 @@ const SH_COUPE={len:4.7,wid:1.9,wr:.36,zf:1.5,zr:-1.3,noseH:.85,cowlZ:.35,beltH:
 const SH_MID={len:4.6,wid:1.95,wr:.35,zf:1.4,zr:-1.25,noseH:.62,cowlZ:.6,beltH:.86,roofF:-.15,roofR:-.8,roofH:1.18,deckZ:-1.9,deckH:.96,tailH:.94,style:'mid',head:'eye',extras:['sideintake'],exh:[-.2,.2]};
 const sh=(base,model,extra)=>Object.assign({},base,{model},extra||{});
 const CARS=[
+  REAL('Mazda RX-7','D',250,5.3,1260,1.3,1.1,'Twin-rotor nineties icon. Light, balanced and born to drift.',sh(SH_COUPE,'rx7',{len:4.29,roofH:1.2})),
+  REAL('Nissan 370Z','D',250,5.2,1500,1.1,1.05,'Short, punchy V6 coupe. Rear-drive and happy to hang the tail out.',sh(SH_COUPE,'z370',{len:4.25,roofH:1.3})),
   REAL('Mazda MX-5','D',219,6.5,1075,1.4,1.15,'Tiny, light roadster. Slowest on the straights, best in the corners.',sh(SH_ROADSTER,'mx5')),
   REAL('Toyota GR86','D',226,6.3,1270,1.3,1.1,'Light rear-drive coupe. Happy to slide, slow to pass anyone.',sh(SH_COUPE,'gr86',{len:4.27,roofH:1.31,beltH:.95})),
   REAL('Volkswagen Golf GTI','D',250,6.3,1430,1.1,1.1,'The everyday hot hatch. Easy to drive, never the fastest.',sh(SH_HATCH,'golf')),
   REAL('Mini Cooper S','D',235,6.8,1265,1.35,1.05,'Go-kart handling in a tiny hatch. Darts through gaps nothing else fits.',sh(SH_HATCH,'mini',{len:3.87,roofH:1.41})),
   REAL('Nissan Silvia S15 Spec-R','D',240,6.0,1250,1.3,1.15,'Turbo rear-drive drift icon. Built to go sideways, and drifting fills its nitro fast.',sh(SH_COUPE,'silvia',{len:4.44,roofH:1.29,wing:'duck'})),
   REAL('Toyota GR Yaris','D',230,5.5,1280,1.35,1.05,'Rally homologation hatch. Short, grippy and happy to be thrown sideways.',sh(SH_HATCH,'yaris',{len:4.0,rim:0x55555c})),
+  REAL('Ford Focus RS','C',266,4.7,1530,1.2,1.0,'All-wheel-drive hot hatch with a drift mode. Grips, then slides on command.',sh(SH_HATCH,'focusrs',{len:4.39})),
+  REAL('BMW M2 Competition','C',280,4.2,1550,1.15,1.0,'Compact twin-turbo six. The quickest C-class car on a straight.',sh(SH_COUPE,'m2',{len:4.46,roofH:1.4})),
   REAL('Honda Civic Type R','C',275,5.4,1430,1.25,1.05,'Front-drive hot hatch with a huge wing and a very sharp front end.',sh(SH_HATCH,'civic',{len:4.59,wing:'big'})),
   REAL('Ford Mustang GT','C',250,4.9,1830,.8,1.1,'V8 muscle. Strong off the line and heavy enough to shove traffic aside.',sh(SH_COUPE,'mustang',{len:4.81,tail:'tri',wing:'duck'})),
   REAL('Toyota GR Supra','C',250,4.1,1540,1.1,1.0,'Turbo straight-six coupe. The quickest launch in the class.',sh(SH_COUPE,'supra',{len:4.38,roofH:1.29,wing:'duck'})),
   REAL('Subaru WRX STI','C',255,5.2,1530,1.25,1.0,'All-wheel-drive rally sedan with a tall wing. Grips anywhere.',sh(SH_COUPE,'wrx',{len:4.6,roofH:1.47,wing:'big'})),
+  REAL('Honda NSX','B',307,2.9,1725,1.15,1.1,'Hybrid mid-engined all-wheel drive. Instant electric shove out of every corner.',sh(SH_MID,'nsx',{len:4.49})),
+  REAL('Dodge Challenger SRT Hellcat','B',320,3.6,2000,.8,1.0,'Supercharged V8 muscle. A rocket in a straight line and a handful in the bends.',sh(SH_COUPE,'hellcat',{len:5.03,roofH:1.45})),
+  REAL('Chevrolet Camaro ZL1','B',318,3.5,1750,.95,1.0,'Supercharged V8 coupe with real grip. Muscle that can corner.',sh(SH_COUPE,'camaro',{len:4.78,roofH:1.35})),
   REAL('BMW M4 Competition','B',290,3.9,1725,1.0,1.0,'Twin-turbo six with all-wheel drive. Quick everywhere, heavy in the bends.',sh(SH_COUPE,'m4',{len:4.79})),
   REAL('Chevrolet Corvette C8','A',312,2.9,1655,1.1,1.0,'Mid-engined American V8. Supercar pace in the B class.',sh(SH_MID,'c8',{len:4.63})),
   REAL('Tesla Model S Plaid','B',322,2.1,2190,.85,1.35,'Electric sedan with savage launch and a huge battery for nitro. Heavy in corners.',sh(SH_COUPE,'models',{len:4.97,roofH:1.44,grille:'none',exh:[]})),
@@ -1785,6 +1792,7 @@ const CARS=[
   REAL('Audi R8 V10 Performance','A',331,3.1,1595,1.1,1.0,'Naturally aspirated V10 and quattro grip. Stable and fast.',sh(SH_MID,'r8',{len:4.43})),
   REAL('Aston Martin Vantage','B',314,3.6,1630,1.1,1.0,'Front-engined twin-turbo V8 GT. Long bonnet, tidy balance.',sh(SH_COUPE,'vantage',{len:4.47,roofH:1.27})),
   REAL('Mercedes-AMG GT S','B',310,3.8,1645,1.05,1.05,'Long-nosed V8 muscle from Affalterbach. Stable at speed.',sh(SH_COUPE,'amggt',{len:4.55,roofH:1.26})),
+  REAL('Ferrari 812 Superfast','A',340,2.9,1630,1.05,1.0,'Front-engined V12 grand tourer. Huge top end, long nose to place.',sh(SH_COUPE,'f812',{len:4.66,roofH:1.28})),
   REAL('Ford GT','A',348,3.0,1385,1.1,1.0,'Le Mans-bred twin-turbo V6 with flying-buttress bodywork. Top of the A class on the straights.',sh(SH_MID,'fordgt',{len:4.78})),
   REAL('Ferrari F8 Tributo','A',340,2.9,1435,1.15,1.0,'Twin-turbo V8 Ferrari. Quick to turn in and fast everywhere.',sh(SH_MID,'f8',{len:4.61})),
   REAL('Porsche 911 Turbo S','A',330,2.7,1640,1.15,1.05,'All-wheel-drive 911 that launches like a hypercar. Stable, easy to place.',sh(SH_COUPE,'p911t',{len:4.54,roofH:1.3})),
@@ -1794,6 +1802,8 @@ const CARS=[
   REAL('Lamborghini Revuelto','S',350,2.5,1772,1.05,1.1,'V12 plug-in hybrid flagship. Brutal pace, and a lot of car to turn.',sh(SH_MID,'revuelto',{len:4.95})),
   REAL('Pagani Huayra BC','S',370,2.8,1218,1.15,1.0,'Carbon-bodied twin-turbo V12. The lightest hypercar here.',sh(SH_MID,'huayra',{len:4.61})),
   REAL('Koenigsegg Jesko','S',410,2.5,1420,1.1,.95,'Swedish twin-turbo V8 with a giant wing. Nearly Chiron pace and far lighter on its feet.',sh(SH_MID,'jesko',{len:4.61,wing:'big'})),
+  REAL('Ferrari LaFerrari','S',350,2.4,1585,1.1,1.1,'Hybrid V12 flagship. Electric torque fills every gap in the power.',sh(SH_MID,'laferrari',{len:4.7})),
+  REAL('McLaren P1','S',350,2.8,1490,1.15,1.1,'Hybrid twin-turbo V8 with active aero. Light, sharp and brutally fast.',sh(SH_MID,'p1',{len:4.59})),
   REAL('Bugatti Chiron','S',420,2.4,1995,.85,.9,'The fastest car here by a distance. Heavy, and it needs room to turn.',sh(SH_MID,'chiron',{len:4.54,grille:'horseshoe',tail:'bar'})),
   REAL('McLaren Senna','S',335,2.8,1198,1.25,.95,'Track car with number plates. Featherweight, huge downforce, the sharpest S-class car in a corner.',sh(SH_MID,'senna',{len:4.74,wing:'big'})),
   REAL('Lamborghini Aventador SVJ','S',350,2.8,1525,1.0,1.0,'Naturally aspirated V12 with active aero. Wild, loud and planted at full speed.',sh(SH_MID,'svj',{len:4.94})),
@@ -1830,6 +1840,16 @@ const CREDITS={
   huayra:['2016 Pagani Huayra BC','ddiaz-design','CC BY-NC-SA 4.0','013a102992cb4dda9035e018b7a6addb'],
   jesko:['2020 Koenigsegg Jesko','ddiaz-design','CC BY 4.0','c657f51fb0db43e38fea172dfa385287'],
   chiron:['2016 Bugatti Chiron','ddiaz-design','CC BY-NC-SA 4.0','065129f73f2849029909d8beeea760ff'],
+  laferrari:['2014 Ferrari LaFerrari','ddiaz-design','CC BY 4.0','8b46fa49718647de846387ef4c1e95b3'],
+  p1:['2014 McLaren P1','ddiaz-design','CC BY 4.0','bdf89a13ec0b48beb698f7b658073d2a'],
+  f812:['2018 Ferrari 812 Superfast','ddiaz-design','CC BY-NC-SA 4.0','6716d40cad6c4f7db9c42e2db3a94ce3'],
+  nsx:['2019 Honda NSX','ddiaz-design','CC BY-NC-SA 4.0','78ec2b54b63744d48d037b6e41c5004a'],
+  hellcat:['2019 Dodge Challenger SRT Hellcat','ddiaz-design','CC BY-NC-SA 4.0','f210ad5e17e04b2389b1c3628477105c'],
+  camaro:['2017 Chevrolet Camaro ZL1','ddiaz-design','CC BY 4.0','c57c5b0ff3e347c5aa40795a23e22187'],
+  focusrs:['2016 Ford Focus RS','ddiaz-design','CC BY-NC-SA 4.0','27e25fcead154e62a1dd8e92ccedb691'],
+  m2:['2019 BMW M2 Competition','ddiaz-design','CC BY-NC-SA 4.0','e43741a793da4e3f8e9747e31a1a8ff6'],
+  rx7:['1993 Mazda RX-7','ddiaz-design','CC BY-NC-SA 4.0','0921f5c673cf45cdb737ee999f6d213e'],
+  z370:['2013 Nissan 370Z','ddiaz-design','CC BY-NC-SA 4.0','11db2d5c2cd34c8b84e560b8090574e8'],
   senna:['2019 McLaren Senna','ddiaz-design','CC BY 4.0','6924eb7b4dde44b19d87c8c31edc74b4'],
   svj:['2019 Lamborghini Aventador SVJ','ddiaz-design','CC BY 4.0','1910d24bbad34fdda0c4fe30f01b3cc1'],
   nevera:['2022 Rimac Nevera','ddiaz-design','CC BY-NC-SA 4.0','d3700fc37a2c4a61adb33ac3ffedd787'],
@@ -1877,7 +1897,8 @@ const MP={on:/[?&]mp=1/.test(location.search),cfg:null,me:null,host:false,sendT:
 const netNow=()=>performance.timeOrigin+performance.now()+MP.off;
 function assignRivals(){
   if(MP.cfg)return;
-  const cls=player.spec.cls,pool=CARS.filter(c=>c.cls===cls&&c!==player.spec),list=pool.length?pool:[player.spec];
+  // a random five from your class each race, so every car in it turns up as a rival
+  const cls=player.spec.cls,pool=CARS.filter(c=>c.cls===cls&&c!==player.spec).sort(()=>Math.random()-.5),list=pool.length?pool:[player.spec];
   rivals.forEach((r,i)=>{const spec=list[i%list.length];
     if(r.spec!==spec||!r.car){if(r.car)scene.remove(r.car.g);r.spec=spec;r.car=makeCar(r.color,{shape:spec.shape,flames:true});scene.add(r.car.g);}});
 }
