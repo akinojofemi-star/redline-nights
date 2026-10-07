@@ -1,6 +1,6 @@
 # Redline Nights: agent handoff
 
-Last updated 2026-10-07. Read this before changing anything.
+Last updated 2026-10-07 (evening). Read this before changing anything.
 
 Redline Nights is an Asphalt 9-style arcade street racer, built and maintained for the user (repo owner `akinojofemi-star`).
 
@@ -167,6 +167,8 @@ f.contentWindow.__ev('T.issues.join("\\n")');
 **Known false alarms**
 - "player outside limits x = hi+5" comes from the out-of-bounds probe placing the car there on purpose.
 - A rare "could not stay on the main road" is the bot running wide.
+- "results never shown" when `laps × lap time` exceeds `secs` (default 170 s). Pass a bigger `secs` for multi-lap races.
+- An occasional race note of a player 0.6–0.8 m outside limits during a wall bounce, or an out-of-bounds where the bot runs off a gap's cliff edge.
 
 **Other checks**
 - **Screenshots:** iframes render black with `toDataURL`. Navigate the pane itself to `game.html?test=1&n=<unique>#map` instead (a hash-only change doesn't reload). Render, then POST `renderer.domElement.toDataURL()` to `tools/test/recv.py` (port 8791). `tools/test/sheet.swift` makes contact sheets.
@@ -197,6 +199,11 @@ Mac builds need `identity: '-'` and `hardenedRuntime: false` (already set). Dele
 
 ## Recent history (newest first)
 
+- **Bug fixes (2026-10-07):**
+  - The "NaN bounding sphere" error: the Civic Type R's code-built stand-in body (shown while its model downloads) had a NaN wing, because the hatch shape has no `deckH`. The wing now stands on the tailgate.
+  - Gap placement steps down its rules (280 m run-out, then 200, then 180) instead of silently keeping an unchecked spot, and keeps 600 m after the start line so the pack has spread out. City's gap moved from 349 m to 793 m, Tokyo's from an unchecked 1560 m to 3330 m (Tokyo's tunnel moved to 1215–1674 m as a result). The other maps are unchanged.
+  - Fork divider: `goreCheck` now judges a hit where the car's front reaches the block's front face. Before, the edge wall shoved a straddling car aside first, so Coast's short-fork divider never crashed anyone.
+  - Test suite: the parked-traffic probe picks a car on a straight approach.
 - **Touch controls editor:** drag the buttons, size, opacity, swap sides, reset.
 - **Mobile UI:** tabbed menu sheet, slim race HUD, full screen in the HUD, pause menu and settings.
 - **Full feature test pass (45 races plus probes on all 9 maps).** Fixed:
@@ -220,8 +227,7 @@ Mac builds need `identity: '-'` and `hardenedRuntime: false` (already set). Dele
 ## Open items and known issues
 
 - **Untested on real devices:** the mobile UI and the touch editor were only checked at phone sizes in a desktop browser. Ask the user for feedback from players.
-- **Gap placement:** on Neon City the gap now sits about 350 m after the start line (moved to keep it clear of forks). On Tokyo the gap ends just before a fork starts. Both work but could be moved by hand.
-- **Unexplained console errors:** "BoxGeometry … NaN bounding sphere" errors appeared once during heavy test sessions and couldn't be reproduced on any map afterwards. Watch for them.
+- **Gap placement:** Tokyo's gap only fits with the 200 m run-out tier, and it still ends about 185 m before the long fork. That's the best spot the map allows.
 - **Sunset Coast palms** are code-built, not photo-real (Poly Haven has no palm).
 - **New maps:** the user once asked for maps modelled on an Asphalt video that can no longer be viewed. Ask for screenshots if new maps come up.
 - **Stale desktop builds:** the share folder's 1.6.4 builds don't include the mobile UI and test-pass fixes. Rebuild before any desktop release.

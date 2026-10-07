@@ -107,7 +107,8 @@ T.probes=function(){const p=player,out=[];G.modeSel='classic';G.lapsSel=5;startR
     p.wreck=0;OBST.forEach(q=>{q.dead=0;placeObst(q);});const o2=blk[1]||blk[0];T.setAt(-1,o2.s-80,o2.x,45);p.nitro=1;pressNitro();const w1=p.stats.wrecks;T.run(60*3,{lane:o2.x,noBrake:true},()=>o2.dead);
     if(!o2.dead)T.note(MAP_ID+' nitro did not smash the roadblock');if(p.stats.wrecks>w1)T.note(MAP_ID+' wrecked on a roadblock while on nitro');}}
   // traffic: hitting a parked car sends it flying
-  {const t=traffic.find(t=>t.br<0&&!t.down&&T.clear(t.s-70)===mod(t.s-70));if(t){T.setAt(-1,t.s-70,t.x,45);T.run(60*3,{lane:t.x,noBrake:true},()=>t.flying>0||t.down);if(!(t.flying>0||t.down))T.note(MAP_ID+' drove through parked traffic');}}
+  {const straight=s=>{for(let d=0;d<=90;d+=6){sample(s+d);if(Math.abs(TS.c)>1/400)return false;}return true;};
+   const t=traffic.find(t=>t.br<0&&!t.down&&T.clear(t.s-70)===mod(t.s-70)&&straight(t.s-70))||traffic.find(t=>t.br<0&&!t.down&&T.clear(t.s-70)===mod(t.s-70));if(t){T.setAt(-1,t.s-70,t.x,45);T.run(60*3,{lane:t.x,noBrake:true},()=>t.flying>0||t.down);if(!(t.flying>0||t.down))T.note(MAP_ID+' drove through parked traffic');}}
   // takedown: nitro ram into a rival
   {const r=rivals[0];if(r&&G.rules.knock){T.setAt(-1,T.clear(L*.3),laneX(p,1),60);r.br=-1;r.dist=p.dist+9;r.s=mod(r.dist);r.x=p.x;r.lane=1;r.laneCD=5;traffic.forEach(t=>{if(t.br<0&&Math.abs(wrapD(t.s,p.s))<300)t.down=true;});r.speed=40;r.wreck=0;r.out=false;const k0=p.stats.knock;p.nitro=1;pressNitro();
     let minD=99;const o={lane:p.x};T.run(60*4,o,()=>{o.lane=r.x;if(r.br===p.br)minD=Math.min(minD,Math.hypot(dAlong(-1,posOf(r),posOf(p)),r.x-p.x));return p.stats.knock>k0;});

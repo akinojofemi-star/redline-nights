@@ -805,10 +805,14 @@ const MARKS=layoutPoints(LAYOUTS[MAP_ID]);
 // next bend coming, as for the ramps
 const GAPS=(LAYOUTS[MAP_ID].gaps||[]).map(([e,f,len])=>{const [a,b]=MARKS.edge[e];let s0=mod((a+(((b-a)%1+1)%1)*f)*L);
   // and well clear of a fork, so both roads stay whole where they share the tarmac
-  const ok=s=>{for(let d=-60;d<len+280;d+=6){sample(s+d);if(Math.abs(TS.c)>1/150)return false;}
+  const ok=(s,run,rad,st)=>{const d0=wrapD(s,0);if(d0>=0?d0<=st:d0>=-300)return false;for(let d=-60;d<len+run;d+=6){sample(s+d);if(Math.abs(TS.c)>1/rad)return false;}
     for(let d=-200;d<len+120;d+=6)for(const b of BR){const dd=wrapD(s+d,b.s0);if(dd>-60&&dd<b.span+40&&(dd<0||dd>b.span||sepM(b,dd)<GAP+20))return false;}
     return true;};
-  search:for(let k=0;k<L/12;k++)for(const sg of [-1,1]){const t=mod(s0+sg*k*6);if(ok(t)&&Math.abs(wrapD(t,0))>300){s0=t;break search;}}
+  // strictest first: a long flat run-out, and far enough from the grid that the pack has spread out before anyone jumps; then less run-out
+  let found=false;
+  tiers:for(const [run,rad,st] of [[280,150,600],[200,150,600],[180,120,600],[280,150,300],[200,150,300],[180,120,300],[150,100,300]])
+    for(let k=0;k<L/12;k++)for(const sg of [-1,1]){const t=mod(s0+sg*k*6);if(ok(t,run,rad,st)){s0=t;found=true;break tiers;}}
+  if(!found)console.warn('gap: no clear stretch on '+MAP_ID+', left at '+Math.round(s0));
   return {s0,s1:mod(s0+len),len};});
 // the tunnel: up to a tenth of the lap, as near the middle of the lap as it can be, on a stretch where no other road
 // (a fork, or the lap passing back over itself) comes anywhere near its walls, and clear of the start and the gaps
@@ -1591,9 +1595,11 @@ function makeCar(color,{shape=SEDAN,flames=false}={}){
   add(body,B3(W*.7,.12,.06),MAT.trim,0,c+.1,-hl-.02); // diffuser
   for(const x of S.exh){add(body,PART.pipe,MAT.chrome,x,c+.12,-hl-.04);add(body,PART.pipeIn,MAT.trim,x,c+.12,-hl-.115);}
   // wings
-  if(S.wing==='swan'||S.wing==='big'){const wy=S.wing==='swan'?S.roofH+.02:S.deckH+.42,wz=-hl+.36;add(body,B3(W*.92,.05,.42),MAT.trim,0,wy,wz);
-    for(const sx of [-1,1]){add(body,B3(.05,wy-S.deckH,.14),MAT.trim,sx*.36,(wy+S.deckH)/2,wz);add(body,B3(.04,.16,.5),MAT.trim,sx*W*.46,wy+.03,wz);}}
-  else if(S.wing==='gt'){const wy=S.deckH+.24,wz=-hl+.3;add(body,B3(W*.84,.05,.3),pm,0,wy,wz);for(const sx of [-1,1])add(body,B3(.06,.24,.12),pm,sx*W*.36,wy-.12,wz);}
+  // a hatch has no boot deck: its wing stands on the top of the tailgate
+  const dk=S.deckH!==undefined?S.deckH:S.tailH+.28;
+  if(S.wing==='swan'||S.wing==='big'){const wy=S.wing==='swan'?S.roofH+.02:dk+.42,wz=-hl+.36;add(body,B3(W*.92,.05,.42),MAT.trim,0,wy,wz);
+    for(const sx of [-1,1]){add(body,B3(.05,wy-dk,.14),MAT.trim,sx*.36,(wy+dk)/2,wz);add(body,B3(.04,.16,.5),MAT.trim,sx*W*.46,wy+.03,wz);}}
+  else if(S.wing==='gt'){const wy=dk+.24,wz=-hl+.3;add(body,B3(W*.84,.05,.3),pm,0,wy,wz);for(const sx of [-1,1])add(body,B3(.06,.24,.12),pm,sx*W*.36,wy-.12,wz);}
   else if(S.wing==='roof')add(body,B3(W*.74,.05,.3),MAT.trim,0,S.roofH+.02,S.roofR-.16);
   else if(S.wing==='duck')add(body,B3(W*.82,.06,.16),pm,0,S.tailH+.05,-hl+.1);
   // extras
@@ -2767,8 +2773,11 @@ function nudge(e,d){if(e.br>=0){const b=BR[e.br];e.bs=Math.max(0,e.bs+d);e.dist+
 function goreCheck(){
   const p=player;if(G.mode!=='race'||p.wreck>0||p.air||p.oob||p.ghost>0)return;sampleE(p);
   const cx=TS.p.x+TS.r.x*p.x,cz=TS.p.z+TS.r.z*p.x;p._gore=p._gore||{};
+  // judged where the car's front reaches the block's front face (half the 3.2 m block plus the car's front), not at its
+  // middle: by then the edge wall where the roads part has already shoved a straddling car sideways past it
+  const AL0=-3.6;
   for(const b of BR){const n=b.nose;if(!n)continue;const rx=cx-n.x,rz=cz-n.z,al=rx*n.fx+rz*n.fz,lat=Math.abs(rx*n.fz-rz*n.fx),was=p._gore[b.i];
-    p._gore[b.i]=al;if(was!==undefined&&was<0&&al>=0&&al-was<12&&lat<2.0){wreckPlayer();toast('HIT THE DIVIDER','danger','PICK A ROAD BEFORE THE SPLIT');return;}}
+    p._gore[b.i]=al;if(was!==undefined&&was<AL0&&al>=AL0&&al-was<12&&lat<2.0){wreckPlayer();toast('HIT THE DIVIDER','danger','PICK A ROAD BEFORE THE SPLIT');return;}}
 }
 function collisions(){
   goreCheck();
