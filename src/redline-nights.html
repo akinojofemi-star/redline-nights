@@ -1081,6 +1081,42 @@ const SX=(ROAD_HALF-13.6)+(VERGE[1]-7);
 const spot=(i,off)=>{off+=Math.sign(off)*SX;return [P[i*3]+R[i*3]*off,P[i*3+2]+R[i*3+2]*off];};
 const _eu=new THREE.Euler(0,0,0,'YXZ');
 // list entries: [x,y,z, sx,sy,sz, yaw, colour?, tilt?]
+// ---------------------------------------------------------------- photo props
+// Real trees (CC0 Poly Haven models, millions of polygons each) photographed in Blender against a clear background and
+// drawn as three crossed planes: photoreal from the road for six triangles a tree. Instances are grouped into chunks
+// so whole chunks out in the haze are skipped. Boulders are the real (simplified) rock mesh with its photo texture.
+const IMP={fir_a:{w:6.53,h:18.93},fir_b:{w:6.06,h:14.06},jacaranda:{w:24.42,h:19.47},quiver:{w:1.18,h:2.72}};
+const PROP_CHUNKS=[],IMPGEO={};
+function impGeo(name){
+  if(IMPGEO[name])return IMPGEO[name];const a=IMP[name].w/IMP[name].h,gs=[];
+  for(let k=0;k<3;k++){const g=new THREE.PlaneGeometry(a,1).translate(0,.5,0);g.rotateY(k*Math.PI/3);gs.push(g);}
+  let n=0;gs.forEach(g=>n+=g.attributes.position.count);const pos=new Float32Array(n*3),uv=new Float32Array(n*2),nor=new Float32Array(n*3),idx=[];let o=0;
+  gs.forEach(g=>{pos.set(g.attributes.position.array,o*3);uv.set(g.attributes.uv.array,o*2);for(let i=0;i<g.attributes.position.count;i++)nor[(o+i)*3+1]=1;
+    g.index.array.forEach(i=>idx.push(i+o));o+=g.attributes.position.count;});
+  // normals point up so the picture is lit like a tree (by the sky), not like a flat board
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));g.setAttribute('uv',new THREE.BufferAttribute(uv,2));
+  g.setAttribute('normal',new THREE.BufferAttribute(nor,3));g.setIndex(idx);return IMPGEO[name]=g;}
+// items: [x, y, z, height, yaw]; tint lets night maps darken the photo
+function chunked(geo,mat,items,size=420){
+  const cells=new Map();for(const it of items){const k=Math.floor(it[0]/size)+','+Math.floor(it[2]/size);(cells.get(k)||cells.set(k,[]).get(k)).push(it);}
+  const m=new THREE.Matrix4(),q=new THREE.Quaternion(),out=[];
+  for(const list of cells.values()){const im=new THREE.InstancedMesh(geo,mat,list.length);let cx=0,cz=0;
+    list.forEach((e,i)=>{q.setFromAxisAngle(_yAxis,e[4]||0);const sc=e[3];m.compose(new V3(e[0],e[1],e[2]),q,e[5]?new V3(e[5],e[6],e[7]):new V3(sc,sc,sc));im.setMatrixAt(i,m);cx+=e[0];cz+=e[2];});
+    im.userData.c=new V3(cx/list.length,0,cz/list.length);scene.add(im);PROP_CHUNKS.push(im);out.push(im);}
+  return out;}
+function impTrees(name,items,tint){
+  if(!items.length)return;const t=TEXL.load('tex/imp_'+name+'.png');t.encoding=THREE.sRGBEncoding;t.anisotropy=MAXANISO;
+  const mat=new THREE.MeshStandardMaterial({map:t,alphaTest:.45,side:THREE.DoubleSide,roughness:.9,color:tint===undefined?0xffffff:tint});
+  chunked(impGeo(name),mat,items);}
+const _yAxis=new V3(0,1,0);
+function updatePropChunks(){const lim=(MAP.fog[2]+250)**2,c=camera.position;for(const im of PROP_CHUNKS){const d=im.userData.c;im.visible=(d.x-c.x)**2+(d.z-c.z)**2<lim;}}
+// the boulder mesh replaces the stand-in rocks once it has loaded
+function boulders(list,standIn,tint){
+  if(!THREE.GLTFLoader||!list.length)return;
+  new THREE.GLTFLoader().load('models/boulder.json?v=1',g=>{let mesh=null;g.scene.traverse(o=>{if(o.isMesh&&!mesh)mesh=o;});if(!mesh)return;
+    const mat=mesh.material;if(tint!==undefined)mat.color=new THREE.Color(tint);
+    // the rock is 2.4 x 1.5 x 3.1 m: a stand-in of size s becomes that rock scaled to s
+    chunked(mesh.geometry,mat,list.map(e=>[e[0],e[1]-e[4]*.45,e[2],0,e[6],e[3]/1.2,e[4]/.75,e[5]/1.5]));if(standIn)standIn.visible=false;},undefined,()=>{});}
 function instanced(geo,mat,list){
   if(!list.length)return null;
   const im=new THREE.InstancedMesh(geo,mat,list.length),m=new THREE.Matrix4(),q=new THREE.Quaternion(),c=new THREE.Color();
@@ -1137,18 +1173,15 @@ if(MAP.scenery==='canyon'){
     while(y<h){const t=6+r()*26;g.fillStyle=cols[(r()*cols.length)|0];g.fillRect(0,y,w,t);y+=t;}});
   strata.wrapS=strata.wrapT=THREE.RepeatWrapping;strata.repeat.set(3,1);
   const rockMat=rnTex(new THREE.MeshStandardMaterial({map:strata,roughness:.95,flatShading:true}),{tex:'rockLayer',scale:14,mul:true});
-  const mesas=[],boulders=[],trunks=[],arms=[];
+  const mesas=[],boulders_=[],trunks=[];
   for(let i=0;i<NS;i+=10)for(const side of [-1,1]){
     if(SR()<.55){const rad=10+SR()*38,[x,z]=spot(i,side*(rad+28+SR()*260));if(trackDist(x,z)>rad+22)mesas.push([x,GROUND_Y,z,rad,25+SR()*95,rad*(.7+SR()*.5),SR()*6]);}
-    if(SR()<.5){const sc=1+SR()*3.5,[x,z]=spot(i+3,side*(19+SR()*40));if(trackDist(x,z)>17)boulders.push([x,GROUND_Y+sc*.4,z,sc,sc*.8,sc*1.2,SR()*6]);}
-    if(SR()<.7){const h=3+SR()*4,[x,z]=spot(i+6,side*(18+SR()*70));if(trackDist(x,z)>16){const yaw=SR()*6;trunks.push([x,GROUND_Y,z,1,h,1,yaw]);
-      for(const sgn of [-1,1])if(SR()<.75)arms.push([x+Math.cos(yaw)*sgn*.75,GROUND_Y+h*(.35+SR()*.2),z+Math.sin(yaw)*sgn*.75,1,h*.38,1,yaw]);}}
+    if(SR()<.5){const sc=2.5+SR()*4.5,[x,z]=spot(i+3,side*(21+SR()*40));if(trackDist(x,z)>18)boulders_.push([x,GROUND_Y+sc*.4,z,sc,sc*.8,sc*1.2,SR()*6]);}
+    if(SR()<.7){const h=6.5+SR()*5,[x,z]=spot(i+6,side*(20+SR()*70));if(trackDist(x,z)>17)trunks.push([x,GROUND_Y-.1,z,h,SR()*6]);}
   }
   instanced(new THREE.CylinderGeometry(1,1.12,1,8,1).translate(0,.5,0),rockMat,mesas);
-  instanced(new THREE.DodecahedronGeometry(1,0),rockMat,boulders);
-  const cactus=rnTex(new THREE.MeshStandardMaterial({color:0xffffff,roughness:.8,flatShading:true}),{tex:'grass',scale:2,tint:new THREE.Color(1.2,1.7,1)});
-  instanced(new THREE.CylinderGeometry(.32,.38,1,7).translate(0,.5,0),cactus,trunks);
-  instanced(new THREE.CylinderGeometry(.22,.22,1,6).translate(0,.5,0),cactus,arms);
+  boulders(boulders_,instanced(new THREE.DodecahedronGeometry(1,0),rockMat,boulders_),0xe8c0a0);
+  impTrees('quiver',trunks,0x8a7866);
   const far=new THREE.MeshBasicMaterial({color:0xc06e45,fog:false}),fg=new THREE.CylinderGeometry(1,1.12,1,7).translate(0,.5,0);
   const ring=[];for(let i=0;i<40;i++){const a=i/40*Math.PI*2+SR()*.1,r=2700+SR()*700,rad=180+SR()*380;ring.push([Math.cos(a)*r,GROUND_Y-10,Math.sin(a)*r,rad,140+SR()*260,rad*(.6+SR()*.6),SR()*6]);}
   instanced(fg,far,ring);
@@ -1157,12 +1190,9 @@ if(MAP.scenery==='alpine'){
   const trunks=[],pines=[],caps=[];
   for(let i=0;i<NS;i+=3)for(const side of [-1,1]){
     if(SR()>.8)continue;const [x,z]=spot(i,side*(22+Math.pow(SR(),1.6)*280));if(trackDist(x,z)<19)continue;
-    const h=8+SR()*12,r=h*.3,yaw=SR()*6;trunks.push([x,GROUND_Y,z,.9,2.2,.9,yaw]);pines.push([x,GROUND_Y+1.6,z,r,h,r,yaw]);caps.push([x,GROUND_Y+1.6+h*.55,z,r*.48,h*.45,r*.48,yaw]);
+    const h=10+SR()*14,yaw=SR()*6;(SR()<.6?pines:caps).push([x,GROUND_Y-.2,z,h,yaw]);
   }
-  const cone=new THREE.ConeGeometry(1,1,7).translate(0,.5,0);
-  instanced(new THREE.CylinderGeometry(.3,.4,1,5).translate(0,.5,0),rnTex(new THREE.MeshStandardMaterial({roughness:.9}),{tex:'dirt',scale:1.5,tint:0x6a4a36}),trunks);
-  instanced(cone,rnTex(new THREE.MeshStandardMaterial({roughness:.85,flatShading:true}),{tex:'grass',scale:2.5,tint:new THREE.Color(.8,1.3,.9)}),pines);
-  instanced(cone,rnTex(new THREE.MeshStandardMaterial({roughness:.7,flatShading:true}),{tex:'snow',scale:3}),caps);
+  impTrees('fir_a',pines,0xb8bcc8);impTrees('fir_b',caps,0xb8bcc8); // dusk light on photo firs
   const rockF=new THREE.MeshBasicMaterial({color:0x2c3756,fog:false}),snowF=new THREE.MeshBasicMaterial({color:0xe6eeff,fog:false});
   const peaks=[],tops=[];for(let i=0;i<34;i++){const a=i/34*Math.PI*2+SR()*.12,r=3000+SR()*700,h=650+SR()*800,w=420+SR()*380;
     peaks.push([Math.cos(a)*r,GROUND_Y-20,Math.sin(a)*r,w,h,w,SR()*6]);tops.push([Math.cos(a)*r,GROUND_Y-20+h*.68,Math.sin(a)*r,w*.33,h*.32,w*.33,0]);}
@@ -1195,15 +1225,13 @@ if(MAP.scenery==='jungle'){
   const col=new THREE.Color(),trunks=[],crowns=[],bushes=[];
   for(let i=0;i<NS;i+=3)for(const side of [-1,1]){
     if(SR()>.85)continue;const [x,z]=spot(i,side*(19+Math.pow(SR(),1.4)*230));if(trackDist(x,z)<18)continue;
-    const h=10+SR()*18,yaw=SR()*6,cr=4+SR()*5;trunks.push([x,GROUND_Y,z,.8+SR()*.5,h,.8+SR()*.5,yaw]);
-    crowns.push([x,GROUND_Y+h,z,cr,cr*.55,cr,yaw,col.setHSL(.25+SR()*.1,.6,.035+SR()*.05).getHex()]);
-    if(SR()<.5)crowns.push([x+(SR()-.5)*5,GROUND_Y+h*.72,z+(SR()-.5)*5,cr*.7,cr*.45,cr*.7,yaw,col.setHSL(.27+SR()*.08,.55,.03+SR()*.04).getHex()]);
+    trunks.push([x,GROUND_Y-.2,z,11+SR()*14,SR()*6]);
   }
   for(let i=0;i<NS;i+=4)for(const side of [-1,1]){if(SR()>.6)continue;const [x,z]=spot(i,side*(ROAD_HALF+3+SR()*10));if(trackDist(x,z)<ROAD_HALF+2)continue;
     const s=1.2+SR()*2;bushes.push([x,GROUND_Y+s*.3,z,s,s*.7,s,SR()*6,col.setHSL(.22+SR()*.12,.55,.04+SR()*.05).getHex()]);}
-  instanced(new THREE.CylinderGeometry(.35,.55,1,7).translate(0,.5,0),rnTex(new THREE.MeshStandardMaterial({roughness:.9}),{tex:'dirt',scale:1.5,tint:0x5a4232}),trunks);
+  impTrees('jacaranda',trunks,0xa4b494);
   const leaf=rnTex(new THREE.MeshStandardMaterial({color:0xffffff,roughness:.85,flatShading:true}),{tex:'grass',scale:2.5,tint:new THREE.Color(3,3.2,2.6)});
-  instanced(new THREE.IcosahedronGeometry(1,0),leaf,crowns);instanced(new THREE.DodecahedronGeometry(1,0),leaf,bushes);
+  instanced(new THREE.DodecahedronGeometry(1,0),leaf,bushes);
   // stepped temple ruins
   const stoneTex=canvasTex(128,64,(g,w,h)=>{g.fillStyle='#8a8a74';g.fillRect(0,0,w,h);const r=mulberry32(12);
     for(let y=0;y<h;y+=16)for(let x=(y/16%2)*16;x<w;x+=32){g.fillStyle=`rgba(${60+r()*40|0},${70+r()*40|0},${50+r()*30|0},.6)`;g.fillRect(x+1,y+1,30,14);}
@@ -1221,13 +1249,13 @@ if(MAP.scenery==='jungle'){
 let SMOKE=null;
 if(MAP.scenery==='volcano'){
   const rock=rnTex(new THREE.MeshStandardMaterial({roughness:.95,flatShading:true}),{tex:'rockDark',scale:8,tint:0x5a4444});
-  const spires=[],boulders=[];
+  const spires=[],boulders_=[];
   for(let i=0;i<NS;i+=6)for(const side of [-1,1]){
     if(SR()<.45){const r=3+SR()*10,[x,z]=spot(i,side*(r+20+SR()*220));if(trackDist(x,z)>r+16)spires.push([x,GROUND_Y-1,z,r,12+SR()*45,r,SR()*6,undefined,(SR()-.5)*.25]);}
-    if(SR()<.5){const s=1+SR()*3.5,[x,z]=spot(i+3,side*(18+SR()*40));if(trackDist(x,z)>17)boulders.push([x,GROUND_Y+s*.35,z,s,s*.7,s*1.2,SR()*6]);}
+    if(SR()<.5){const s=1+SR()*3.5,[x,z]=spot(i+3,side*(18+SR()*40));if(trackDist(x,z)>17)boulders_.push([x,GROUND_Y+s*.35,z,s,s*.7,s*1.2,SR()*6]);}
   }
   instanced(new THREE.ConeGeometry(1,1,6).translate(0,.5,0),rock,spires);
-  instanced(new THREE.DodecahedronGeometry(1,0),rock,boulders);
+  boulders(boulders_,instanced(new THREE.DodecahedronGeometry(1,0),rock,boulders_),0x6a5250);
   const ridge=[];for(let i=0;i<36;i++){const a=i/36*Math.PI*2+SR()*.1,r=3000+SR()*700,w=300+SR()*400;ridge.push([Math.cos(a)*r,GROUND_Y-20,Math.sin(a)*r,w,200+SR()*380,w,SR()*6]);}
   instanced(new THREE.ConeGeometry(1,1,7).translate(0,.5,0),new THREE.MeshBasicMaterial({color:0x050101,fog:false}),ridge);
   // the volcano: truncated cone, glowing crater, lava streaks and a smoke column (animated in update)
@@ -2854,7 +2882,7 @@ function update(dt){
   }
   updateTraffic(dt);collisions();updateFeatures(dt);updateWeather(dt);updateProps(dt);
   poseRacer(player,dt);rivals.forEach(r=>!r.out&&poseRacer(r,dt));poseTraffic();
-  cameraFollow(dt);updateParts(dt);updateSlipTrails(dt);
+  cameraFollow(dt);updateParts(dt);updateSlipTrails(dt);updatePropChunks();
   // speed lines
   const k=player.nitroLevel?.35+NT[player.nitroLevel].push/180:player.padT>0||player.slip>0?.3:clamp((player.speed-60)/40,0,1)*.12;slMat.opacity=lerp(slMat.opacity,k,.15);
   if(slMat.opacity>.01){const v=player.speed*1.6*dt;slData.forEach((l,i)=>{l.z+=v;if(l.z>-3)l.z-=80;slPos.set([l.x,l.y,l.z,l.x,l.y,l.z-l.len],i*6);});slGeo.attributes.position.needsUpdate=true;}
