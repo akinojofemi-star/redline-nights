@@ -55,14 +55,16 @@ html,body{height:100%;margin:0;background:var(--ink);color:var(--hud);overflow:h
 .toast small{display:block;text-align:center;font-family:var(--f-ui);font-style:normal;font-size:12px;letter-spacing:.2em;color:var(--hud);text-shadow:none}
 .toast.nitro{color:var(--nitro)}.toast.perfect{color:var(--perfect)}.toast.shock{color:var(--shock)}.toast.pulse{color:var(--pulse)}.toast.danger{color:var(--danger)}.toast.plain{color:var(--hud)}
 @keyframes pop{0%{transform:scale(1.6) skewX(-8deg);opacity:0}12%{transform:scale(1) skewX(-8deg);opacity:1}75%{opacity:1}100%{transform:translateY(-24px) skewX(-8deg);opacity:0}}
-#feed{position:absolute;right:max(16px,env(safe-area-inset-right));top:calc(266px + env(safe-area-inset-top,0px));display:flex;flex-direction:column;align-items:flex-end;gap:4px;pointer-events:none}
+#feed{position:absolute;right:max(16px,env(safe-area-inset-right));top:calc(314px + env(safe-area-inset-top,0px));display:flex;flex-direction:column;align-items:flex-end;gap:4px;pointer-events:none}
 .fd{font:800 italic 14px var(--f-display);letter-spacing:.04em;background:rgba(20,14,30,.8);color:var(--hud);padding:3px 12px;border-right:3px solid var(--shock);transform:skewX(-10deg);transition:opacity .4s}
 #corner{position:absolute;left:50%;top:calc(118px + env(safe-area-inset-top,0px));transform:translateX(-50%) skewX(-10deg);padding:5px 14px;background:var(--panel);font:900 italic 22px var(--f-display);letter-spacing:.06em;white-space:nowrap;color:var(--nitro);border-bottom:3px solid currentColor}
 #corner.hard{color:var(--danger)}
 #hint{position:absolute;left:50%;top:58%;transform:translateX(-50%) skewX(-10deg);padding:6px 14px;background:var(--panel);border:1px solid var(--perfect);color:var(--perfect);font:700 13px var(--f-ui);letter-spacing:.16em;text-transform:uppercase;white-space:nowrap}
 #countdown{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);font-size:150px;color:var(--hud);text-shadow:0 0 40px rgba(255,176,46,.7)}
-#camBtn{pointer-events:auto;position:absolute;right:max(16px,env(safe-area-inset-right));top:calc(314px + env(safe-area-inset-top,0px));height:30px;padding:0 10px;border:1px solid rgba(255,255,255,.3);background:var(--panel);color:var(--hud);font:700 11px var(--f-ui);letter-spacing:.12em;cursor:pointer}
-#pauseBtn{pointer-events:auto;position:absolute;right:max(16px,env(safe-area-inset-right));top:calc(266px + env(safe-area-inset-top,0px));width:40px;height:40px;border:1px solid rgba(255,255,255,.3);background:var(--panel);color:var(--hud);font:700 14px var(--f-ui);cursor:pointer}
+/* camera, full screen and pause in one row under the map */
+.hudbtns{pointer-events:auto;position:absolute;right:max(16px,env(safe-area-inset-right));top:calc(266px + env(safe-area-inset-top,0px));display:flex;gap:6px}
+.hudbtns button{height:36px;min-width:36px;padding:0 10px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.3);background:var(--panel);color:var(--hud);font:700 11px var(--f-ui);letter-spacing:.12em;cursor:pointer}
+#pauseBtn{font-size:13px}
 
 /* touch */
 #touch{position:absolute;inset:auto 0 0 0;height:46%;pointer-events:none}
@@ -87,6 +89,8 @@ h2{margin:0;font-family:var(--f-display);font-style:italic;font-weight:900;font-
 .go{justify-self:start;height:58px;padding:0 42px;border:0;cursor:pointer;background:var(--nitro);color:var(--ink);
   font:900 italic 28px var(--f-display);letter-spacing:.04em;transform:skewX(-14deg);box-shadow:0 0 30px rgba(255,176,46,.45)}
 .go.alt{background:transparent;color:var(--hud);border:1px solid rgba(255,255,255,.35);box-shadow:none;font-size:22px;height:48px;padding:0 26px}
+.go.sm{height:38px;padding:0 16px;font:700 12px var(--f-ui);letter-spacing:.12em;font-style:normal}
+.mtabs{display:none}
 /* garage */
 .garage{display:grid;gap:10px}
 .picker{display:flex;align-items:center;gap:12px}
@@ -145,26 +149,53 @@ td.t{text-align:right}
 .stats b{font-family:var(--f-display);font-style:italic;font-size:30px}
 .best{font-size:13px;color:var(--dim)}
 @media (max-width:900px){.gauge{width:min(300px,calc(100% - 380px))}}
-/* phones: portrait (narrow) or landscape (short). Smaller type, a smaller map, and the gauge, buttons and callouts kept
-   clear of each other and of the touch pads at the bottom corners */
+/* phones: portrait (narrow) or landscape (short). Everything sits in a thin band along the top (position and time,
+   speed and nitro, map and buttons) and the touch pads in the bottom corners, so the road and the car stay clear. Fewer,
+   smaller messages at once; the camera button lives in the pause menu. */
 @media (max-width:640px),(max-height:500px){
-  .pos{font-size:40px}.pos small{font-size:18px}.meta b{font-size:16px}.meta .lbl{font-size:9px}
-  #map{width:110px;height:110px;top:calc(8px + env(safe-area-inset-top,0px))}
-  #pauseBtn{top:calc(124px + env(safe-area-inset-top,0px));width:34px;height:34px}#camBtn{top:calc(124px + env(safe-area-inset-top,0px));right:calc(max(16px,env(safe-area-inset-right)) + 42px);height:34px}
-  #feed{top:calc(166px + env(safe-area-inset-top,0px))}.fd{font-size:11px}
+  .pos{font-size:36px}.pos small{font-size:16px}.meta b{font-size:15px}.meta .lbl{font-size:9px}.meta{gap:6px}
+  #map{width:96px;height:96px;top:calc(8px + env(safe-area-inset-top,0px));opacity:.85}
+  .hudbtns{top:calc(110px + env(safe-area-inset-top,0px));gap:5px}.hudbtns button{height:32px;min-width:32px;padding:0 8px}#camBtn{display:none}
+  #feed{right:auto;left:max(12px,env(safe-area-inset-left));top:calc(112px + env(safe-area-inset-top,0px));align-items:flex-start}
+  .fd{font-size:10px;padding:2px 8px;border-right:0;border-left:3px solid var(--shock)}.fd:nth-child(n+3){display:none}
   .gauge{top:calc(8px + env(safe-area-inset-top,0px));width:min(240px,calc(100% - 300px));gap:2px}
-  #spd{font-size:34px}.unit{font-size:10px}.nbar{height:9px}.nbar.timing{height:18px}#nlabel{font-size:8px;letter-spacing:.12em}#nlabel.hot{font-size:11px}
-  #corner{top:calc(76px + env(safe-area-inset-top,0px));font-size:15px;padding:3px 10px}
-  .toast{font-size:22px}.toast small{font-size:10px}#toasts{top:max(28%,110px)}#countdown{font-size:96px}#hint{font-size:11px}
-  #touch button{width:64px;height:64px}#tR{left:90px}#tD{right:90px}
+  #spd{font-size:32px}.unit{font-size:10px}.nbar{height:9px}.nbar.timing{height:18px}#nlabel{font-size:8px;letter-spacing:.12em}#nlabel.hot{font-size:11px}
+  #corner{top:calc(74px + env(safe-area-inset-top,0px));font-size:14px;padding:3px 10px}
+  .toast{font-size:20px}.toast small{display:none}.toast:nth-child(n+3){display:none}#toasts{top:max(30%,110px)}#countdown{font-size:96px}#hint{font-size:10px;top:auto;bottom:calc(110px + env(safe-area-inset-bottom,0px))}
+  #touch button{width:66px;height:66px;background:rgba(14,10,22,.4);border-color:rgba(255,255,255,.42);font-size:11px;text-shadow:0 1px 3px rgba(0,0,0,.8)}#tR{left:92px}#tD{right:92px}#tL,#tR{font-size:18px}
+  #touch button.on{background:rgba(255,255,255,.28)}
+  /* the menu: a sheet along the bottom (or down the side in landscape) with tabs, the car on show above it, RACE always in reach */
+  #menu{padding:0;overflow:hidden}
+  #menu .card.tabbed>*{min-width:0}
+  #menu .card.tabbed{box-sizing:border-box;width:100%;grid-template-columns:minmax(0,1fr);gap:12px;max-width:none;margin:0;overflow-y:auto;overscroll-behavior:contain;padding:0 16px;align-content:start;background:rgba(14,10,22,.93)}
+  #menu .card.tabbed .tag{display:none}
+  #menu .card.tabbed [data-tab]:not(.on){display:none!important}
+  #menu .card.tabbed .mtabs{display:grid;grid-template-columns:repeat(4,1fr);position:sticky;top:0;z-index:3;margin:0 -16px;background:rgba(14,10,22,.98)}
+  .mtabs button{height:42px;border:0;border-bottom:2px solid rgba(255,255,255,.14);background:transparent;color:var(--dim);font:700 12px var(--f-ui);letter-spacing:.12em;text-transform:uppercase;cursor:pointer}
+  .mtabs button[aria-selected="true"]{color:var(--nitro);border-bottom-color:var(--nitro)}
+  #menu .card.tabbed .racerow{position:sticky;bottom:0;z-index:3;margin:0 -16px;padding:10px 16px calc(12px + env(safe-area-inset-bottom,0px));background:rgba(14,10,22,.98);border-top:1px solid rgba(255,255,255,.1);flex-wrap:nowrap}
+  #menu .card.tabbed .racerow .go{height:50px;font-size:24px;padding:0 30px}#menu .card.tabbed .racerow .go.alt{height:42px;font-size:16px;padding:0 14px}
+  #menu .card.tabbed .best{display:none}
+  #paints{flex-wrap:nowrap;overflow-x:auto;padding:4px 2px 6px}.sw{flex:none;width:30px;height:30px}
+  #menu .blurb{min-height:0;font-size:12px}#menu .card.tabbed #carCredit{display:none}
+  .overlay:not(#menu){align-items:flex-end;padding-block:24px;background:linear-gradient(0deg,rgba(14,10,22,.95) 0%,rgba(14,10,22,.75) 70%,rgba(14,10,22,.2) 100%)}
+  .overlay:not(#menu)>.card{margin-block:auto 0}
+  .prefs{gap:8px}
 }
 @media (max-width:640px){
   #mapSeg{grid-template-columns:repeat(2,1fr)}
-  .gauge{top:calc(124px + env(safe-area-inset-top,0px));width:min(180px,calc(100% - 200px))}
-  #camBtn{top:calc(164px + env(safe-area-inset-top,0px));right:max(16px,env(safe-area-inset-right))}#feed{top:calc(206px + env(safe-area-inset-top,0px))}
-  #corner{top:calc(190px + env(safe-area-inset-top,0px))}#toasts{top:max(34%,240px)}
-  .overlay{align-items:flex-end;padding-block:24px;background:linear-gradient(0deg,rgba(14,10,22,.95) 0%,rgba(14,10,22,.75) 70%,rgba(14,10,22,.2) 100%)}
-  .overlay>.card{margin-block:auto 0}
+  .gauge{width:min(160px,calc(100% - 236px))}#spd{font-size:28px}#nlabel{letter-spacing:.04em;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  #menu{align-items:flex-end;background:linear-gradient(0deg,rgba(14,10,22,.9) 0%,transparent 60%)}
+  #menu h1{position:fixed;left:16px;top:calc(14px + env(safe-area-inset-top,0px));font-size:44px;text-shadow:0 2px 14px rgba(0,0,0,.6)}
+  #menu .card.tabbed{height:58vh;border-top:1px solid rgba(255,255,255,.12)}
+}
+@media (max-height:500px) and (min-width:641px){
+  #map{width:84px;height:84px}
+  .hudbtns{top:calc(8px + env(safe-area-inset-top,0px));right:calc(max(16px,env(safe-area-inset-right)) + 92px)}
+  #feed{top:calc(104px + env(safe-area-inset-top,0px))}
+  #menu{align-items:stretch;background:linear-gradient(90deg,rgba(14,10,22,.9) 0%,transparent 60%)}
+  #menu .card.tabbed{width:min(440px,56vw);height:100%}
+  #menu h1{font-size:34px;margin-top:12px}#menu h1 span{display:inline;margin-left:.2em}
 }
 @media (prefers-reduced-motion:reduce){.toast{animation-duration:1.6s}}
 </style>
@@ -181,8 +212,7 @@ td.t{text-align:right}
       <div id="modeLine" hidden></div>
     </div>
     <canvas id="map" width="480" height="480"></canvas>
-    <button id="pauseBtn" aria-label="Pause">II</button>
-    <button id="camBtn" aria-label="Change camera (C)">CHASE</button>
+    <div class="hudbtns"><button id="camBtn" aria-label="Change camera (C)">CHASE</button><button class="fsBtn" id="fsHud" aria-label="Full screen"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M1 5V1h4M11 1h4v4M15 11v4h-4M5 15H1v-4" fill="none" stroke="currentColor" stroke-width="2"/></svg></button><button id="pauseBtn" aria-label="Pause">II</button></div>
     <div id="toasts"></div>
     <div id="corner" hidden></div>
     <div id="feed"></div>
@@ -202,13 +232,14 @@ td.t{text-align:right}
   <div id="menu" class="overlay">
     <div class="card">
       <h1>Redline<span>Nights</span></h1>
-      <p class="tag">Eight tracks with split routes, forty-three real cars in five classes, four modes, five camera views. Drift to fill nitro, hit it again on the beat for Perfect Nitro, and double-tap a full tank for a Shockwave that clears the road.</p>
-      <div class="garage">
+      <p class="tag">Nine tracks with split routes, forty-three real cars in five classes, four modes, five camera views. Drift to fill nitro, hit it again on the beat for Perfect Nitro, and double-tap a full tank for a Shockwave that clears the road.</p>
+      <div class="mtabs" role="tablist" aria-label="Race setup"><button role="tab" data-t="car">Car</button><button role="tab" data-t="track">Track</button><button role="tab" data-t="mode">Mode</button><button role="tab" data-t="set">Settings</button></div>
+      <div class="garage" data-tab="track">
         <div class="lbl">Track</div>
         <div class="row seg" id="mapSeg"></div>
         <p class="blurb" id="mapBlurb"></p>
       </div>
-      <div class="garage">
+      <div class="garage" data-tab="car">
         <div class="lbl">Garage</div>
         <div class="row seg" id="classSeg" role="group" aria-label="Car class"></div>
         <div class="picker"><button id="carPrev" aria-label="Previous car">&lsaquo;</button>
@@ -219,19 +250,20 @@ td.t{text-align:right}
         <p class="credit" id="carCredit"></p>
         <div class="statbars" id="carStats"></div>
       </div>
-      <div><div class="lbl" style="margin-bottom:8px">Paint</div><div class="row" id="paints"></div></div>
-      <div class="garage">
+      <div data-tab="car"><div class="lbl" style="margin-bottom:8px">Paint</div><div class="row" id="paints"></div></div>
+      <div class="garage" data-tab="mode">
         <div class="lbl">Mode</div>
         <div class="row seg" id="modeSeg"></div>
         <p class="blurb" id="modeBlurb"></p>
       </div>
-      <div id="lapsWrap"><div class="lbl" style="margin-bottom:8px">Laps</div><div class="row seg" id="lapsSeg"></div></div>
-      <label class="steer"><span class="lbl">Steering sensitivity</span><input type="range" class="steerSl" min="50" max="160" step="10" aria-label="Steering sensitivity"><b class="steerVal"></b></label>
-      <div class="garage">
+ <div id="lapsWrap" data-tab="mode"><div class="lbl" style="margin-bottom:8px">Laps</div><div class="row seg" id="lapsSeg"></div></div>
+      <label class="steer" data-tab="set"><span class="lbl">Steering sensitivity</span><input type="range" class="steerSl" min="50" max="160" step="10" aria-label="Steering sensitivity"><b class="steerVal"></b></label>
+      <div class="row prefs" data-tab="set"><button class="go alt sm fsBtn">FULL SCREEN</button><button class="go alt sm muteBtn">SOUND ON</button></div>
+      <div class="garage" data-tab="set">
         <div class="lbl">Race settings</div>
         <div class="opts" id="opts"></div>
       </div>
-      <details class="ctrls"><summary class="lbl">Controls</summary><div class="keys">
+      <details class="ctrls" data-tab="set"><summary class="lbl">Controls</summary><div class="keys">
         <span><kbd>← →</kbd> <kbd>A D</kbd></span><span>Steer. The car accelerates by itself, but only you steer it: it turns as hard as you hold the key and runs straight when you let go, on bends and at forks alike. Steer into every bend yourself (the steering sensitivity is in the settings).</span>
         <span><kbd>↓</kbd> <kbd>S</kbd></span><span>Brake. Tap brake while steering to start a drift, on a bend or a straight. Steer into it to tighten, steer the other way to swing into a drift the other way (chain them left-right down a straight), let go to ease out and the car runs straight. Nitro ends a drift, and starting one turns nitro off. Drifting charges nitro.</span>
         <span><kbd>↓ ↓</kbd></span><span>Double-tap brake for a 360 spin, on the road or in the air: it fills nitro and ends any nitro you're burning. Hit nitro during the spin to keep your speed up. Stack it with a barrel roll for a combo: purple corkscrew ramps always roll you, and clipping the edge of any other ramp with one side of the car tips you into one.</span>
@@ -244,14 +276,15 @@ td.t{text-align:right}
         <span><kbd>C</kbd></span><span>Change camera: chase (low, close), high chase, far chase, hood, bumper.</span>
         <span><kbd>P</kbd> <kbd>M</kbd></span><span>Pause, mute.</span>
       </div></details>
-      <details class="ctrls"><summary class="lbl">Car model credits</summary><div class="credits" id="credits"></div></details>
-      <div class="row"><button class="go" id="raceBtn">RACE</button><span class="best" id="best"></span></div>
+      <details class="ctrls" data-tab="set"><summary class="lbl">Car model credits</summary><div class="credits" id="credits"></div></details>
+      <div class="row racerow"><button class="go" id="raceBtn">RACE</button><span class="best" id="best"></span></div>
     </div>
   </div>
 
   <div id="pause" class="overlay" hidden>
     <div class="card"><h2>Paused</h2><p class="tag" id="pauseMsg"></p>
       <label class="steer"><span class="lbl">Steering sensitivity</span><input type="range" class="steerSl" min="50" max="160" step="10" aria-label="Steering sensitivity"><b class="steerVal"></b></label>
+      <div class="row prefs"><button class="go alt sm" id="camOpt">CAMERA: CHASE</button><button class="go alt sm fsBtn">FULL SCREEN</button><button class="go alt sm muteBtn">SOUND ON</button></div>
       <div class="row"><button class="go" id="resumeBtn">RESUME</button><button class="go alt" id="restartBtn">RESTART</button><button class="go alt" id="quitBtn">MENU</button></div>
     </div>
   </div>
@@ -2167,7 +2200,8 @@ addEventListener('keydown',e=>{
   if(KEYN.has(e.code)&&G.mode!=='menu')nitroQueued++;
   if(e.code==='ArrowDown'||e.code==='KeyS')brakeTap();
   if(e.code==='KeyP'||e.code==='Escape'){if(G.mode==='race'||G.mode==='countdown')togglePause();}
-  if(e.code==='KeyM')setMuted(!AU.muted);
+  if(e.code==='KeyM'){setMuted(!AU.muted);syncPrefs();}
+  if(e.code==='KeyF')toggleFS();
   if(e.code==='KeyC'&&G.mode!=='menu')cycleCam();
 });
 addEventListener('keyup',e=>{keys[e.code]=false;if(e.key==='Meta')clearKeys();if(GAMEKEYS.has(e.code)&&inRace())e.preventDefault();});
@@ -2802,7 +2836,7 @@ function nearCam(pos,r){return pos.distanceToSquared(camera.position)<r*r;}
 const CAMS=[{n:'CHASE',back:5,up:1.55,ahead:10,lh:.8},{n:'HIGH CHASE',back:8,up:2.9,ahead:12,lh:1.1},{n:'FAR CHASE',back:12,up:4.3,ahead:14,lh:1.4},
   {n:'HOOD',fp:'hood'},{n:'BUMPER',fp:'bumper'}];
 let camMode=clamp(+store.get('rn-cam')||0,0,CAMS.length-1);
-function cycleCam(){camMode=(camMode+1)%CAMS.length;store.set('rn-cam',camMode);camInit=false;$('camBtn').textContent=CAMS[camMode].n;if(G.mode==='race'||G.mode==='countdown')toast(CAMS[camMode].n,'plain','CAMERA · C');}
+function cycleCam(){camMode=(camMode+1)%CAMS.length;store.set('rn-cam',camMode);camInit=false;$('camBtn').textContent=CAMS[camMode].n;if(G.mode==='race'||G.mode==='countdown')toast(CAMS[camMode].n,'plain','CAMERA · C');syncPrefs();}
 $('camBtn').textContent=CAMS[camMode].n;$('camBtn').addEventListener('click',()=>{cycleCam();$('camBtn').blur();});
 function cameraFollow(dt){
   const p=player,C=CAMS[camMode];sampleE(p);
@@ -3027,6 +3061,34 @@ function refreshModeUI(){
 }
 refreshModeUI();
 $('raceBtn').onclick=()=>{G.resShown=false;startRace();};
+// phones: the menu is a sheet with tabs (car, track, mode, settings) instead of one long page
+{const card=$('menu').querySelector('.card'),mq=matchMedia('(max-width:640px),(max-height:500px)'),tabs=[...card.querySelectorAll('.mtabs button')];
+  let cur=store.get('rn-mtab')||'car';
+  const show=t=>{cur=t;store.set('rn-mtab',t);tabs.forEach(b=>b.setAttribute('aria-selected',String(b.dataset.t===t)));
+    card.querySelectorAll('[data-tab]').forEach(el=>el.classList.toggle('on',el.dataset.tab===t));card.scrollTop=0;};
+  tabs.forEach(b=>b.onclick=()=>show(b.dataset.t));
+  const apply=()=>card.classList.toggle('tabbed',mq.matches);
+  (mq.addEventListener?mq.addEventListener('change',apply):mq.addListener(apply));apply();show(cur);}
+// full screen from inside the game: the page around it (the lobby) goes full screen, or the app's window; iPhones can't
+// do it from a web page, so they get the Home Screen tip instead
+const fsDoc=()=>{try{return window.parent!==window?parent.document:document;}catch(e){return document;}};
+const isFS=()=>{const d=fsDoc();return !!(d.fullscreenElement||d.webkitFullscreenElement);};
+function toggleFS(){
+  const d=fsDoc();
+  if(window.parent!==window){parent.postMessage({t:'fs'},'*');}
+  else if(isFS())(d.exitFullscreen||d.webkitExitFullscreen).call(d);
+  else{const el=d.documentElement,rq=el.requestFullscreen||el.webkitRequestFullscreen;if(rq)rq.call(el);}
+  setTimeout(()=>{if(!isFS()&&!(d.fullscreenEnabled||d.webkitFullscreenEnabled))toast('SHARE \u2192 ADD TO HOME SCREEN','plain','FOR FULL SCREEN ON IPHONE');syncPrefs();},350);
+}
+function syncPrefs(){
+  document.querySelectorAll('.fsBtn').forEach(b=>{if(b.id!=='fsHud')b.textContent=isFS()?'EXIT FULL SCREEN':'FULL SCREEN';});
+  document.querySelectorAll('.muteBtn').forEach(b=>b.textContent=AU.muted?'SOUND OFF':'SOUND ON');
+  $('camOpt').textContent='CAMERA: '+CAMS[camMode].n;}
+document.querySelectorAll('.fsBtn').forEach(b=>b.addEventListener('click',()=>{toggleFS();b.blur();}));
+document.querySelectorAll('.muteBtn').forEach(b=>b.addEventListener('click',()=>{setMuted(!AU.muted);syncPrefs();}));
+$('camOpt').onclick=()=>{cycleCam();syncPrefs();};
+for(const d of new Set([document,fsDoc()]))for(const ev of ['fullscreenchange','webkitfullscreenchange'])d.addEventListener(ev,syncPrefs);
+syncPrefs();
 $('againBtn').onclick=()=>{G.resShown=false;startRace();};
 $('menuBtn').onclick=()=>{if(MP.on){mpReset();parent.postMessage({t:'lobby'},'*');}else toMenu();};
 $('resumeBtn').onclick=()=>togglePause(false);

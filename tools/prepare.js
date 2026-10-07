@@ -17,6 +17,6 @@ for (const [a, b] of swaps) {
   if (!html.includes(a)) throw new Error('Expected script not found in the game: ' + a);
   html = html.replace(a, b);
 }
-if (!/^<!doctype/i.test(html)) html = '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">\n' + html;
+if (!/^<!doctype/i.test(html)) html = '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">\n' + html;
 fs.writeFileSync(path.join(root, 'app', 'game.html'), html);
 console.log('app/game.html written (' + Math.round(html.length / 1024) + ' KB)');

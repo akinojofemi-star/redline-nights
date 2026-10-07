@@ -1,6 +1,11 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Redline Nights</title>
+<!-- added to a phone's home screen it opens full screen, with no browser bars (the only full screen an iPhone allows) -->
+<link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#0e0a16">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Redline">
+<link rel="apple-touch-icon" href="icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Saira+Condensed:ital,wght@1,700;1,900&display=swap">
 <style>
@@ -84,6 +89,12 @@ const frame = $('game');
 // a fresh query each time: changing only the #map part wouldn't reload the page, and the old map would stay up
 let loads = 0;
 function loadGame(map, mp) { S.curMap = map; S.mpLoaded = mp; frame.src = 'game.html?' + (mp ? 'mp=1&' : '') + 'n=' + (++loads) + '#' + map; }
+function toggleFullscreen() {
+  if (APP) return rn.toggleFullscreen();
+  const d = document, el = d.documentElement;
+  if (d.fullscreenElement || d.webkitFullscreenElement) (d.exitFullscreen || d.webkitExitFullscreen).call(d);
+  else { const rq = el.requestFullscreen || el.webkitRequestFullscreen; if (rq) { const p = rq.call(el); if (p && p.catch) p.catch(() => {}); } }
+}
 function toGame(m) { if (frame.contentWindow) frame.contentWindow.postMessage(m, '*'); }
 addEventListener('message', e => {
   if (e.source !== frame.contentWindow) return;
@@ -95,6 +106,7 @@ addEventListener('message', e => {
     if (S.pendingStart) { const c = S.pendingStart; S.pendingStart = null; toGame({ t: 'start', cfg: c }); }
     if (S.screen !== 'race') render();
   } else if (m.t === 'openLobby') { show(true); go('home'); }
+  else if (m.t === 'fs') toggleFullscreen();                  // the game's own full screen button
   else if (m.t === 'loaded') {                                   // our game has the race set up and is holding on the grid
     if (!S.net) return;
     if (S.net.isHost) hubLoaded('H'); else S.net.send({ t: 'loaded', race: S.raceId });
@@ -435,10 +447,7 @@ function wire() {
   copied('copyLink', () => inviteLink(S.net.code));
   on('joinInvite', 'onclick', () => { const c = S.invite; S.invite = null; S.msg = ''; S.err = false; joinRoom('online', c); });
   on('noInvite', 'onclick', () => { S.invite = null; render(); });
-  on('fs', 'onclick', () => {
-    if (APP) return rn.toggleFullscreen();
-    if (document.fullscreenElement) document.exitFullscreen(); else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
-  });
+  on('fs', 'onclick', toggleFullscreen);
   const setChanged = () => { store.set('rn-mp-settings', JSON.stringify(settings)); broadcastLobby(); };
   on('map', 'onchange', e => { settings.map = e.target.value; setChanged(); });
   on('laps', 'onchange', e => { settings.laps = +e.target.value; setChanged(); });

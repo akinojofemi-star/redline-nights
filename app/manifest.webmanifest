@@ -1,0 +1,12 @@
+{
+  "name": "Redline Nights",
+  "short_name": "Redline",
+  "description": "Asphalt-style arcade street racer: solo or online with friends.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#0e0a16",
+  "theme_color": "#0e0a16",
+  "icons": [{ "src": "icon.png", "sizes": "1024x1024", "type": "image/png", "purpose": "any" }]
+}
