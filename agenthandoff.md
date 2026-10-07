@@ -16,7 +16,7 @@ Redline Nights is an Asphalt 9-style arcade street racer, built and maintained f
 - **Finish with a deploy.** Pushing to `main` is the deploy. Then wait for the Pages run to pass and confirm the new code is live (curl the page and grep for a new identifier).
 
 **Driving model** (each of these was an explicit request)
-- **No auto-steering anywhere.** The car only turns when the player steers: no road-following, no self-centring, no pull toward a fork road. The only remaining assist is that a jump's flight bends with the road below it.
+- **No auto-steering anywhere**, and nothing that looks like it: the camera must not swing when the car is switched between roads. The car only turns when the player steers: no road-following, no self-centring, no pull toward a fork road. The only remaining assist is that a jump's flight bends with the road below it.
 - **Players choose any fork, as late as they like.** Arriving straddling the divider crashes them.
 - **The game should punish bad steering, not forgive it.** Wide run-offs and solid barriers are the safety net.
 
@@ -199,6 +199,11 @@ Mac builds need `identity: '-'` and `hardenedRuntime: false` (already set). Dele
 
 ## Recent history (newest first)
 
+- **Forks, ramps from the air, drift feel (2026-10-08):**
+  - Forks no longer pull the car. Three causes: (1) the chase camera snapped up to 25° in a frame when the car was switched between the two overlapping roads; it now carries the road's direction across a switch and eases over (`camRoad` in `cameraFollow`). (2) A car physically on the other road when the overlap ended was slid onto the road it was counted on and its nose turned up to 38°; `onOtherRoad` now moves it to the road it's actually on. (3) A car on the seam between the roads (on neither) was eased onto one; now it's a divider crash. The divider block is drawn on the real seam between the road edges (it was up to ~5 m off where roads meet at an angle).
+  - Ramps work from the air: `rampStep` lands a flying car on a ramp surface it comes down onto, bounces it off a ramp's tall side, and launches it again if it skims the lip within 1.5 m. Rivals use the same code.
+  - Drift: tail kicks out to about 30° in 0.3 s (was 0.5 s for 28°) and holds about 40° with no overshoot, unwinds in about 0.5 s on release, and hands back to grip with no snap. The drift direction uses the sign of the stick, so half-stick drifts fully. Steering is unchanged (the user said it's fine).
+  - Suite: new probes for skimming a ramp in the air and for camera swings at forks.
 - **Bug fixes (2026-10-07):**
   - The "NaN bounding sphere" error: the Civic Type R's code-built stand-in body (shown while its model downloads) had a NaN wing, because the hatch shape has no `deckH`. The wing now stands on the tailgate.
   - Gap placement steps down its rules (280 m run-out, then 200, then 180) instead of silently keeping an unchecked spot, and keeps 600 m after the start line so the pack has spread out. City's gap moved from 349 m to 793 m, Tokyo's from an unchecked 1560 m to 3330 m (Tokyo's tunnel moved to 1215–1674 m as a result). The other maps are unchanged.

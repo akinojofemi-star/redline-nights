@@ -135,6 +135,15 @@ T.probes=function(){const p=player,out=[];G.modeSel='classic';G.lapsSel=5;startR
   // ghost contact: drive through a rival
   {SET.contact=false;G.rules=rulesFor('classic');T.setAt(-1,T.clear(L*.3),laneX(p,1),60);const r=rivals[0];r.br=-1;r.dist=p.dist+30;r.s=mod(r.dist);r.x=p.x;r.speed=30;r.wreck=0;const s0=p.speed;T.run(60*2,{lane:p.x,noBrake:true});
     if(r.wreck>0)T.note(MAP_ID+' ghost mode: rival still knocked');SET.contact=true;G.rules=rulesFor('classic');}
+  // a car already in the air that skims a ramp's lip takes that ramp (it launches again)
+  {const r=RAMPS.find(r=>r.br<0&&r.T!==RAMP_TYPES.gap&&r.T!==RAMP_TYPES.mega);if(r){T.setAt(-1,r.s+r.T.len-4,r.x,50);p.air=true;p.y=rEnd(r,r.x)+.8;p.vy=-2;p.airT=.5;
+    let up=false;for(let i=0;i<20&&!up;i++){p.botSteer=0;p.botBrake=false;update(1/60);up=p.air&&p.vy>0;}p.botSteer=undefined;p.botBrake=undefined;
+    if(!up)T.note(MAP_ID+' skimming a ramp in the air did not launch the car');}}
+  // forks: driving through with no steering, switching roads must not swing the camera (that reads as being steered)
+  for(const b of BR){T.setAt(-1,msB(b,b.split)-70,offM(b,Math.max(0,wrapD(msB(b,b.split),b.s0)-1))/2,50);camInit=false;
+    const v0=new THREE.Vector3(),v1=new THREE.Vector3();cameraFollow(1/60);camera.getWorldDirection(v0);let worst=0;
+    for(let i=0;i<90&&p.wreck<=0;i++){p.botSteer=0;p.botBrake=false;update(1/60);cameraFollow(1/60);camera.getWorldDirection(v1);worst=Math.max(worst,v1.angleTo(v0)*57.3);v0.copy(v1);}
+    p.botSteer=undefined;p.botBrake=undefined;p.wreck=0;if(worst>8)T.note(MAP_ID+' '+b.kind+' fork: camera swung '+worst.toFixed(0)+'° in one frame');}
   const gl=renderer.getContext().getError();if(gl)T.note(MAP_ID+' GL error '+gl);
   return 'probes done';};
 'suite ok'
