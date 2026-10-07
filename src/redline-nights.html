@@ -72,6 +72,16 @@ html,body{height:100%;margin:0;background:var(--ink);color:var(--hud);overflow:h
   border:2px solid rgba(255,255,255,.35);background:rgba(14,10,22,.45);color:var(--hud);font:700 12px var(--f-ui);letter-spacing:.1em;touch-action:none}
 #tL{left:16px}#tR{left:104px}#tD{right:104px}#tN{right:16px;border-color:var(--nitro)!important;color:var(--nitro)!important}
 #touch button.on{background:rgba(255,255,255,.22)}
+/* touch controls editor: the four buttons drag anywhere over the game, with size and opacity; saved per orientation */
+.touchOnly{display:none}.coarse .touchOnly{display:inline-block}
+#tedit{position:fixed;inset:0;z-index:20;background:rgba(14,10,22,.35);touch-action:none}
+#tedit[hidden]{display:none}
+#tedit .tbar{position:absolute;left:50%;top:calc(10px + env(safe-area-inset-top,0px));transform:translateX(-50%);width:min(560px,calc(100% - 24px));display:grid;gap:8px;padding:12px 14px;background:rgba(14,10,22,.92);border:1px solid rgba(255,255,255,.18);font-size:12px}
+#tedit .tbar b{font:900 italic 22px var(--f-display)}#tedit .tbar span{color:var(--dim)}
+#tedit label{display:grid;grid-template-columns:5.5em 1fr;align-items:center;gap:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);font-size:11px}#tedit input{accent-color:#ffb02e;width:100%}
+#tedit .tb{position:absolute;border-radius:50%;border:2px dashed rgba(255,255,255,.75);background:rgba(14,10,22,.55);color:var(--hud);font:700 12px var(--f-ui);letter-spacing:.1em;cursor:grab;touch-action:none}
+#tedit .tb[data-b="tN"]{border-color:var(--nitro);color:var(--nitro)}#tedit .tb.drag{cursor:grabbing;background:rgba(255,176,46,.25)}
+@media (max-height:500px){#tedit .tbar{grid-template-columns:auto 1fr 1fr;align-items:center;top:6px;padding:8px 12px}#tedit .tbar span{display:none}#tedit .tbar .row{grid-column:1/-1;justify-content:center}}
 
 /* overlays */
 .overlay{position:absolute;inset:0;display:flex;align-items:center;padding-inline:max(16px,6vw);
@@ -258,7 +268,7 @@ td.t{text-align:right}
       </div>
  <div id="lapsWrap" data-tab="mode"><div class="lbl" style="margin-bottom:8px">Laps</div><div class="row seg" id="lapsSeg"></div></div>
       <label class="steer" data-tab="set"><span class="lbl">Steering sensitivity</span><input type="range" class="steerSl" min="50" max="160" step="10" aria-label="Steering sensitivity"><b class="steerVal"></b></label>
-      <div class="row prefs" data-tab="set"><button class="go alt sm fsBtn">FULL SCREEN</button><button class="go alt sm muteBtn">SOUND ON</button></div>
+      <div class="row prefs" data-tab="set"><button class="go alt sm fsBtn">FULL SCREEN</button><button class="go alt sm muteBtn">SOUND ON</button><button class="go alt sm tlayBtn touchOnly">TOUCH CONTROLS</button></div>
       <div class="garage" data-tab="set">
         <div class="lbl">Race settings</div>
         <div class="opts" id="opts"></div>
@@ -284,9 +294,17 @@ td.t{text-align:right}
   <div id="pause" class="overlay" hidden>
     <div class="card"><h2>Paused</h2><p class="tag" id="pauseMsg"></p>
       <label class="steer"><span class="lbl">Steering sensitivity</span><input type="range" class="steerSl" min="50" max="160" step="10" aria-label="Steering sensitivity"><b class="steerVal"></b></label>
-      <div class="row prefs"><button class="go alt sm" id="camOpt">CAMERA: CHASE</button><button class="go alt sm fsBtn">FULL SCREEN</button><button class="go alt sm muteBtn">SOUND ON</button></div>
+      <div class="row prefs"><button class="go alt sm" id="camOpt">CAMERA: CHASE</button><button class="go alt sm fsBtn">FULL SCREEN</button><button class="go alt sm muteBtn">SOUND ON</button><button class="go alt sm tlayBtn touchOnly">TOUCH CONTROLS</button></div>
       <div class="row"><button class="go" id="resumeBtn">RESUME</button><button class="go alt" id="restartBtn">RESTART</button><button class="go alt" id="quitBtn">MENU</button></div>
     </div>
+  </div>
+
+  <div id="tedit" hidden>
+    <div class="tbar"><b>Touch controls</b><span>Drag the buttons where you want them</span>
+      <label>Size <input type="range" id="teSize" min="60" max="150" step="5" aria-label="Button size"></label>
+      <label>Opacity <input type="range" id="teAlpha" min="25" max="100" step="5" aria-label="Button opacity"></label>
+      <div class="row"><button class="go alt sm" id="teSwap">SWAP SIDES</button><button class="go alt sm" id="teReset">RESET</button><button class="go sm" id="teDone">DONE</button></div></div>
+    <button class="tb" data-b="tL">◀</button><button class="tb" data-b="tR">▶</button><button class="tb" data-b="tD">DRIFT</button><button class="tb" data-b="tN">NITRO</button>
   </div>
 
   <div id="results" class="overlay" hidden>
@@ -2211,7 +2229,41 @@ document.addEventListener('pointerup',e=>{const b=e.target.closest&&e.target.clo
 const bindTouch=(id,key)=>{const b=$(id);const on=v=>e=>{e.preventDefault();if(key==='n'){if(v)nitroQueued++;}else{touchState[key]=v;if(key==='d'&&v)brakeTap();}b.classList.toggle('on',v);};
   b.addEventListener('pointerdown',on(true));['pointerup','pointercancel','pointerleave'].forEach(ev=>b.addEventListener(ev,on(false)));};
 bindTouch('tL','l');bindTouch('tR','r');bindTouch('tD','d');bindTouch('tN','n');
-if(matchMedia('(pointer: coarse)').matches)$('touch').hidden=false;
+if(matchMedia('(pointer: coarse)').matches){$('touch').hidden=false;document.documentElement.classList.add('coarse');}
+// custom touch layout: for each orientation, each button's centre as a fraction of the screen, plus size and opacity
+const TB=['tL','tR','tD','tN'];
+const tlKey=()=>innerWidth>innerHeight?'land':'port';
+const tlAll=()=>{try{return JSON.parse(store.get('rn-touch')||'{}')||{};}catch(e){return {};}};
+const tlBase=()=>innerWidth<=640||innerHeight<=500?66:76;
+function tlDefault(){const W=innerWidth,H=innerHeight,S=tlBase(),gap=S===66?92:104,y=(H-20-S/2)/H;
+  return {b:{tL:[(16+S/2)/W,y],tR:[(gap+S/2)/W,y],tD:[1-(gap+S/2)/W,y],tN:[1-(16+S/2)/W,y]},size:1,alpha:1};}
+function tlGet(){return tlAll()[tlKey()]||null;}
+function applyTouchLayout(){const L=tlGet(),box=$('touch');
+  TB.forEach(id=>{const b=$(id);if(!L){b.style.cssText='';return;}const S=tlBase()*L.size,[cx,cy]=L.b[id];
+    Object.assign(b.style,{left:(cx*innerWidth-S/2)+'px',top:(cy*innerHeight-S/2)+'px',right:'auto',bottom:'auto',width:S+'px',height:S+'px'});});
+  box.style.cssText=L?'inset:0;height:auto;opacity:'+L.alpha:'';}
+addEventListener('resize',applyTouchLayout);applyTouchLayout();
+{let ed=null,from=null,key='';const E=$('tedit'),tbs=[...E.querySelectorAll('.tb')];
+  const draw=()=>{const S=tlBase()*ed.size;tbs.forEach(t=>{const [cx,cy]=ed.b[t.dataset.b];Object.assign(t.style,{left:(cx*innerWidth-S/2)+'px',top:(cy*innerHeight-S/2)+'px',width:S+'px',height:S+'px',opacity:Math.max(.35,ed.alpha)});});
+    $('teSize').value=Math.round(ed.size*100);$('teAlpha').value=Math.round(ed.alpha*100);};
+  const open=()=>{from=!$('pause').hidden?'pause':!$('menu').hidden?'menu':null;if(from)$(from).hidden=true;
+    key=tlKey();ed=JSON.parse(JSON.stringify(tlGet()||tlDefault()));E.hidden=false;if(from==='menu')setViewShift(false);draw();};
+  // saved under the orientation it was laid out in; a reset layout is simply forgotten, so the standard one applies
+  const close=save=>{if(save){const all=tlAll();if(ed.std)delete all[key];else all[key]=ed;store.set('rn-touch',JSON.stringify(all));}E.hidden=true;if(from)$(from).hidden=false;if(from==='menu')setViewShift(true);applyTouchLayout();};
+  document.querySelectorAll('.tlayBtn').forEach(b=>b.addEventListener('click',open));
+  tbs.forEach(t=>{let dx=0,dy=0;
+    t.addEventListener('pointerdown',e=>{e.preventDefault();t.setPointerCapture(e.pointerId);const r=t.getBoundingClientRect();dx=e.clientX-(r.left+r.width/2);dy=e.clientY-(r.top+r.height/2);t.classList.add('drag');});
+    t.addEventListener('pointermove',e=>{if(!t.classList.contains('drag'))return;const S=tlBase()*ed.size/2;
+      ed.std=false;ed.b[t.dataset.b]=[clamp(e.clientX-dx,S,innerWidth-S)/innerWidth,clamp(e.clientY-dy,S,innerHeight-S)/innerHeight];draw();});
+    for(const ev of ['pointerup','pointercancel'])t.addEventListener(ev,()=>t.classList.remove('drag'));});
+  $('teSize').oninput=e=>{ed.size=+e.target.value/100;ed.std=false;draw();};
+  $('teAlpha').oninput=e=>{ed.alpha=+e.target.value/100;ed.std=false;draw();};
+  // mirror the layout left to right (for left-handed play), keeping the left arrow on the left of the right one
+  $('teSwap').onclick=()=>{TB.forEach(id=>{ed.b[id][0]=1-ed.b[id][0];});const l=ed.b.tL[0];ed.b.tL[0]=ed.b.tR[0];ed.b.tR[0]=l;
+    if(ed.b.tL[0]>ed.b.tR[0]){const t=ed.b.tL;ed.b.tL=ed.b.tR;ed.b.tR=t;}ed.std=false;draw();};
+  $('teReset').onclick=()=>{ed=tlDefault();ed.std=true;draw();};
+  $('teDone').onclick=()=>close(true);
+  addEventListener('resize',()=>{if(!E.hidden)close(true);});} // turning the phone mid-edit keeps what was laid out so far
 // steering sensitivity (Settings, 50-160%): how sharply steering turns the car and how fast it comes in
 let STEER=1;const readSteer=()=>{STEER=clamp(+(store.get('rn-steer')||1)||1,.5,1.6);};readSteer();
 addEventListener('storage',e=>{if(e.key==='rn-steer')readSteer();});
