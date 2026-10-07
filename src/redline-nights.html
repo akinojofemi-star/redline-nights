@@ -27,18 +27,19 @@ html,body{height:100%;margin:0;background:var(--ink);color:var(--hud);overflow:h
 .meta{display:flex;gap:10px;align-items:baseline}
 .meta b{font-family:var(--f-display);font-style:italic;font-size:24px;font-variant-numeric:tabular-nums}
 #map{position:absolute;right:max(16px,env(safe-area-inset-right));top:calc(14px + env(safe-area-inset-top,0px));width:240px;height:240px;opacity:.95}
-.bottom{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));display:grid;justify-items:center;gap:6px;width:min(420px,calc(100% - 32px))}
+/* speed and nitro sit at the top centre, as in Asphalt, so nothing covers the road ahead or the thumbs on a phone */
+.gauge{position:absolute;left:50%;transform:translateX(-50%);top:calc(12px + env(safe-area-inset-top,0px));display:grid;justify-items:center;gap:4px;width:min(380px,calc(100% - 560px))}
 .speedo{display:flex;align-items:baseline;gap:8px}
-#spd{font-size:76px;line-height:.85;text-shadow:0 2px 18px rgba(0,0,0,.6)}
+#spd{font-size:54px;line-height:.85;text-shadow:0 2px 18px rgba(0,0,0,.6)}
 .unit{font-size:13px;letter-spacing:.14em;color:var(--dim);text-transform:uppercase}
 .nbar{position:relative;width:100%;height:14px;background:rgba(255,255,255,.1);transform:skewX(-18deg);border:1px solid rgba(255,255,255,.22);overflow:hidden}
 #nfill{position:absolute;inset:0 auto 0 0;width:30%;background:linear-gradient(90deg,#ff7a18,var(--nitro));box-shadow:0 0 18px var(--nitro);transition:background .2s}
 .nbar i{position:absolute;top:0;bottom:0;width:2px;background:rgba(14,10,22,.8)}
-#nlabel{font-size:12px;letter-spacing:.22em;font-weight:700;color:var(--nitro)}
+#nlabel{font-size:12px;letter-spacing:.22em;font-weight:700;color:var(--nitro);white-space:nowrap}
 #ptimer{position:relative;width:62%;height:6px;background:rgba(255,255,255,.12);transform:skewX(-18deg)}
 #pzone{position:absolute;left:55%;width:30%;top:0;bottom:0;background:var(--perfect);opacity:.8}
 #pmark{position:absolute;top:-3px;bottom:-3px;width:3px;background:var(--hud);left:0}
-#toasts{position:absolute;left:50%;top:22%;transform:translateX(-50%);display:grid;justify-items:center;gap:4px}
+#toasts{position:absolute;left:50%;top:max(26%,170px);transform:translateX(-50%);display:grid;justify-items:center;gap:4px}
 .toast{font-family:var(--f-display);font-style:italic;font-weight:900;font-size:34px;letter-spacing:.04em;white-space:nowrap;
   text-shadow:0 0 16px currentColor,0 2px 0 rgba(0,0,0,.5);animation:pop 1.3s ease-out forwards}
 .toast small{display:block;text-align:center;font-family:var(--f-ui);font-style:normal;font-size:12px;letter-spacing:.2em;color:var(--hud);text-shadow:none}
@@ -46,7 +47,7 @@ html,body{height:100%;margin:0;background:var(--ink);color:var(--hud);overflow:h
 @keyframes pop{0%{transform:scale(1.6) skewX(-8deg);opacity:0}12%{transform:scale(1) skewX(-8deg);opacity:1}75%{opacity:1}100%{transform:translateY(-24px) skewX(-8deg);opacity:0}}
 #feed{position:absolute;right:max(16px,env(safe-area-inset-right));top:calc(266px + env(safe-area-inset-top,0px));display:flex;flex-direction:column;align-items:flex-end;gap:4px;pointer-events:none}
 .fd{font:800 italic 14px var(--f-display);letter-spacing:.04em;background:rgba(20,14,30,.8);color:var(--hud);padding:3px 12px;border-right:3px solid var(--shock);transform:skewX(-10deg);transition:opacity .4s}
-#corner{position:absolute;left:50%;top:calc(14px + env(safe-area-inset-top,0px));transform:translateX(-50%) skewX(-10deg);padding:5px 14px;background:var(--panel);font:900 italic 22px var(--f-display);letter-spacing:.06em;white-space:nowrap;color:var(--nitro);border-bottom:3px solid currentColor}
+#corner{position:absolute;left:50%;top:calc(118px + env(safe-area-inset-top,0px));transform:translateX(-50%) skewX(-10deg);padding:5px 14px;background:var(--panel);font:900 italic 22px var(--f-display);letter-spacing:.06em;white-space:nowrap;color:var(--nitro);border-bottom:3px solid currentColor}
 #corner.hard{color:var(--danger)}
 #hint{position:absolute;left:50%;top:58%;transform:translateX(-50%) skewX(-10deg);padding:6px 14px;background:var(--panel);border:1px solid var(--perfect);color:var(--perfect);font:700 13px var(--f-ui);letter-spacing:.16em;text-transform:uppercase;white-space:nowrap}
 #countdown{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);font-size:150px;color:var(--hud);text-shadow:0 0 40px rgba(255,176,46,.7)}
@@ -96,6 +97,7 @@ h2{margin:0;font-family:var(--f-display);font-style:italic;font-weight:900;font-
 #classSeg button{min-width:44px;font:900 italic 18px var(--f-display)}
 #classSeg button[aria-pressed="true"]{background:var(--cc);border-color:var(--cc);color:var(--ink)}
 .opts{display:grid;gap:10px}
+.steer{display:grid;grid-template-columns:auto 1fr 3.2em;gap:12px;align-items:center;margin:4px 0 14px}.steer input{accent-color:#ffb02e;width:100%}.steer b{font:700 14px var(--f-ui);text-align:right}
 .opt{display:grid;grid-template-columns:1fr auto;gap:2px 14px;align-items:center}
 .opt b{font:700 14px var(--f-ui)}
 .opt small{grid-column:1;color:var(--dim);font-size:12px;line-height:1.35}
@@ -132,13 +134,27 @@ td.t{text-align:right}
 .stats div{display:grid}
 .stats b{font-family:var(--f-display);font-style:italic;font-size:30px}
 .best{font-size:13px;color:var(--dim)}
+@media (max-width:900px){.gauge{width:min(300px,calc(100% - 380px))}}
+/* phones: portrait (narrow) or landscape (short). Smaller type, a smaller map, and the gauge, buttons and callouts kept
+   clear of each other and of the touch pads at the bottom corners */
+@media (max-width:640px),(max-height:500px){
+  .pos{font-size:40px}.pos small{font-size:18px}.meta b{font-size:16px}.meta .lbl{font-size:9px}
+  #map{width:110px;height:110px;top:calc(8px + env(safe-area-inset-top,0px))}
+  #pauseBtn{top:calc(124px + env(safe-area-inset-top,0px));width:34px;height:34px}#camBtn{top:calc(124px + env(safe-area-inset-top,0px));right:calc(max(16px,env(safe-area-inset-right)) + 42px);height:34px}
+  #feed{top:calc(166px + env(safe-area-inset-top,0px))}.fd{font-size:11px}
+  .gauge{top:calc(8px + env(safe-area-inset-top,0px));width:min(240px,calc(100% - 300px));gap:2px}
+  #spd{font-size:34px}.unit{font-size:10px}.nbar{height:9px}#nlabel{font-size:8px;letter-spacing:.12em}
+  #corner{top:calc(76px + env(safe-area-inset-top,0px));font-size:15px;padding:3px 10px}
+  .toast{font-size:22px}.toast small{font-size:10px}#toasts{top:max(28%,110px)}#countdown{font-size:96px}#hint{font-size:11px}
+  #touch button{width:64px;height:64px}#tR{left:90px}#tD{right:90px}
+}
 @media (max-width:640px){
   #mapSeg{grid-template-columns:repeat(2,1fr)}
-  #spd{font-size:56px}.pos{font-size:48px}#map{width:150px;height:150px}#pauseBtn{top:calc(176px + env(safe-area-inset-top,0px))}#camBtn{top:calc(224px + env(safe-area-inset-top,0px))}
-  .toast{font-size:26px}#countdown{font-size:110px}
+  .gauge{top:calc(124px + env(safe-area-inset-top,0px));width:min(180px,calc(100% - 200px))}
+  #camBtn{top:calc(164px + env(safe-area-inset-top,0px));right:max(16px,env(safe-area-inset-right))}#feed{top:calc(206px + env(safe-area-inset-top,0px))}
+  #corner{top:calc(190px + env(safe-area-inset-top,0px))}#toasts{top:max(34%,240px)}
   .overlay{align-items:flex-end;padding-block:24px;background:linear-gradient(0deg,rgba(14,10,22,.95) 0%,rgba(14,10,22,.75) 70%,rgba(14,10,22,.2) 100%)}
   .overlay>.card{margin-block:auto 0}
-  .bottom{bottom:calc(112px + env(safe-area-inset-bottom,0px))}
 }
 @media (prefers-reduced-motion:reduce){.toast{animation-duration:1.6s}}
 </style>
@@ -162,7 +178,7 @@ td.t{text-align:right}
     <div id="feed"></div>
     <div id="hint" hidden>Double-tap brake for 360</div>
     <div id="countdown" class="num"></div>
-    <div class="bottom">
+    <div class="gauge">
       <div class="speedo"><span id="spd" class="num">0</span><span class="unit">km/h</span></div>
       <div id="ptimer" hidden><div id="pzone"></div><div id="pmark"></div></div>
       <div class="nbar"><div id="nfill"></div><i style="left:33.3%"></i><i style="left:66.6%"></i></div>
@@ -177,7 +193,7 @@ td.t{text-align:right}
   <div id="menu" class="overlay">
     <div class="card">
       <h1>Redline<span>Nights</span></h1>
-      <p class="tag">Eight tracks with split routes, twenty-seven real cars in five classes, four modes, five camera views. Drift to fill nitro, hit it again on the beat for Perfect Nitro, and double-tap a full tank for a Shockwave that clears the road.</p>
+      <p class="tag">Eight tracks with split routes, thirty-three real cars in five classes, four modes, five camera views. Drift to fill nitro, hit it again on the beat for Perfect Nitro, and double-tap a full tank for a Shockwave that clears the road.</p>
       <div class="garage">
         <div class="lbl">Track</div>
         <div class="row seg" id="mapSeg"></div>
@@ -201,21 +217,22 @@ td.t{text-align:right}
         <p class="blurb" id="modeBlurb"></p>
       </div>
       <div id="lapsWrap"><div class="lbl" style="margin-bottom:8px">Laps</div><div class="row seg" id="lapsSeg"></div></div>
+      <label class="steer"><span class="lbl">Steering sensitivity</span><input type="range" class="steerSl" min="50" max="160" step="10" aria-label="Steering sensitivity"><b class="steerVal"></b></label>
       <div class="garage">
         <div class="lbl">Race settings</div>
         <div class="opts" id="opts"></div>
       </div>
       <details class="ctrls"><summary class="lbl">Controls</summary><div class="keys">
         <span><kbd>← →</kbd> <kbd>A D</kbd></span><span>Steer. The car accelerates by itself and turns with the road on its own (as far as its tyres can grip); steering points it across the road, and it straightens up when you let go.</span>
-        <span><kbd>↓</kbd> <kbd>S</kbd></span><span>Brake. Tap brake while steering to start a drift: it holds by itself. Steer into it to tighten, let go to ease out, counter-steer or hit nitro to straighten up. Drifting charges nitro.</span>
+        <span><kbd>↓</kbd> <kbd>S</kbd></span><span>Brake. Tap brake while steering to start a drift, on a bend or a straight. Steer into it to tighten, steer the other way to swing into a drift the other way (chain them left-right down a straight), let go to ease out. Nitro ends a drift, and starting one turns nitro off. Drifting charges nitro.</span>
         <span><kbd>↓ ↓</kbd></span><span>Double-tap brake for a 360 spin, on the road or in the air. A spin on the road costs speed; one in the air costs a little on landing. Stack it with a barrel roll for a combo: purple corkscrew ramps always roll you, and clipping the edge of any other ramp with one side of the car tips you into one.</span>
-        <span><kbd>Space</kbd> <kbd>↑</kbd></span><span>Nitro. Tap again in the blue zone for Perfect. Double-tap a full bar for Shockwave.</span>
+        <span><kbd>Space</kbd> <kbd>↑</kbd></span><span>Nitro. Tap again in the blue zone for Perfect. Double-tap a full bar for Shockwave. Tap it once more, or brake, to turn it off: what's left stays in the tank.</span>
         <span><kbd>Forks</kbd></span><span>Where the road splits, the two roads overlap for a stretch: steer onto whichever one you want from any lane. The choice locks in at the striped barrier. The shortcut is shorter and tighter; the nitro route is longer but loaded with canisters, pads and ramps.</span>
         <span><kbd>On track</kbd></span><span>Purple corkscrew ramps add speed for as long as you're in the air. Parked cars and buses go flying when you hit them: on nitro it barely slows you, without it you lose a chunk of speed (more for a bus). Blue canisters add nitro. Green pads boost you for free. Barrels slow you; concrete roadblocks wreck you unless you're on nitro.</span>
         <span><kbd>Corners</kbd></span><span>The top of the screen calls out sharp bends and hairpins ahead. Take one faster than the tyres can hold and the car runs wide into the wall: brake in a straight line first, or drift through it. A drift corners harder than grip but scrubs off speed. The inside line is the shorter way round.</span>
-        <span><kbd>Edges</kbd></span><span>Walls keep you on the road; kerbed and cliff edges don't. Run wide onto the verge and you slow down, go over the edge and you're out of bounds: you're put back where you left the road, a lot slower. Jumps over gaps need speed: come up short and you drop in.</span>
+        <span><kbd>Edges</kbd></span><span>Walls keep you on the road. Kerbed and cliff edges have a run-off with a red-and-white barrier at the end: run wide and you slow down on the verge, hit the barrier and you bounce off it like a wall. Only flying over it and landing beyond is out of bounds: you're put back where you left the road, a lot slower. Jumps over gaps need speed: come up short and you drop in.</span>
         <span><kbd>Nitro</kbd></span><span>Fills from drifting, air time, near misses, knockdowns, stunts and slipstreams. The feed on the right counts drift distance and air time.</span>
-        <span><kbd>C</kbd></span><span>Change camera: chase, high chase, far chase, hood, bumper.</span>
+        <span><kbd>C</kbd></span><span>Change camera: chase (low, close), high chase, far chase, hood, bumper.</span>
         <span><kbd>P</kbd> <kbd>M</kbd></span><span>Pause, mute.</span>
       </div></details>
       <details class="ctrls"><summary class="lbl">Car model credits</summary><div class="credits" id="credits"></div></details>
@@ -225,6 +242,7 @@ td.t{text-align:right}
 
   <div id="pause" class="overlay" hidden>
     <div class="card"><h2>Paused</h2><p class="tag" id="pauseMsg"></p>
+      <label class="steer"><span class="lbl">Steering sensitivity</span><input type="range" class="steerSl" min="50" max="160" step="10" aria-label="Steering sensitivity"><b class="steerVal"></b></label>
       <div class="row"><button class="go" id="resumeBtn">RESUME</button><button class="go alt" id="restartBtn">RESTART</button><button class="go alt" id="quitBtn">MENU</button></div>
     </div>
   </div>
@@ -302,7 +320,8 @@ const MAP=MAPS[MAP_ID];
 // ---------------------------------------------------------------- renderer
 const canvas=$('gl');
 const renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});
-renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.75));
+const SMALL=matchMedia('(pointer: coarse)').matches&&Math.min(screen.width,screen.height)<600; // a phone
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,SMALL?1.3:1.75));
 renderer.outputEncoding=THREE.sRGBEncoding;
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure=MAP.exposure;
@@ -633,8 +652,8 @@ const GAP=2*ROAD_HALF;     // two roads drive as one wide road exactly while the
 // returns [lo, hi, openLo, openHi]: a walled side stops the car at its line, an open side is the edge of the world
 function limits(e){let lo=-LIM,hi=LIM,oLo=false,oHi=false;
   if(e.br<0){const k=kOf(e.s),hw=hwAt(-1,e.s);
-    if(EL[k]){lo=-(hw+VERGE[EL[k]]);oLo=true;}else lo=-(hw-1.4);
-    if(ER[k]){hi=hw+VERGE[ER[k]];oHi=true;}else hi=hw-1.4;
+    if(EL[k]){lo=-(hw+VERGE[EL[k]]-1.1);oLo=true;}else lo=-(hw-1.4);
+    if(ER[k]){hi=hw+VERGE[ER[k]]-1.1;oHi=true;}else hi=hw-1.4;
     for(const b of BR){const d=wrapD(e.s,b.s0);if(d<0||d>b.span||sepM(b,d)>=GAP)continue;
     const o=offM(b,d);lo=Math.min(lo,o-LIM);hi=Math.max(hi,o+LIM);}}
   else{const b=BR[e.br];if(sepB(b,e.bs)<GAP){const o=offB(b,e.bs);lo=Math.min(lo,o-LIM);hi=Math.max(hi,o+LIM);}}
@@ -670,12 +689,24 @@ function forkCheck(e){
 for(const q of layoutBranches(LAYOUTS[MAP_ID])){const b=buildBranchPts(q.pts,q.kind);b.i=BR.length;BR.push(b);}
 // section and gap positions from the layout's corners (fractions of the lap)
 const MARKS=layoutPoints(LAYOUTS[MAP_ID]);
-const GAPS=(LAYOUTS[MAP_ID].gaps||[]).map(([e,f,len])=>{const [a,b]=MARKS.edge[e],s0=mod((a+(((b-a)%1+1)%1)*f)*L);return {s0,s1:mod(s0+len),len};});
-// the tunnel: a tenth of the lap, as near the middle of the lap as it can be while staying clear of the forks and the start
-const TUNNEL=(()=>{const len=.1*L,clear=(a)=>BR.every(b=>{const d=wrapD(a-60,b.s0);return d+len+120<0||d>b.span;})&&a>.15*L&&a+len<.88*L
-    &&GAPS.every(g=>{const d=wrapD(a-120,g.s0);return d+len+240<0||d>g.len;});
-  for(let k=0;k<300;k++)for(const sg of [1,-1]){const a=.4*L+sg*k*10;if(clear(a))return {s0:a,s1:a+len,h:10.5,w:14.4*RW};}
-  return {s0:.4*L,s1:.5*L,h:10.5,w:14.4*RW};})();
+// a gap slides along the lap (up to 480 m either way, never onto the start) until there's room after the far side to land flat out and see the
+// next bend coming, as for the ramps
+const GAPS=(LAYOUTS[MAP_ID].gaps||[]).map(([e,f,len])=>{const [a,b]=MARKS.edge[e];let s0=mod((a+(((b-a)%1+1)%1)*f)*L);
+  const ok=s=>{for(let d=-60;d<len+280;d+=6){sample(s+d);if(Math.abs(TS.c)>1/150)return false;}return true;};
+  search:for(let k=0;k<80;k++)for(const sg of [-1,1]){const t=mod(s0+sg*k*6);if(ok(t)&&Math.abs(wrapD(t,0))>300){s0=t;break search;}}
+  return {s0,s1:mod(s0+len),len};});
+// the tunnel: up to a tenth of the lap, as near the middle of the lap as it can be, on a stretch where no other road
+// (a fork, or the lap passing back over itself) comes anywhere near its walls, and clear of the start and the gaps
+const TUNNEL=(()=>{const TW=14.4*RW,R2=(ROAD_HALF+TW+16)**2,blk=new Uint8Array(NS);
+  for(let k=0;k<NS;k++){const x=P[k*3],z=P[k*3+2],s=k/NS*L;
+    for(let j=0;j<NS&&!blk[k];j+=2)if(Math.abs(wrapD(j/NS*L,s))>320&&(P[j*3]-x)**2+(P[j*3+2]-z)**2<R2)blk[k]=1;
+    for(const b of BR){if(blk[k])break;for(let i=0;i<b.n;i+=2)if((b.P[i*3]-x)**2+(b.P[i*3+2]-z)**2<R2){blk[k]=1;break;}}}
+  const clear=(a,len)=>{if(a<260||a+len>L-260)return false; // not across the start/finish
+    if(!GAPS.every(g=>{const d=wrapD(a-120,g.s0);return d+len+240<0||d>g.len;}))return false;
+    for(let s=a-60;s<=a+len+60;s+=L/NS)if(blk[Math.round(mod(s)/L*NS)%NS])return false;return true;};
+  for(const f of [.1,.085,.07,.055,.04]){const len=f*L;
+    for(let k=0;k<L/20;k++)for(const sg of [1,-1]){const a=.4*L+sg*k*10;if(clear(a,len))return {s0:a,s1:a+len,h:10.5,w:TW};}}
+  return {s0:.4*L,s1:.44*L,h:10.5,w:TW};})();
 
 function ribbon(pt,vLen){
   const n=NS+1,pos=new Float32Array(n*6),uv=new Float32Array(n*4),idx=new Uint16Array(NS*6),a=[0,0,0];
@@ -787,16 +818,19 @@ for(const side of [-1,1]){
     else scene.add(new THREE.Mesh(ribbonRun(padRun(run),(k,s,o)=>s?at(k,side*outer(k,side),-0.02,o):atY(k,side*(outer(k,side)+.3),GROUND_Y,o),8,L/NS),wallMat));
   }
 }
-// out of bounds made obvious: a glowing red line where an open edge drops away (the far edge of a run-off, or the kerb of
-// a cliff) with a low red light-fence above it and red-and-white posts, and a glowing lip across both ends of every gap
+// the edge of the world made obvious: a glowing red line where the run-off of an open edge ends (or the kerb of a cliff)
+// with a solid red-and-white crash barrier on it that cars bounce off like a wall (only a car that flies over it and lands
+// beyond is out of bounds), and a glowing lip across both ends of every gap
 {
-  const glow=new THREE.MeshBasicMaterial({color:0xff2d4a,side:THREE.DoubleSide}),fence=new THREE.MeshBasicMaterial({color:0xff2d4a,transparent:true,opacity:.42,side:THREE.DoubleSide,depthWrite:false});
+  const barTex=canvasTex(32,128,(g,w,h)=>{for(let y=0;y<4;y++){g.fillStyle=y%2?'#f4f0e8':'#e8202e';g.fillRect(0,y*32,w,32);}g.fillStyle='#2a2430';g.fillRect(w-5,0,5,h);g.fillRect(0,0,3,h);});
+  barTex.wrapS=barTex.wrapT=THREE.RepeatWrapping;
+  const glow=new THREE.MeshBasicMaterial({color:0xff2d4a,side:THREE.DoubleSide}),fence=new THREE.MeshBasicMaterial({map:barTex,side:THREE.DoubleSide});
   const postTex=canvasTex(16,64,(g,w,h)=>{for(let y=0;y<4;y++){g.fillStyle=y%2?'#f4f0e8':'#e8202e';g.fillRect(0,y*16,w,16);}});
   const postPos=[];
   for(const side of [-1,1]){const E=side>0?ER:EL;
     for(const run of runs(NS,k=>E[k]>0&&!GAPK[k],true)){
       scene.add(new THREE.Mesh(ribbonRun(padRun(run),(k,s,o)=>at(k,side*(outer(k,side)-(s?0:.8)),.07,o),4,L/NS),glow));
-      scene.add(new THREE.Mesh(ribbonRun(padRun(run),(k,s,o)=>at(k,side*outer(k,side),s?1:.07,o),4,L/NS),fence));
+      scene.add(new THREE.Mesh(ribbonRun(padRun(run),(k,s,o)=>at(k,side*(outer(k,side)+.15),s?1.1:-.05,o),4,L/NS),fence));
       for(let i=0;i<run.length;i+=Math.round(10/L*NS))postPos.push([run[i],side]);}}
   const posts=new THREE.InstancedMesh(new THREE.BoxGeometry(.22,1.1,.22).translate(0,.55,0),new THREE.MeshBasicMaterial({map:postTex}),postPos.length),o=new THREE.Object3D(),a=[0,0,0];
   postPos.forEach(([k,side],i)=>{at(k,side*outer(k,side),0,a);o.position.set(a[0],a[1],a[2]);o.updateMatrix();posts.setMatrixAt(i,o.matrix);});scene.add(posts);
@@ -892,8 +926,11 @@ for(const b of BR){
   // striped gore marker where the two roads separate and where they merge again
   const goreTex=canvasTex(128,64,(g,w,h)=>{g.fillStyle='#16121e';g.fillRect(0,0,w,h);g.fillStyle=col;for(let x=-64;x<w;x+=32){g.beginPath();g.moveTo(x,h);g.lineTo(x+16,h);g.lineTo(x+48,0);g.lineTo(x+32,0);g.fill();}});
   for(const end of [0,1]){let bs=end?b.len:0;for(let k=0;k<200;k++){const q=end?b.len-k*2:k*2;if(sepB(b,q)>=GAP){bs=q;break;}}
-    const g=new THREE.Group(),m=new THREE.Mesh(new THREE.BoxGeometry(2.4,1.3,2.4),[new THREE.MeshBasicMaterial({map:goreTex}),new THREE.MeshBasicMaterial({map:goreTex}),MAT_DARK(),MAT_DARK(),new THREE.MeshBasicMaterial({map:goreTex}),new THREE.MeshBasicMaterial({map:goreTex})]);
-    m.position.y=.65;g.add(m);placeAt(g,b.i,bs,offB(b,bs)/2,.03);scene.add(g);}
+    const g=new THREE.Group(),m=new THREE.Mesh(new THREE.BoxGeometry(2.2,1.3,3.2),[new THREE.MeshBasicMaterial({map:goreTex}),new THREE.MeshBasicMaterial({map:goreTex}),MAT_DARK(),MAT_DARK(),new THREE.MeshBasicMaterial({map:goreTex}),new THREE.MeshBasicMaterial({map:goreTex})]);
+    m.position.y=.65;g.add(m);placeAt(g,b.i,bs,offB(b,bs)/2,.03);scene.add(g);
+    // the split's nose is solid: a car that reaches it still straddling the two roads hits it (see goreCheck)
+    if(!end){sampleB(b,bs);const l=Math.hypot(TS.f.x,TS.f.z);b.nose={x:g.position.x,z:g.position.z,fx:TS.f.x/l,fz:TS.f.z/l};
+      for(const ex of [-.8,.8]){const lamp=new THREE.Mesh(new THREE.SphereGeometry(.16,8,6),new THREE.MeshBasicMaterial({color:0xffb02e}));lamp.position.set(ex,1.45,0);g.add(lamp);}}}
 }
 function MAT_DARK(){return new THREE.MeshStandardMaterial({color:0x14121a,roughness:.6});}
 // at each split: a board over the nose saying which road is which, and the routes' names painted on the road before it
@@ -1157,30 +1194,46 @@ const RAMP_TYPES={
   kicker:{len:10,w:6.4,hl:1.5,hr:1.5,launch:.15,vmin:6,vmax:15,col:'#ffb02e',pat:'chev'},
   mega:{len:18,w:8.4,hl:3.4,hr:3.4,launch:.21,vmin:11,vmax:21,col:'#3fc8ff',pat:'chev2'},
   twist:{len:12,w:6.4,hl:2.6,hr:.5,launch:.17,vmin:8,vmax:16,col:'#b678ff',pat:'diag',roll:true},
+  hop:{len:9,w:6.4,hl:1.1,hr:1.1,launch:.1,vmin:5,vmax:9,col:'#ffb02e',pat:'chev'}, // a short kicker for the twisty fork routes
   hump:{len:9,w:24.4,hl:.9,hr:.9,launch:.1,vmin:5,vmax:9,col:'#ff3d9a',pat:'bars'},
-  gap:{len:18,w:27.2,hl:3.2,hr:3.2,launch:.24,vmin:13,vmax:21,col:'#ffb02e',pat:'chev2'}
+  gap:{len:18,w:27.2,hl:3.2,hr:3.2,launch:.2,vmin:13,vmax:15,col:'#ffb02e',pat:'chev2'}
 };
 // nearest spot to fraction u where the road runs nearly straight from 40 m before to `need` metres after, away from forks
 // and from spots already taken: ramps need a run-up and somewhere to land
 const TAKEN=[];
 function flatS(u,need,maxC=1/260,gap=70){
-  const ok=s=>{for(let d=-40;d<need;d+=6){sample(s+d);if(Math.abs(TS.c)>maxC)return false;}
-    if(BR.some(b=>wrapD(s,b.s0)>-80&&wrapD(s,b.s0)<b.span+40))return false;
+  // inside a fork's stretch the main road is fine once it is well clear of the other road (not near either junction)
+  const ok=s=>{for(let d=-40;d<need;d+=6){sample(s+d);if(Math.abs(TS.c)>maxC)return false;
+      for(const b of BR){const dd=wrapD(s+d,b.s0);if(dd>-80&&dd<b.span+40&&(dd<0||dd>b.span||sepM(b,dd)<GAP+10))return false;}}
     if(wrapD(s,TUNNEL.s0)>-need-40&&wrapD(s,TUNNEL.s1)<40)return false;
     if(GAPS.some(g=>{const d=wrapD(s,g.s0);return d>-need-80&&d<g.len+80;}))return false;
     if(wrapD(s,0)>-need-90&&wrapD(s,0)<90)return false;        // keep the start grid and finish line clear
     return TAKEN.every(t=>Math.abs(wrapD(s,t))>gap);};
   for(let k=0;k<500;k++)for(const sg of [1,-1]){const s=mod(u*L+sg*k*6);if(ok(s)){TAKEN.push(s);return s;}}
-  return mod(u*L);}
+  return null;}
+// a ramp needs road with no bend too tight to take flat out (the flight itself bends with the road) for the run-up, the
+// flight at full speed and a second or two after landing (a jump that lands just before a hairpin puts you in the wall
+// with no time to react)
+const RUNOUT={hump:140,hop:120,kicker:220,twist:240,mega:290};
+// the same on a fork's own road: away from where it shares the main road, and dropped if there's no such straight
+function flatB(b,f,need,maxC=1/150){
+  const ok=bs=>{if(bs<40||bs+need>b.len-30)return false;for(let d=-40;d<need;d+=6){sampleB(b,bs+d);if(Math.abs(TS.c)>maxC)return false;if(sepB(b,bs+d)<GAP+2)return false;}return true;};
+  for(let k=0;k<400;k++)for(const sg of [1,-1]){const bs=b.len*f+sg*k*6;if(ok(bs))return bs;}
+  return null;}
 const RAMPS=[[.06,'hump',0],[.12,'kicker',-6.5],[.18,'twist',6.5,1],[.30,'mega',0],[.38,'kicker',-9.75],[.45,'twist',-3.25,-1],
   [.55,'hump',0],[.62,'mega',3.25],[.69,'kicker',-3.25],[.80,'twist',9.75,-1],[.87,'kicker',6.5],[.94,'mega',-6.5]]
-  .map(([u,type,x,flip])=>{const s=flatS(u,RAMP_TYPES[type].len+(type==='mega'?140:90));return {s,x:fitX(-1,s,x*RW),T:RAMP_TYPES[type],flip:flip||1,br:-1};});
+  .map(([u,type,x,flip])=>{const s=flatS(u,RUNOUT[type],1/150);return s===null?null:{s,x:fitX(-1,s,x*RW),T:RAMP_TYPES[type],flip:flip||1,br:-1};}).filter(Boolean);
 // every gap has a full-width jump ramp running right up to its edge
 for(const g of GAPS){const w=2*hwAt(-1,g.s0);RAMPS.push({s:mod(g.s0-RAMP_TYPES.gap.len),x:0,T:Object.assign({},RAMP_TYPES.gap,{w}),flip:1,br:-1});}
 // route goodies: the long way round gets ramps; the shortcut gets a speed hump
 for(const b of BR){
-  if(b.kind==='long'){RAMPS.push({s:b.len*.36,x:LANES[1],T:RAMP_TYPES.kicker,flip:1,br:b.i},{s:b.len*.58,x:LANES[2],T:RAMP_TYPES.mega,flip:1,br:b.i});}
-  else RAMPS.push({s:b.len*.5,x:0,T:RAMP_TYPES.hump,flip:1,br:b.i});
+  // tried at a few spots along the route; never where its flight would carry a car over the route's canister rows
+  const rows=[.16,.3,.75,.86].map(f=>b.len*f);
+  const put=(fs,x,type,maxC)=>{for(const f of fs){const s=flatB(b,f,RUNOUT[type],maxC);
+    if(s!==null&&RAMPS.every(r=>r.br!==b.i||Math.abs(r.s-s)>RUNOUT[type])&&rows.every(q=>q<s-20||q>s+RUNOUT[type]*.7)){RAMPS.push({s,x,T:RAMP_TYPES[type],flip:1,br:b.i});return;}}};
+  if(b.kind==='long'){put([.58,.45,.68,.36],LANES[2],'mega',1/90);put([.4,.5,.62,.22],LANES[1],'kicker',1/75);
+    put([.5,.4,.62,.24,.7],LANES[1],'hop',1/80);put([.66,.36,.2,.55],LANES[2],'hop',1/80);}
+  else put([.5,.35,.65],0,'hump',1/100);
 }
 function rEnd(r,x){const T=r.T,t=clamp((x-r.x)/T.w+.5,0,1);return r.flip>0?lerp(T.hl,T.hr,t):lerp(T.hr,T.hl,t);}
 function rampHeight(br,s,x){for(const r of RAMPS){if(r.br!==br)continue;const into=dAlong(br,s,r.s);if(into>=0&&into<=r.T.len&&Math.abs(x-r.x)<r.T.w/2+.6)return {r,h:into/r.T.len*rEnd(r,x)};}return null;}
@@ -1340,21 +1393,27 @@ function makeCar(color,{shape=SEDAN,flames=false}={}){
   return car;
 }
 // Blender-modelled bodies (models/<id>.glb). Materials are matched by name so paint colour and lighting stay consistent.
-const MODEL_CACHE={},MODEL_VER=6; // bump when the Blender models are re-exported
+const MODEL_CACHE={},MODEL_VER=8; // bump when the Blender models are re-exported
 function loadModel(id){
   if(!THREE.GLTFLoader)return Promise.reject(new Error('no loader'));
   return MODEL_CACHE[id]||(MODEL_CACHE[id]=new Promise((res,rej)=>new THREE.GLTFLoader().load('models/'+id+'.json?v='+MODEL_VER,g=>res(g.scene),undefined,rej)));
 }
 const DECAL=m=>{const c=m.clone();c.polygonOffset=true;c.polygonOffsetFactor=-1;c.polygonOffsetUnits=-1;return c;};
-const MODEL_MATS={glass:MAT.glass,trim:DECAL(MAT.trim),chrome:MAT.chrome,light_head:DECAL(MAT.head),light_tail:DECAL(MAT.tail),tyre:MAT.tyre};
+const MODEL_MATS={glass:MAT.glass,trim:DECAL(MAT.trim),chrome:MAT.chrome,light_head:DECAL(MAT.head),light_tail:DECAL(MAT.tail),tyre:MAT.tyre,
+  black:new THREE.MeshStandardMaterial({color:0x020203,metalness:.5,roughness:.16,envMap:ENV})}; // gloss black: two-tone roofs, carbon panels
+// models exported with their texture colours baked in (COLOR_0) show them on trim and chrome: grilles, carbon, badges
+const VC_MATS={};
+// (the baked colour is the part's own colour, so the material's tint goes to white; parts with no texture of their own
+// were baked with the game's colour for their kind)
+const vcMat=m=>VC_MATS[m.uuid]||(VC_MATS[m.uuid]=Object.assign(m.clone(),{vertexColors:true,color:new THREE.Color(0xffffff)}));
 const RIM_SOLID={};
 function modelMat(x,car){const n=(x&&x.name||'').replace(/\.\d+$/,'');return n==='paint'?car.paint:MODEL_MATS[n]||(n==='rim'?MAT.chrome:car.paint);}
 function swapInModel(car,src,S){
   const m=src.clone(true),wheels=[];
   const rim=RIM_SOLID[S.rim]||(RIM_SOLID[S.rim]=new THREE.MeshStandardMaterial({color:S.rim===0xffffff?0xc8ccd4:S.rim,metalness:.85,roughness:.25,envMap:ENV}));
-  const pick=x=>{const n=(x&&x.name||'').replace(/\.\d+$/,'');return n==='rim'?rim:modelMat(x,car);};
+  const pick=(x,vc)=>{const n=(x&&x.name||'').replace(/\.\d+$/,''),mm=n==='rim'?rim:modelMat(x,car);return vc&&(n==='trim'||n==='chrome')?vcMat(mm):mm;};
   m.traverse(o=>{
-    if(o.isMesh)o.material=Array.isArray(o.material)?o.material.map(pick):pick(o.material);
+    if(o.isMesh){const vc=!!o.geometry.attributes.color;o.material=Array.isArray(o.material)?o.material.map(x=>pick(x,vc)):pick(o.material,vc);}
     if(/_wheel_(FL|FR|RL|RR)$/.test(o.name)){o.rotation.order='YXZ';o.userData.front=/_F[LR]$/.test(o.name);wheels.push(o);}
   });
   const keep=new Set(car.fl?car.fl.parts:[]);
@@ -1445,7 +1504,7 @@ const U=u=>u*L;
   });
 }
 // roadworks: barrels slow you, concrete blocks wreck you unless you're on nitro
-const ZONES=[{u:.155,lanes:[0,1]},{u:.52,lanes:[3]},{u:.835,lanes:[1,2]}].map(z=>({s:flatS(z.u,60,1/90,90),lanes:z.lanes,len:44}));
+const ZONES=[{u:.155,lanes:[0,1]},{u:.52,lanes:[3]},{u:.835,lanes:[1,2]}].map(z=>({s:flatS(z.u,60,1/90,90)??mod(z.u*L),lanes:z.lanes,len:44}));
 const OBST=[];
 const lampMat=new THREE.MeshBasicMaterial({color:0xffb02e});
 {
@@ -1473,7 +1532,7 @@ const lampMat=new THREE.MeshBasicMaterial({color:0xffb02e});
 function placeObst(o){placeAt(o.mesh,o.br,o.s,o.x,o.kind==='barrel'?.55:0);}
 function smash(o,src){
   const heavy=o.kind==='block';o.dead=1;o.flyT=heavy?2.2:1.6;sampleAt(o.br,o.s);o.baseY=TS.p.y;
-  o.vel.copy(TS.f).multiplyScalar(src.speed*(heavy?.55:.8)).addScaledVector(TS.r,(o.x>=src.x?1:-1)*(4+rnd()*6)).addScaledVector(TS.u,(heavy?5:7)+rnd()*5);
+  o.vel.copy(TS.f).multiplyScalar(src.speed*1.08+6).addScaledVector(TS.r,(o.x>=src.x?1:-1)*(8+rnd()*6)).addScaledVector(TS.u,(heavy?5:7)+rnd()*5);
   o.ang.set((rnd()-.5)*12,(rnd()-.5)*10,(rnd()-.5)*12);
   for(let i=0;i<(heavy?16:6);i++)emit(o.mesh.position,new V3((rnd()-.5)*10,rnd()*7,(rnd()-.5)*10),.5,.5,.1,heavy?0xe9e2d6:0xff7a20,true);
   if(src===player)G.shake=Math.max(G.shake,heavy?.9:.25);
@@ -1508,11 +1567,16 @@ function updateFeatures(dt){
   const p=player,racing=G.mode==='race';
   lampMat.color.setHex(Math.floor(G.t*3)%2?0xffb02e:0x40280c);
   padTex.offset.y=(padTex.offset.y-dt*1.8)%1;
+  // a canister is collected when the car passes through it in the world, whichever road (main or fork) either is on,
+  // checked along the whole path the car took since the last frame so a fast car or a long frame can't skip it
+  sampleE(p);const pw1=TS.p.clone().addScaledVector(TS.r,p.x).addScaledVector(TS.u,p.y+.7),pw0=p._pw&&p._pw.distanceToSquared(pw1)<400?p._pw:pw1;p._pw=pw1;
+  const seg=new V3().subVectors(pw1,pw0),sl2=Math.max(seg.lengthSq(),1e-6);
   for(const k of PICK){
     if(k.off>0){k.off-=dt;if(k.off<=0){if(Math.abs(wrapD(k.ms,p.s))>200)k.g.visible=true;else k.off=.5;}continue;}
     if(Math.abs(wrapD(k.ms,p.s))>600)continue;
     placeAt(k.g,k.br,k.s,k.x,k.y+1+Math.sin(G.t*3+k.s)*.25+(k.br<0?0:.03));k.g.rotateY(G.t*2.5);
-    if(racing&&p.wreck<=0&&k.br===p.br&&Math.abs(dAlong(k.br,k.s,posOf(p)))<2.6&&Math.abs(k.x-p.x)<1.9&&Math.abs(p.y+.6-k.y-1)<2.2){
+    const q=k.g.position,tq=clamp(((q.x-pw0.x)*seg.x+(q.y-pw0.y)*seg.y+(q.z-pw0.z)*seg.z)/sl2,0,1);
+    if(racing&&p.wreck<=0&&!p.oob&&q.distanceToSquared(pw0.clone().addScaledVector(seg,tq))<(k.y>0?3.6:3.1)**2){
       k.off=12;k.g.visible=false;p.nitro=Math.min(1,p.nitro+.1);sfx('ping');
       for(let i=0;i<10;i++)emit(k.g.position,new V3((rnd()-.5)*8,rnd()*6,(rnd()-.5)*8),.5,.6,.1,0x3fc8ff,true);
       if(G.t-lastPickToast>1.5){lastPickToast=G.t;toast(k.y>0?'AIR PICKUP':'NITRO PICKUP','perfect','+10% EACH');}
@@ -1526,8 +1590,8 @@ function updateFeatures(dt){
   for(const o of OBST){
     if(o.dead){
       if(o.flyT>0){o.flyT-=dt;const m=o.mesh;o.vel.y-=GRAV*dt;m.position.addScaledVector(o.vel,dt);
-        if(m.position.y<o.baseY+.5&&o.vel.y<0){m.position.y=o.baseY+.5;o.vel.y*=-.3;o.vel.x*=.6;o.vel.z*=.6;o.ang.multiplyScalar(.6);}
-        m.rotation.x+=o.ang.x*dt;m.rotation.y+=o.ang.y*dt;m.rotation.z+=o.ang.z*dt;if(o.flyT<=0)m.visible=false;}
+        if(m.position.y<o.baseY+.5&&o.vel.y<0){m.position.y=o.baseY+.5;o.vel.y*=-.3;o.vel.x*=.85;o.vel.z*=.85;o.ang.multiplyScalar(.6);}
+        m.rotation.x+=o.ang.x*dt;m.rotation.y+=o.ang.y*dt;m.rotation.z+=o.ang.z*dt;m.visible=o.flyT>0&&!nearCam(m.position,o.kind==='block'?4.5:2.2);}
       else if(Math.abs(wrapD(o.ms,p.s))>350){o.dead=0;o.mesh.visible=true;placeObst(o);}
       continue;
     }
@@ -1603,28 +1667,34 @@ const CARS=[
   REAL('Volkswagen Golf GTI','D',250,6.3,1430,1.1,1.1,'The everyday hot hatch. Easy to drive, never the fastest.',sh(SH_HATCH,'golf')),
   REAL('Mini Cooper S','D',235,6.8,1265,1.35,1.05,'Go-kart handling in a tiny hatch. Darts through gaps nothing else fits.',sh(SH_HATCH,'mini',{len:3.87,roofH:1.41})),
   REAL('Nissan Silvia S15 Spec-R','D',240,6.0,1250,1.3,1.15,'Turbo rear-drive drift icon. Built to go sideways, and drifting fills its nitro fast.',sh(SH_COUPE,'silvia',{len:4.44,roofH:1.29,wing:'duck'})),
-  REAL('Toyota GR Yaris','C',230,5.5,1280,1.35,1.05,'Rally homologation hatch. Short, grippy and happy to be thrown sideways.',sh(SH_HATCH,'yaris',{len:4.0,rim:0x55555c})),
+  REAL('Toyota GR Yaris','D',230,5.5,1280,1.35,1.05,'Rally homologation hatch. Short, grippy and happy to be thrown sideways.',sh(SH_HATCH,'yaris',{len:4.0,rim:0x55555c})),
   REAL('Honda Civic Type R','C',275,5.4,1430,1.25,1.05,'Front-drive hot hatch with a huge wing and a very sharp front end.',sh(SH_HATCH,'civic',{len:4.59,wing:'big'})),
   REAL('Ford Mustang GT','C',250,4.9,1830,.8,1.1,'V8 muscle. Strong off the line and heavy enough to shove traffic aside.',sh(SH_COUPE,'mustang',{len:4.81,tail:'tri',wing:'duck'})),
   REAL('Toyota GR Supra','C',250,4.1,1540,1.1,1.0,'Turbo straight-six coupe. The quickest launch in the class.',sh(SH_COUPE,'supra',{len:4.38,roofH:1.29,wing:'duck'})),
   REAL('Subaru WRX STI','C',255,5.2,1530,1.25,1.0,'All-wheel-drive rally sedan with a tall wing. Grips anywhere.',sh(SH_COUPE,'wrx',{len:4.6,roofH:1.47,wing:'big'})),
   REAL('BMW M4 Competition','B',290,3.9,1725,1.0,1.0,'Twin-turbo six with all-wheel drive. Quick everywhere, heavy in the bends.',sh(SH_COUPE,'m4',{len:4.79})),
-  REAL('Chevrolet Corvette C8','B',312,2.9,1655,1.1,1.0,'Mid-engined American V8. Supercar pace in the B class.',sh(SH_MID,'c8',{len:4.63})),
+  REAL('Chevrolet Corvette C8','A',312,2.9,1655,1.1,1.0,'Mid-engined American V8. Supercar pace in the B class.',sh(SH_MID,'c8',{len:4.63})),
   REAL('Tesla Model S Plaid','B',322,2.1,2190,.85,1.35,'Electric sedan with savage launch and a huge battery for nitro. Heavy in corners.',sh(SH_COUPE,'models',{len:4.97,roofH:1.44,grille:'none',exh:[]})),
-  REAL('Audi RS6 Avant','B',305,3.6,2075,.85,1.15,'Twin-turbo V8 estate. A family car that runs with supercars on the straights.',sh(SH_HATCH,'rs6',{len:5.0,roofH:1.47})),
+  REAL('Audi RS6 Avant','C',305,3.6,2075,.85,1.15,'Twin-turbo V8 estate. A family car that runs with supercars on the straights.',sh(SH_HATCH,'rs6',{len:5.0,roofH:1.47})),
   REAL('Porsche Taycan Turbo S','B',260,2.8,2295,.95,1.4,'Electric four-door with the biggest nitro tank in its class. Lower top speed, huge shove.',sh(SH_COUPE,'taycan',{len:4.96,roofH:1.38,grille:'none',exh:[]})),
-  REAL('Nissan GT-R','A',315,2.8,1750,1.15,1.0,'All-wheel-drive brute. Launches hard and stays planted.',sh(SH_COUPE,'gtr',{len:4.71,tail:'quad',wing:'gt'})),
+  REAL('Nissan GT-R','B',315,2.8,1750,1.15,1.0,'All-wheel-drive brute. Launches hard and stays planted.',sh(SH_COUPE,'gtr',{len:4.71,tail:'quad',wing:'gt'})),
   REAL('Porsche 911 GT3','A',318,3.4,1435,1.35,.95,'Track-focused 911. The sharpest steering in the garage.',sh(SH_COUPE,'p911',{len:4.57,roofH:1.28,head:'round',wing:'swan'})),
   REAL('Audi R8 V10 Performance','A',331,3.1,1595,1.1,1.0,'Naturally aspirated V10 and quattro grip. Stable and fast.',sh(SH_MID,'r8',{len:4.43})),
-  REAL('Aston Martin Vantage','A',314,3.6,1630,1.1,1.0,'Front-engined twin-turbo V8 GT. Long bonnet, tidy balance.',sh(SH_COUPE,'vantage',{len:4.47,roofH:1.27})),
-  REAL('Mercedes-AMG GT S','A',310,3.8,1645,1.05,1.05,'Long-nosed V8 muscle from Affalterbach. Stable at speed.',sh(SH_COUPE,'amggt',{len:4.55,roofH:1.26})),
-  REAL('Lamborghini Huracán Tecnica','S',325,3.2,1379,1.15,1.0,'Rear-drive V10 wedge. Loud, quick and well balanced.',sh(SH_MID,'huracan',{len:4.55})),
+  REAL('Aston Martin Vantage','B',314,3.6,1630,1.1,1.0,'Front-engined twin-turbo V8 GT. Long bonnet, tidy balance.',sh(SH_COUPE,'vantage',{len:4.47,roofH:1.27})),
+  REAL('Mercedes-AMG GT S','B',310,3.8,1645,1.05,1.05,'Long-nosed V8 muscle from Affalterbach. Stable at speed.',sh(SH_COUPE,'amggt',{len:4.55,roofH:1.26})),
+  REAL('Ford GT','A',348,3.0,1385,1.1,1.0,'Le Mans-bred twin-turbo V6 with flying-buttress bodywork. Top of the A class on the straights.',sh(SH_MID,'fordgt',{len:4.78})),
+  REAL('Ferrari F8 Tributo','A',340,2.9,1435,1.15,1.0,'Twin-turbo V8 Ferrari. Quick to turn in and fast everywhere.',sh(SH_MID,'f8',{len:4.61})),
+  REAL('Porsche 911 Turbo S','A',330,2.7,1640,1.15,1.05,'All-wheel-drive 911 that launches like a hypercar. Stable, easy to place.',sh(SH_COUPE,'p911t',{len:4.54,roofH:1.3})),
+  REAL('Lamborghini Huracán Tecnica','A',325,3.2,1379,1.15,1.0,'Rear-drive V10 wedge. Loud, quick and well balanced.',sh(SH_MID,'huracan',{len:4.55})),
   REAL('Ferrari SF90 Stradale','S',340,2.5,1570,1.1,1.15,'Plug-in hybrid V8. Electric boost makes its nitro last.',sh(SH_MID,'sf90',{len:4.71})),
-  REAL('McLaren 720S','S',341,2.9,1419,1.1,.95,'Light carbon supercar. Huge top end for its size.',sh(SH_MID,'mc720',{len:4.54})),
+  REAL('McLaren 720S','A',341,2.9,1419,1.1,.95,'Light carbon supercar. Huge top end for its size.',sh(SH_MID,'mc720',{len:4.54})),
   REAL('Lamborghini Revuelto','S',350,2.5,1772,1.05,1.1,'V12 plug-in hybrid flagship. Brutal pace, and a lot of car to turn.',sh(SH_MID,'revuelto',{len:4.95})),
   REAL('Pagani Huayra BC','S',370,2.8,1218,1.15,1.0,'Carbon-bodied twin-turbo V12. The lightest hypercar here.',sh(SH_MID,'huayra',{len:4.61})),
   REAL('Koenigsegg Jesko','S',410,2.5,1420,1.1,.95,'Swedish twin-turbo V8 with a giant wing. Nearly Chiron pace and far lighter on its feet.',sh(SH_MID,'jesko',{len:4.61,wing:'big'})),
-  REAL('Bugatti Chiron','S',420,2.4,1995,.85,.9,'The fastest car here by a distance. Heavy, and it needs room to turn.',sh(SH_MID,'chiron',{len:4.54,grille:'horseshoe',tail:'bar'}))
+  REAL('Bugatti Chiron','S',420,2.4,1995,.85,.9,'The fastest car here by a distance. Heavy, and it needs room to turn.',sh(SH_MID,'chiron',{len:4.54,grille:'horseshoe',tail:'bar'})),
+  REAL('McLaren Senna','S',335,2.8,1198,1.25,.95,'Track car with number plates. Featherweight, huge downforce, the sharpest S-class car in a corner.',sh(SH_MID,'senna',{len:4.74,wing:'big'})),
+  REAL('Lamborghini Aventador SVJ','S',350,2.8,1525,1.0,1.0,'Naturally aspirated V12 with active aero. Wild, loud and planted at full speed.',sh(SH_MID,'svj',{len:4.94})),
+  REAL('Rimac Nevera','S',412,1.9,2150,.9,1.45,'Four-motor electric hypercar. The hardest launch in the game and a giant battery for nitro, but heavy.',sh(SH_MID,'nevera',{len:4.75})),
 ];
 const CLASSES=['D','C','B','A','S'];
 const CLASS_NAME={D:'Class D · street',C:'Class C · hot hatch and muscle',B:'Class B · sports',A:'Class A · supercar',S:'Class S · hypercar'};
@@ -1657,6 +1727,12 @@ const CREDITS={
   huayra:['2016 Pagani Huayra BC','ddiaz-design','CC BY-NC-SA 4.0','013a102992cb4dda9035e018b7a6addb'],
   jesko:['2020 Koenigsegg Jesko','ddiaz-design','CC BY 4.0','c657f51fb0db43e38fea172dfa385287'],
   chiron:['2016 Bugatti Chiron','ddiaz-design','CC BY-NC-SA 4.0','065129f73f2849029909d8beeea760ff'],
+  senna:['2019 McLaren Senna','ddiaz-design','CC BY 4.0','6924eb7b4dde44b19d87c8c31edc74b4'],
+  svj:['2019 Lamborghini Aventador SVJ','ddiaz-design','CC BY 4.0','1910d24bbad34fdda0c4fe30f01b3cc1'],
+  nevera:['2022 Rimac Nevera','ddiaz-design','CC BY-NC-SA 4.0','d3700fc37a2c4a61adb33ac3ffedd787'],
+  fordgt:['2017 Ford GT','ddiaz-design','CC BY-NC-SA 4.0','7eb9c5aca1e84d428898bf88fa9ab8b7'],
+  f8:['2020 Ferrari F8 Tributo','ddiaz-design','CC BY-NC-SA 4.0','8a86c4d634f64f8b8ee836bc93fa6ac8'],
+  p911t:['2021 Porsche 911 Turbo S (992)','ddiaz-design','CC BY-NC-SA 4.0','b6756fc06654405a839bf14e931e4c83'],
   traffic:['Generic passenger car pack','comrade1280','CC BY 4.0','20f9af9b8a404d5cb022ac6fe87f21f5'],
   bus:['Isuzu Erga Mio bus','own.guest','CC BY 4.0','050e8acd0bbc4da0902a8a874ef10fca'],
   train:['Train | Locomotive SD40-2','nikcore76','CC BY 4.0','bdeadf60bf774adc9a39c744792c02c4'],
@@ -1887,6 +1963,12 @@ const bindTouch=(id,key)=>{const b=$(id);const on=v=>e=>{e.preventDefault();if(k
   b.addEventListener('pointerdown',on(true));['pointerup','pointercancel','pointerleave'].forEach(ev=>b.addEventListener(ev,on(false)));};
 bindTouch('tL','l');bindTouch('tR','r');bindTouch('tD','d');bindTouch('tN','n');
 if(matchMedia('(pointer: coarse)').matches)$('touch').hidden=false;
+// steering sensitivity (Settings, 50-160%): how sharply steering turns the car and how fast it comes in
+let STEER=1;const readSteer=()=>{STEER=clamp(+(store.get('rn-steer')||1)||1,.5,1.6);};readSteer();
+addEventListener('storage',e=>{if(e.key==='rn-steer')readSteer();});
+document.querySelectorAll('.steerSl').forEach(el=>{
+  const show=()=>document.querySelectorAll('.steerSl').forEach(e=>{e.value=Math.round(STEER*100);e.nextElementSibling.textContent=Math.round(STEER*100)+'%';});
+  el.addEventListener('input',()=>{store.set('rn-steer',el.value/100);readSteer();show();});el.addEventListener('change',()=>el.blur());show();});
 const steerIn=()=>((keys.ArrowRight||keys.KeyD||touchState.r)?1:0)-((keys.ArrowLeft||keys.KeyA||touchState.l)?1:0);
 const brakeIn=()=>!!(keys.ArrowDown||keys.KeyS||touchState.d);
 
@@ -1995,6 +2077,7 @@ function startSpin(dir){
 }
 function brakeTap(){
   const p=player;if(G.mode!=='race'||G.paused)return;const now=G.raceTime;
+  if(p.nitroLevel>0)nitroOff(); // braking (and so starting a drift) shuts the nitro off
   if(now-p.lastBrakeTap<.3){p.lastBrakeTap=-9;startSpin(steerIn()||(p.vx>.5?1:p.vx<-.5?-1:1));}else{p.lastBrakeTap=now;p.driftArm=now;}
 }
 function trickPayout(list,T){
@@ -2021,7 +2104,7 @@ function knockdown(o,how){
 }
 function knockTraffic(t,src){
   sampleE(t);t.baseY=TS.p.y;
-  t.vel.copy(TS.f).multiplyScalar(Math.max(src.speed,20)*(t.big?.45:.85)).addScaledVector(TS.r,Math.sign(t.x-src.x||1)*(8+rnd()*6)).addScaledVector(TS.u,(t.big?5:9)+rnd()*5);
+  t.vel.copy(TS.f).multiplyScalar(Math.max(src.speed,20)*1.08+6).addScaledVector(TS.r,Math.sign(t.x-src.x||1)*(t.big?7:10)+rnd()*6*Math.sign(t.x-src.x||1)).addScaledVector(TS.u,(t.big?5:9)+rnd()*5);
   t.ang.set((rnd()-.5)*10,(rnd()-.5)*8,(rnd()-.5)*12).multiplyScalar(t.big?.4:1);t.flying=2.4;
 }
 function wreckPlayer(){
@@ -2050,8 +2133,10 @@ function pressNitro(){
     const e=G.raceTime-p.nitroStart;
     if(e<.3&&p.fullAtStart){p.nitroLevel=3;toast('SHOCKWAVE','shock');sfx('shock');shockwave();}
     else if(e>=PW0&&e<=PW1){p.nitroLevel=2;p.stats.perfect++;toast('PERFECT NITRO','perfect');sfx('perfect');}
-  }
+    else if(e>PW1)nitroOff();
+  }else nitroOff(); // tapping again while it burns turns it off; what's left stays in the tank
 }
+function nitroOff(){const p=player;if(!p.nitroLevel)return;p.nitroLevel=0;toast('NITRO OFF','plain');}
 const PW0=.55,PW1=.85;
 
 // ---------------------------------------------------------------- update: player
@@ -2116,18 +2201,21 @@ function carPhysics(p,dt,steer,brake,racing){
   // controls: steering eases in and out; the autopilot (race finished) steers itself back to a lane
   if(G.mode==='finish'){const look=20+Math.hypot(p.wvx,p.wvz)*.4;sampleAt(p.br,posOf(p)+look);const ax=TS.p.x+TS.r.x*(p.autoX||0)-wx,az=TS.p.z+TS.r.z*(p.autoX||0)-wz;
     const hx=Math.cos(p.psi),hz=Math.sin(p.psi),ang=Math.atan2(hx*az-hz*ax,hx*ax+hz*az);steer=clamp(ang*3,-1,1);}
-  p.steerS+=(steer-p.steerS)*Math.min(1,(Math.abs(steer)>Math.abs(p.steerS)?7:10)*dt);
+  p.steerS+=(steer-p.steerS)*Math.min(1,(Math.abs(steer)>Math.abs(p.steerS)?7*(.6+.4*STEER):10)*dt);
   // drift: tap brake while steering (or steer just after the tap). The rear tyres let go and the slide is held at the
-  // angle you steer for: into the turn holds or tightens it, letting go straightens it in about half a second, counter-
-  // steer ends it at once. It also ends on nitro, a jump, a hard wall hit or low speed.
+  // angle you steer for, on a bend or a straight alike: into the slide holds or tightens it, steering the other way swings
+  // the car into a drift the other way (so you can chain left-right-left down a straight), and letting go eases it out
+  // until the car straightens. It ends on nitro, a jump, a hard wall hit or low speed. Starting one shuts the nitro off.
   const u0=p.wvx*Math.cos(p.psi)+p.wvz*Math.sin(p.psi);
   if(racing&&!p.drift&&steer!==0&&u0>32&&!p.air&&!p.spin&&(brake||G.raceTime-p.driftArm<.3)){
-    p.drift=true;p.driftDir=steer;p.driftT=0;p.driftArm=-9;p.betaT=-steer*.35;p.yawR+=steer*1.1;}
-  const into=p.drift?steer*p.driftDir:0;
-  if(p.drift){p.driftT+=dt;
-    const want=into>0?(brake?1.0:.8):into<0?0:Math.max(0,Math.abs(p.betaT)-1.8*dt);
+    p.drift=true;p.driftDir=steer;p.driftT=0;p.flipT=0;p.noSteerT=0;p.driftArm=-9;p.betaT=-steer*.35;p.yawR+=steer*1.1;if(p===player)nitroOff();}
+  let into=p.drift?steer*p.driftDir:0;
+  if(p.drift){p.driftT+=dt;p.noSteerT=steer?0:(p.noSteerT||0)+dt;
+    if(into<0&&p.driftT-(p.flipT||0)>.2){ // swing over into a drift the other way
+      p.driftDir=steer;p.flipT=p.driftT;p.betaT=-p.betaT;p.yawR+=steer*.9;into=1;}
+    const want=into>0?(brake?.85:.68):Math.max(0,Math.abs(p.betaT)-1.0*dt);
     p.betaT=-p.driftDir*(into>0?lerp(Math.abs(p.betaT),want,Math.min(1,3*dt)):want);}
-  p.gripR+=((p.drift?.42:1)-p.gripR)*Math.min(1,(p.drift?6:2.5)*dt);
+  p.gripR+=((p.drift?.5:1)-p.gripR)*Math.min(1,(p.drift?6:2.5)*dt);
   // engine and brakes
   const top=sp.top+NB[p.nitroLevel]+(p.padT>0?14:0)+p.slip*4,fin=G.mode==='finish';
   // the road's own turn rate at the car's line, and the car's heading relative to the road
@@ -2145,6 +2233,9 @@ function carPhysics(p,dt,steer,brake,racing){
     if(p.air){ // no tyres in the air: hold course, a little air control
       if(p.purple)fx=5;else fx=0;
       // in the air the car eases round to face where it's flying (no spin carried over from a drift) with a touch of air control
+      // the flight bends with the road below it (Asphalt's jump assist), so a jump off a ramp before a bend lands on the road
+      // at the same offset instead of flying straight on into the barrier
+      const om=-cRoad*u*h,co=Math.cos(om),so=Math.sin(om),vx0=p.wvx;p.wvx=vx0*co-p.wvz*so;p.wvz=vx0*so+p.wvz*co;p.psi+=om;
       let dpsi=Math.atan2(p.wvz,p.wvx)-p.psi;dpsi=Math.atan2(Math.sin(dpsi),Math.cos(dpsi));p.yawR=dpsi*3+p.steerS*.4;
       p.wvx+=hx*fx*h;p.wvz+=hz*fx*h;p.psi+=p.yawR*h;wx+=p.wvx*h;wz+=p.wvz*h;continue;}
     // steering angle: finer as speed rises, and wider in a drift so you can counter-steer
@@ -2159,24 +2250,24 @@ function carPhysics(p,dt,steer,brake,racing){
       // assist) and can be pulled tighter than grip allows by steering into the slide, or opened up by counter-steering;
       // the slide itself scrubs off speed
       const into2=p.steerS*p.driftDir;
-      wT=-cRoad*u+p.driftDir*Math.max(0,into2)*.55/(1+u/45)-(into2<-.3?p.driftDir*.25:0);
+      wT=-cRoad*u+p.driftDir*Math.max(0,into2)*.72*STEER/(1+u/45);
       const capD=mu*1.05*1.3,aLat=clamp(V*wT,-capD,capD),vl=Math.max(V,1);
       pathAx=-p.wvz/vl*aLat;pathAz=p.wvx/vl*aLat;
       const bb=Math.atan2(w,Math.max(u,1));
-      pathAx-=p.wvx/vl*(4+26*bb*bb);pathAz-=p.wvz/vl*(4+26*bb*bb);fx*=Math.max(.3,Math.cos(bb));
+      pathAx-=p.wvx/vl*(6+30*bb*bb);pathAz-=p.wvz/vl*(6+30*bb*bb);fx*=Math.max(.3,Math.cos(bb));
     }else{ // gripping: the tyres pull the car's path in line with its nose, up to the grip limit; past it the car slides
       const cap=mu*1.05;fy=clamp(-w*30,-cap,cap);fx-=Math.abs(fy)/cap*Math.abs(w)*.6;
     }
     beta=Math.atan2(w,Math.max(u,1));
     if(p.drift){
       // the body swings out to the slide angle and holds it there (a PD on the sideslip, relative to the line's turn)
-      yawAcc=28*(beta-p.betaT)-7*(p.yawR-wT);
+      yawAcc=38*(beta-p.betaT)-10*(p.yawR-wT);
     }else{
       // grip driving with Asphalt's steering assist: the car turns with the road by itself, your steering adds a turn of
       // its own that gets gentler with speed, and with no input it straightens up to the road. The car rotates toward
       // that rate quickly but not instantly, never faster than the tyres can carry it; the tyres then decide how well
       // the car's path follows its nose, so a bend taken too fast still runs wide.
-      const rRoad=-cRoad*u,rIn=Math.abs(p.steerS)>.05?p.steerS*1.7*stK*(1.15-.15*sp.mass)/(1+Math.max(0,u)/22)*clamp(1-thRel*Math.sign(p.steerS)/capA,0,1)-(Math.abs(thRel)>capA?2*(thRel-Math.sign(thRel)*capA):0):-2*thRel;
+      const rRoad=-cRoad*u,rIn=Math.abs(p.steerS)>.05?p.steerS*1.7*STEER*stK*(1.15-.15*sp.mass)/(1+Math.max(0,u)/22)*clamp(1-thRel*Math.sign(p.steerS)/capA,0,1)-(Math.abs(thRel)>capA?2*(thRel-Math.sign(thRel)*capA):0):-2*thRel;
       const lim=(mu*1.05)/Math.max(u,4),rT=clamp(rRoad+rIn,-lim,lim);p.rTp=rT;
       yawAcc=11/(.55+.45*sp.mass)*(rT-p.yawR)+10*(beta-clamp(beta,-.12,.12));
     }
@@ -2186,7 +2277,7 @@ function carPhysics(p,dt,steer,brake,racing){
     wx+=p.wvx*h;wz+=p.wvz*h;latSum+=fy;
   }
   if(p.drift){p.slipA=Math.min(1,Math.abs(beta)/.9);p.nitro=Math.min(1,p.nitro+.2*(.6+p.slipA)*dt);p.driftM=(p.driftM||0)+Math.hypot(p.wvx,p.wvz)*dt;
-    if(Math.hypot(p.wvx,p.wvz)<22||(p.driftT>.25&&into<=0&&Math.abs(beta)<.22)||(p.driftT>.15&&into<-.3))endDrift();}
+    if(Math.hypot(p.wvx,p.wvz)<22||(p.noSteerT>.3&&Math.abs(beta)<.15))endDrift();}
   if(!p.drift)p.slipA=0;
   // back onto the track
   projectTo(p,wx,wz);
@@ -2195,11 +2286,14 @@ function carPhysics(p,dt,steer,brake,racing){
   const [lo,hi,oLo,oHi]=limits(p);t=trackFrame(p);
   // on the kerb and verge of an open edge: rumble and lose speed
   if(p.br<0&&!p.air){const hw=hwAt(-1,p.s),sd=Math.sign(p.x);if(Math.abs(p.x)>hw-.8&&(sd>0?oHi:oLo)){const k=1-dt*(Math.abs(p.x)>hw+1.4?.45:.2);p.wvx*=k;p.wvz*=k;G.shake=Math.max(G.shake,.12);}}
-  if((p.x<lo&&oLo)||(p.x>hi&&oHi)){if(racing&&!p.air)goOOB(p,p.x>hi?1:-1,Math.hypot(p.wvx,p.wvz));}
+  // past the barrier at the end of a run-off: in the air the car flies on; landing more than a few metres beyond it (it
+  // can't get there on the ground) is out of bounds; otherwise the barrier is a wall like any other
+  const open=(p.x<lo&&oLo)||(p.x>hi&&oHi);
+  if(open&&(p.air||Math.abs(p.x-(p.x>hi?hi:lo))>3)){if(racing&&!p.air)goOOB(p,p.x>hi?1:-1,Math.hypot(p.wvx,p.wvz));}
   else if(p.x<lo||p.x>hi){const side=p.x>hi?1:-1,lim=side>0?hi:lo;
     // normally a wall stops you dead on its line; where the overlap of two roads ends under a car (the gore), it is eased
     // back onto its own road over a few frames instead of jumping
-    p.x=Math.abs(p.x-lim)>1?p.x-side*Math.min(Math.abs(p.x-lim),25*dt):lim;
+    p.x=!open&&Math.abs(p.x-lim)>1?p.x-side*Math.min(Math.abs(p.x-lim),25*dt):lim;
     const vr=p.wvx*t.rx+p.wvz*t.rz,vf=p.wvx*t.fx+p.wvz*t.fz,hit=Math.max(0,vr*side),V0=Math.hypot(vr,vf);
     const vr2=hit>0?-vr*.3:vr,vf2=vf-Math.sign(vf)*Math.min(Math.abs(vf),hit*.35+2*dt);
     p.wvx=t.fx*vf2+t.rx*vr2;p.wvz=t.fz*vf2+t.rz*vr2;
@@ -2275,7 +2369,8 @@ function updatePlayer(dt){
     if(p.drift)endDrift();p.yawR=0;
     if(T===RAMP_TYPES.mega)toast('MEGA RAMP','perfect','DOUBLE-TAP BRAKE TO SPIN');
   }
-  if(racing&&!p.air&&!p.oob&&inGap(p.br,p.s)){const g=GAPS.find(g=>wrapD(p.s,g.s0)>=-1&&wrapD(p.s,g.s0)<g.len+1);goOOB(p,Math.sign(p.x)||1,p.speed,g);}
+  if(racing&&!p.air&&!p.oob&&!p.ramp&&inGap(p.br,p.s)){ // (still on the ramp's lip: it launches this step)
+    const g=GAPS.find(g=>wrapD(p.s,g.s0)>=-1&&wrapD(p.s,g.s0)<g.len+1);goOOB(p,Math.sign(p.x)||1,p.speed,g);}
   if(ev&&ev.landed){
     if(p.airT>.35)feed('AIR TIME '+p.airT.toFixed(2)+' S');
     G.shake=Math.max(G.shake,.4);sfx('land');p.svy=(p.svy||0)-Math.min(9,(ev.impact||6)*.45)*(.8+.2*p.spec.mass);
@@ -2351,7 +2446,7 @@ function updateRivals(dt){
       if(r.airMax>.8&&rnd()<.45)r.spin={dir:rnd()<.5?-1:1,t:0,dur:.55};}
     if(r.spin){r.spin.t+=dt;if(r.spin.t>=r.spin.dur)r.spin=null;}
     if(ev&&ev.landed){r.stunt=null;r.spin=null;}
-    if(!r.air&&inGap(r.br,r.s)){const g=GAPS.find(g=>wrapD(r.s,g.s0)>=-1&&wrapD(r.s,g.s0)<g.len+1);if(g){r.dist+=wrapD(g.s1+12,r.s);r.s=mod(r.dist);r.wreck=1.2;r.speed*=.5;r.y=0;}}
+    if(!r.air&&!r.ramp&&inGap(r.br,r.s)){const g=GAPS.find(g=>wrapD(r.s,g.s0)>=-1&&wrapD(r.s,g.s0)<g.len+1);if(g){r.dist+=wrapD(g.s1+12,r.s);r.s=mod(r.dist);r.wreck=1.2;r.speed*=.5;r.y=0;}}
     if(!r.finished&&r.dist>=G.laps*L&&G.mode!=='menu'){r.finished=true;r.finishTime=G.raceTime;}
   }
 }
@@ -2361,17 +2456,27 @@ function updateTraffic(dt){
   for(const t of traffic){
     if(t.flying>0){
       t.flying-=dt;const g=t.car.g;t.vel.y-=GRAV*dt;g.position.addScaledVector(t.vel,dt);
-      if(g.position.y<t.baseY+.6&&t.vel.y<0){g.position.y=t.baseY+.6;t.vel.y*=-.35;t.vel.x*=.6;t.vel.z*=.6;t.ang.multiplyScalar(.6);}
+      if(g.position.y<t.baseY+.6&&t.vel.y<0){g.position.y=t.baseY+.6;t.vel.y*=-.35;t.vel.x*=.85;t.vel.z*=.85;t.ang.multiplyScalar(.6);}
       t.car.body.rotation.x+=t.ang.x*dt;t.car.body.rotation.y+=t.ang.y*dt;t.car.body.rotation.z+=t.ang.z*dt;
       if(rnd()<.4)emit(g.position,new V3(0,2,0),1.1,1.5,5,0x2c2830,false);
-      if(t.flying<=0){t.down=true;g.visible=false;}
+      g.visible=!nearCam(g.position,t.len/2+2);if(t.flying<=0){t.down=true;g.visible=false;}
     }else if(t.down&&Math.abs(wrapD(t.s,player.s))>320){t.down=false;placeTraffic(t);}
   }
 }
 function overlap(a,b){if(a.br!==b.br)return null;const ds=dAlong(a.br,posOf(b),posOf(a)),dx=b.x-a.x,ln=((b.len||CAR_LEN)+CAR_LEN)/2,wd=((b.w||CAR_W)+CAR_W)/2;
   return Math.abs(ds)<ln&&Math.abs(dx)<wd?{ds,dx,ln,wd}:null;}
 function nudge(e,d){if(e.br>=0){const b=BR[e.br];e.bs=Math.max(0,e.bs+d);e.dist+=d*b.span/b.len;}else e.dist+=d;e.s=mod(e.dist);}
+// late at a split: a car that reaches the nose of the divider while still straddling the two roads crashes into it.
+// Checked as the car crosses the nose's line (so a fast frame can't step over it); the car's centre within 2 m of the
+// nose means its body overlaps the 2.2 m wide cushion.
+function goreCheck(){
+  const p=player;if(G.mode!=='race'||p.wreck>0||p.air||p.oob||p.ghost>0)return;sampleE(p);
+  const cx=TS.p.x+TS.r.x*p.x,cz=TS.p.z+TS.r.z*p.x;p._gore=p._gore||{};
+  for(const b of BR){const n=b.nose;if(!n)continue;const rx=cx-n.x,rz=cz-n.z,al=rx*n.fx+rz*n.fz,lat=Math.abs(rx*n.fz-rz*n.fx),was=p._gore[b.i];
+    p._gore[b.i]=al;if(was!==undefined&&was<0&&al>=0&&al-was<12&&lat<2.0){wreckPlayer();toast('HIT THE DIVIDER','danger','PICK A ROAD BEFORE THE SPLIT');return;}}
+}
 function collisions(){
+  goreCheck();
   const p=player;if(G.mode!=='race'||p.wreck>0)return;
   const others=[...traffic.filter(t=>!t.down&&!(t.flying>0)),...rivals.filter(r=>!r.out)];
   for(const o of others){
@@ -2421,8 +2526,8 @@ function poseRacer(e,dt){
   if(e.isPlayer){
     // nose leads the turn: yaw shows where the car is pointed plus a bit of where the wheel is asking it to go
     yaw=e.visYaw||0;e.driftAng=0;
-    roll=clamp(-e.lat*.0022,-.075,.075);
-    if(!e.air&&!e.ramp)pitch=clamp(-e.lng*.0012,-.035,.05);
+    roll=clamp(-(e.lat||0)*.0022,-.075,.075);
+    if(!e.air&&!e.ramp)pitch=clamp(-(e.lng||0)*.0012,-.035,.05);
     c.wheels.forEach(w=>{if(w.userData.front)w.rotation.y=-(e.delta||0)*1.4;});
   }
   if(e.stunt&&e.air&&e.stunt.t!=='jump'){
@@ -2443,9 +2548,12 @@ function poseRacer(e,dt){
 function poseTraffic(){} // parked traffic is placed once (placeTraffic) and only moves when knocked flying
 
 // ---------------------------------------------------------------- camera
-const camPos=new V3(),camLook=new V3(),_v=new V3(),_d=new V3();let camInit=false;
+const camPos=new V3(),camLook=new V3(),camOff=new V3(),_v=new V3(),_d=new V3();let camInit=false;
+// something knocked flying that comes within r of the camera is hidden for those frames rather than filling the screen
+function nearCam(pos,r){return pos.distanceToSquared(camera.position)<r*r;}
 // C cycles the view. Chase views trail the car and swing a little with its heading; hood and bumper ride on the car.
-const CAMS=[{n:'CHASE',back:7.4,up:2.35,ahead:13,lh:1.0},{n:'HIGH CHASE',back:10.5,up:3.8,ahead:12,lh:1.3},{n:'FAR CHASE',back:14,up:5,ahead:14,lh:1.5},
+// CHASE is the low, close Asphalt view: about roof height, a couple of metres off the back bumper, the car low in the frame
+const CAMS=[{n:'CHASE',back:5,up:1.55,ahead:10,lh:.8},{n:'HIGH CHASE',back:8,up:2.9,ahead:12,lh:1.1},{n:'FAR CHASE',back:12,up:4.3,ahead:14,lh:1.4},
   {n:'HOOD',fp:'hood'},{n:'BUMPER',fp:'bumper'}];
 let camMode=clamp(+store.get('rn-cam')||0,0,CAMS.length-1);
 function cycleCam(){camMode=(camMode+1)%CAMS.length;store.set('rn-cam',camMode);camInit=false;$('camBtn').textContent=CAMS[camMode].n;if(G.mode==='race'||G.mode==='countdown')toast(CAMS[camMode].n,'plain','CAMERA · C');}
@@ -2462,19 +2570,26 @@ function cameraFollow(dt){
     camLook.copy(camPos).addScaledVector(_d,30).addScaledVector(u,C.fp==='hood'?-2.2:-.6);
     camInit=false;
   }else{
-    let back=(C.back||9.2)+p.nitroLevel*.9,up=C.up||3.3;
+    const dm=playerCar.dim;let back=(C.back||9.2)+clamp(dm.front-2.2,-.6,1.5)+clamp(p.speed/90,0,1)*.5+p.nitroLevel*.7,up=(C.up||3.3)+clamp(dm.h-1.25,-.2,1.2)*.8; // sized to the car
+    if(camera.aspect<.8){back+=1.3;up+=.3;} // portrait phone: a step further back so the car doesn't fill the width
     const cy=(p.camYaw||0)*.85;_d.copy(f).multiplyScalar(Math.cos(cy)).addScaledVector(r,-Math.sin(cy));
     if(G.mode==='finish'){G.finishT+=dt;const a=G.finishT*.5;_v.copy(base).addScaledVector(f,Math.cos(a)*-10).addScaledVector(r,Math.sin(a)*10).addScaledVector(u,3.5);}
     else _v.copy(base).addScaledVector(_d,-back).addScaledVector(u,up+p.y*.5);
-    if(!camInit){camPos.copy(_v);camInit=true;}
-    camPos.lerp(_v,1-Math.exp(-dt*(G.mode==='finish'?2:9)));
+    // the camera rides with the car and only its offset from the car is smoothed (smoothing the world position made it
+    // trail further behind the faster the car went)
+    _v.sub(base);if(!camInit){camOff.copy(_v);camInit=true;}
+    camOff.lerp(_v,1-Math.exp(-dt*(G.mode==='finish'?2:9)));camPos.copy(base).add(camOff);
     camLook.copy(base).addScaledVector(f,G.mode==='finish'?0:(C.ahead||10)).addScaledVector(u,(C.lh||1.2)+p.y*.6);
   }
   camera.position.copy(camPos);
-  if(G.shake>0){const s=G.shake*.35;camera.position.x+=(rnd()-.5)*s;camera.position.y+=(rnd()-.5)*s;G.shake=Math.max(0,G.shake-dt*2.2);}
-  if(p.nitroLevel){const s=.05*p.nitroLevel;camera.position.x+=(rnd()-.5)*s;camera.position.y+=(rnd()-.5)*s;}
+  // shake is a smooth wobble (a fresh random jolt every frame reads as the screen glitching)
+  const sh=Math.min(G.shake,1)*.16+.025*p.nitroLevel,wt=G.t*31;
+  if(sh>0){camera.position.addScaledVector(r,(Math.sin(wt*1.07)+Math.sin(wt*.61+1.3))*sh*.5).addScaledVector(u,(Math.sin(wt*.93+.4)+Math.sin(wt*.53+2.1))*sh*.4);}
+  G.shake=Math.max(0,G.shake-dt*2.2);
   camera.lookAt(camLook);
-  const fov=(C.fp?66:62)+clamp(p.speed/100,0,1.2)*14+p.nitroLevel*4+(p.padT>0?3:0);camera.fov=lerp(camera.fov,fov,1-Math.exp(-dt*4));camera.updateProjectionMatrix();
+  let fov=(C.fp?66:62)+clamp(p.speed/100,0,1.2)*14+p.nitroLevel*4+(p.padT>0?3:0);
+  // a tall (portrait phone) screen keeps the side-to-side view of a 1.3:1 one, so the road isn't cropped to the car
+  if(camera.aspect<1.15)fov=Math.min(96,2*Math.atan(Math.tan(fov*Math.PI/360)*1.15/camera.aspect)*180/Math.PI);camera.fov=lerp(camera.fov,fov,1-Math.exp(-dt*4));camera.updateProjectionMatrix();
 }
 function cameraAttract(dt){
   const t=G.t*.35,c=playerCar.g.position;sample(player.s);
@@ -2485,6 +2600,8 @@ function cameraAttract(dt){
 function setViewShift(on){
   const w=innerWidth,h=innerHeight;
   if(on){if(w>640)camera.setViewOffset(w,h,-w*.24,0,w,h);else camera.setViewOffset(w,h,0,h*.26,w,h);}
+  // racing on a tall (portrait) screen: the picture moves down so the car sits low, with the road ahead above it
+  else if(h>w*1.15)camera.setViewOffset(w,h,0,-h*.13,w,h);
   else camera.clearViewOffset();
 }
 
@@ -2591,7 +2708,9 @@ function step(dt){
   else if(MP.hold){poseRacer(player,0);rivals.forEach(r=>!r.out&&poseRacer(r,0));cameraFollow(dt);if(!hud.hidden){updateHud();drawMap();}}
   sky.position.copy(camera.position);skyMat.uniforms.tm.value=G.t;
   updateAudio();
-  renderer.render(scene,camera);
+  // a car the camera is passing through is left out of this frame rather than drawn from the inside
+  const hid=[...rivals,...traffic].filter(o=>o.car&&o.car.g.visible&&nearCam(o.car.g.position,3.4));hid.forEach(o=>o.car.g.visible=false);
+  renderer.render(scene,camera);hid.forEach(o=>o.car.g.visible=true);
 }
 document.addEventListener('visibilitychange',()=>{if(document.hidden){clearKeys();if(G.mode==='race'||G.mode==='countdown')togglePause(true);}});
 

@@ -40,6 +40,7 @@ button.on{background:var(--ok);color:var(--ink);border-color:var(--ok)}
 .msg{margin-top:10px;font-size:14px;color:var(--dim)}
 .msg.err{color:var(--danger)}
 .paints{display:flex;flex-wrap:wrap;gap:6px}
+.steer{display:grid;grid-template-columns:1fr 3.2em;gap:12px;align-items:center}.steer input{accent-color:#ffb02e;width:100%}.steer b{text-align:right}
 .paints button{width:28px;height:28px;padding:0;border:2px solid rgba(255,255,255,.25)}
 .paints button[aria-pressed="true"]{border-color:#fff;box-shadow:0 0 0 2px rgba(255,255,255,.35)}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -55,7 +56,7 @@ button.on{background:var(--ok);color:var(--ink);border-color:var(--ok)}
 (() => {
 'use strict';
 // ---------------------------------------------------------------- state
-const VER = '1.4';                           // multiplayer protocol: only matching versions can play together
+const VER = '1.5';                           // multiplayer protocol: only matching versions can play together
 const $ = id => document.getElementById(id);
 const store = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
 const APP = !!window.rn;                     // inside the desktop app (LAN hosting available)
@@ -322,6 +323,7 @@ const carName = id => ((S.info && S.info.cars.find(c => c.id === id)) || { name:
 const paintHex = i => S.info ? S.info.paints[(i | 0) % S.info.paints.length][1] : '#888';
 
 function render() {
+  if (document.activeElement && document.activeElement.id === 'steer') { S.later = true; return; } // don't yank the slider mid-drag
   const c = $('card');
   if (S.screen === 'home') c.innerHTML = homeHTML();
   else if (S.screen === 'lobby') c.innerHTML = lobbyHTML();
@@ -404,11 +406,14 @@ function lobbyHTML() {
   <div class="grid2"><select id="cls">${classes.map(k => `<option ${k === myCls ? 'selected' : ''}>${k}</option>`).join('')}</select>
   <select id="car">${cars.filter(c => c.cls === myCls).map(c => `<option value="${c.id}" ${c.id === S.car ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></div>
   <div class="lbl">Paint</div><div class="paints" id="paints">${(S.info ? S.info.paints : []).map(([n, h], i) => `<button title="${esc(n)}" style="background:${h}" aria-pressed="${i === S.paint}" data-p="${i}"></button>`).join('')}</div>
+  <div class="lbl">Steering sensitivity</div><div class="steer"><input type="range" id="steer" min="50" max="160" step="10" value="${steerPct()}"><b id="steerVal">${steerPct()}%</b></div>
   <div class="row" style="margin-top:22px">
     ${host ? `<button class="go" id="start" ${S.info ? '' : 'disabled'}>START RACE</button>` : `<button class="${S.ready ? 'on' : ''}" id="ready">${S.ready ? 'Ready' : 'I’m ready'}</button><span class="hint">${racing ? 'A race is on: you’ll join the next one.' : 'Waiting for the host to start.'}</span>`}
     <button id="leave">Leave</button></div>
   <div class="msg ${S.err ? 'err' : ''}">${esc(S.msg)}</div>`;
 }
+// shared with the game (same storage key), which picks up a change straight away, even mid-race
+const steerPct = () => Math.round(Math.min(1.6, Math.max(.5, +(store.get('rn-steer') || 1) || 1)) * 100);
 function wire() {
   const on = (id, ev, fn) => { const el = $(id); if (el) el[ev] = fn; };
   on('name', 'oninput', e => { S.name = e.target.value.trim() || 'Driver'; store.set('rn-name', S.name); });
@@ -419,6 +424,8 @@ function wire() {
   on('code', 'onkeydown', e => { if (e.key === 'Enter') joinRoom('online', e.target.value); });
   on('joinAddr', 'onclick', () => { const a = $('addr').value.trim(); if (a) joinRoom('lan', a, a); });
   on('leave', 'onclick', leave);
+  on('steer', 'oninput', e => { store.set('rn-steer', e.target.value / 100); $('steerVal').textContent = e.target.value + '%'; });
+  on('steer', 'onchange', e => { e.target.blur(); if (S.later) { S.later = false; render(); } });
   const copied = (id, text) => on(id, 'onclick', e => {
     const b = e.target, label = b.textContent;
     const done = () => { b.textContent = 'Copied'; setTimeout(() => { b.textContent = label; }, 1400); };
