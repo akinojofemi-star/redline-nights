@@ -36,16 +36,18 @@ html,body{height:100%;margin:0;background:var(--ink);color:var(--hud);overflow:h
 #nfill{position:absolute;inset:0 auto 0 0;width:30%;background:linear-gradient(90deg,#ff7a18,var(--nitro));box-shadow:0 0 18px var(--nitro);transition:background .2s}
 .nbar i{position:absolute;top:0;bottom:0;width:2px;background:rgba(14,10,22,.8)}
 #nlabel{font-size:12px;letter-spacing:.22em;font-weight:700;color:var(--nitro);white-space:nowrap}
-/* Perfect nitro timing: a big bar in the middle of the screen for the second after a nitro tap. The marker runs along it;
-   tap again while it's in the blue window. The window lights up (and the nitro button glows) while the tap counts. */
-#ptimer{position:absolute;left:50%;top:41%;transform:translateX(-50%);display:grid;justify-items:center;gap:6px;pointer-events:none}
-#ptimer .ptrack{position:relative;width:min(360px,70vw);height:20px;background:rgba(14,10,22,.7);border:2px solid rgba(255,255,255,.55);transform:skewX(-18deg);box-shadow:0 2px 14px rgba(0,0,0,.5)}
-#pzone{position:absolute;top:0;bottom:0;background:var(--perfect);opacity:.45}
-#pmark{position:absolute;top:-7px;bottom:-7px;width:5px;margin-left:-2px;background:#fff;box-shadow:0 0 10px #fff;left:0}
-#ptap{font:italic 900 20px var(--f-display);letter-spacing:.12em;color:var(--hud);text-shadow:0 2px 6px rgba(0,0,0,.7);white-space:nowrap;background:rgba(14,10,22,.72);padding:2px 14px}
-#ptimer.hot #pzone{opacity:1;box-shadow:0 0 22px var(--perfect),0 0 44px var(--perfect)}
-#ptimer.hot .ptrack{border-color:var(--perfect)}
-#ptimer.hot #ptap{color:var(--perfect);font-size:28px;text-shadow:0 0 14px var(--perfect),0 2px 0 rgba(0,0,0,.6)}
+/* Perfect nitro timing, on the nitro bar itself: for the second after a nitro tap the bar grows, shows the blue Perfect
+   window and a white marker sweeping along it; tap again while the marker is in the window. The window lights up (and on
+   a phone the nitro button glows) while the tap counts. */
+#pzone,#pmark{position:absolute;top:0;bottom:0;display:none;pointer-events:none}
+#pzone{z-index:2;background:rgba(63,200,255,.3);box-shadow:inset 0 0 0 2px var(--perfect)}
+#pmark{z-index:3;width:5px;margin-left:-2px;background:#fff;box-shadow:0 0 10px #fff}
+.nbar{transition:height .12s}
+.nbar.timing{height:24px;border-color:rgba(255,255,255,.6)}
+.nbar.timing #pzone,.nbar.timing #pmark{display:block}
+.nbar.hot{border-color:var(--perfect);box-shadow:0 0 18px var(--perfect)}
+.nbar.hot #pzone{background:var(--perfect);box-shadow:0 0 16px var(--perfect)}
+#nlabel.hot{color:var(--perfect)!important;font-size:15px;text-shadow:0 0 10px var(--perfect)}
 #tN.perfect{background:var(--perfect)!important;color:#0e0a16!important;box-shadow:0 0 26px var(--perfect)}
 #toasts{position:absolute;left:50%;top:max(26%,170px);transform:translateX(-50%);display:grid;justify-items:center;gap:4px}
 .toast{font-family:var(--f-display);font-style:italic;font-weight:900;font-size:34px;letter-spacing:.04em;white-space:nowrap;
@@ -151,7 +153,7 @@ td.t{text-align:right}
   #pauseBtn{top:calc(124px + env(safe-area-inset-top,0px));width:34px;height:34px}#camBtn{top:calc(124px + env(safe-area-inset-top,0px));right:calc(max(16px,env(safe-area-inset-right)) + 42px);height:34px}
   #feed{top:calc(166px + env(safe-area-inset-top,0px))}.fd{font-size:11px}
   .gauge{top:calc(8px + env(safe-area-inset-top,0px));width:min(240px,calc(100% - 300px));gap:2px}
-  #spd{font-size:34px}.unit{font-size:10px}.nbar{height:9px}#nlabel{font-size:8px;letter-spacing:.12em}
+  #spd{font-size:34px}.unit{font-size:10px}.nbar{height:9px}.nbar.timing{height:18px}#nlabel{font-size:8px;letter-spacing:.12em}#nlabel.hot{font-size:11px}
   #corner{top:calc(76px + env(safe-area-inset-top,0px));font-size:15px;padding:3px 10px}
   .toast{font-size:22px}.toast small{font-size:10px}#toasts{top:max(28%,110px)}#countdown{font-size:96px}#hint{font-size:11px}
   #touch button{width:64px;height:64px}#tR{left:90px}#tD{right:90px}
@@ -184,12 +186,11 @@ td.t{text-align:right}
     <div id="toasts"></div>
     <div id="corner" hidden></div>
     <div id="feed"></div>
-    <div id="ptimer" hidden><div class="ptrack"><div id="pzone"></div><div id="pmark"></div></div><b id="ptap">TAP IN THE BLUE FOR PERFECT</b></div>
     <div id="hint" hidden>Double-tap brake for 360</div>
     <div id="countdown" class="num"></div>
     <div class="gauge">
       <div class="speedo"><span id="spd" class="num">0</span><span class="unit">km/h</span></div>
-      <div class="nbar"><div id="nfill"></div><i style="left:33.3%"></i><i style="left:66.6%"></i></div>
+      <div class="nbar" id="nbar"><div id="nfill"></div><div id="pzone"></div><div id="pmark"></div><i style="left:33.3%"></i><i style="left:66.6%"></i></div>
       <div id="nlabel">NITRO</div>
     </div>
     <div id="touch" hidden>
@@ -640,10 +641,13 @@ function easeStart(pts,dir){   // dir 1: the route leaves the main road heading 
         cur.push([w[0]*B0[0]+w[1]*B1[0]+w[2]*B2[0]+w[3]*B3[0],lerp(B0[1],B3[1],k),w[0]*B0[2]+w[1]*B1[1]+w[2]*B2[1]+w[3]*B3[2]]);}
       const all=cur.concat(pts.slice(f,f+20));let minR=1e9;for(let i=2;i<all.length-2;i++)minR=Math.min(minR,radius(all[i-2],all[i],all[i+2]));
       // it must stay on its own side of the main road the whole way out (a curve that swings across first would cross it)
-      let shared=0,cross=false,lo=Math.min(sr,prof[f].rel)-40,hi=Math.max(sr,prof[f].rel)+40;const side=Math.sign(prof[f].o);
-      for(const q of cur){const pr=near(q[0],q[2],lo,hi);if(pr.o*side<-1.5){cross=true;break;}if(!shared&&Math.abs(pr.o)>=D)shared=dir*(pr.rel-sr);}
+      // and only ever move away from it until the two are apart: a curve that swings out and back in would lay the roads
+      // on top of each other again, and a car there would flip between them
+      let shared=0,cross=false,back=0,far=0,lo=Math.min(sr,prof[f].rel)-40,hi=Math.max(sr,prof[f].rel)+40;const side=Math.sign(prof[f].o);
+      for(const q of cur){const pr=near(q[0],q[2],lo,hi);if(pr.o*side<-1.5){cross=true;break;}if(!shared&&Math.abs(pr.o)>=D)shared=dir*(pr.rel-sr);
+        if(!shared){far=Math.max(far,pr.o*side);back=Math.max(back,far-pr.o*side);}}
       if(cross)continue;
-      const score=(minR>=need?20000:0)+Math.min(shared,400)*10+Math.min(minR,400);
+      const score=(minR>=need?20000:0)+Math.min(shared,400)*10+Math.min(minR,400)-(back>1.5?60000+back*100:0);
       if(!best||score>best.score)best={score,pts:cur.concat(pts.slice(f))};}}
   return best?best.pts:pts;
 }
@@ -708,8 +712,8 @@ const GAP=2*ROAD_HALF;     // two roads drive as one wide road exactly while the
 // returns [lo, hi, openLo, openHi]: a walled side stops the car at its line, an open side is the edge of the world
 function limits(e){let lo=-LIM,hi=LIM,oLo=false,oHi=false;
   if(e.br<0){const k=kOf(e.s),hw=hwAt(-1,e.s);
-    if(EL[k]){lo=-(hw+VERGE[EL[k]]-1.1);oLo=true;}else lo=-(hw-1.4);
-    if(ER[k]){hi=hw+VERGE[ER[k]]-1.1;oHi=true;}else hi=hw-1.4;
+    if(EL[k]){lo=-(hw+Math.max(ROL[k]-1.1,-1.4));oLo=true;}else lo=-(hw-1.4);
+    if(ER[k]){hi=hw+Math.max(ROR[k]-1.1,-1.4);oHi=true;}else hi=hw-1.4;
     for(const b of BR){const d=wrapD(e.s,b.s0);if(d<0||d>b.span||sepM(b,d)>=GAP)continue;
     const o=offM(b,d);lo=Math.min(lo,o-LIM);hi=Math.max(hi,o+LIM);}}
   else{const b=BR[e.br];if(sepB(b,e.bs)<GAP){const o=offB(b,e.bs);lo=Math.min(lo,o-LIM);hi=Math.max(hi,o+LIM);}}
@@ -721,12 +725,13 @@ function toBranch(e,b,bsGuess){
   const c=Math.round(bsGuess/b.len*(b.n-1)),lo=Math.max(0,c-60),hi=Math.min(b.n-1,c+60);let bi=c,bd=1e18;
   for(let i=lo;i<=hi;i++){const d=(b.P[i*3]-_fw.x)**2+(b.P[i*3+2]-_fw.z)**2;if(d<bd){bd=d;bi=i;}}
   const bs=bi/(b.n-1)*b.len;sampleB(b,bs);
-  e.x=(_fw.x-TS.p.x)*TS.r.x+(_fw.z-TS.p.z)*TS.r.z;e.br=b.i;e.bs=bs;e.dist+=wrapD(mainS(b.i,bs),e.s);e.s=mod(e.dist);}
+  e.x=(_fw.x-TS.p.x)*TS.r.x+(_fw.z-TS.p.z)*TS.r.z;e.br=b.i;e.bs=bs;e.dist+=wrapD(mainS(b.i,bs),e.s);e.s=mod(e.dist);
+  projectTo(e,_fw.x,_fw.z);} // slide to the exact spot (the nearest sample alone would knock the car back up to a sample's length)
 function toMain(e,b){
   sampleE(e);_fw.copy(TS.p).addScaledVector(TS.r,e.x);
   const s0=msB(b,e.bs);let bs=s0,bd=1e18;
   for(let d=-70;d<=70;d+=1){const k=Math.round(mod(s0+d)/L*NS)%NS,q=(P[k*3]-_fw.x)**2+(P[k*3+2]-_fw.z)**2;if(q<bd){bd=q;bs=s0+d;}}
-  sample(bs);e.x=(_fw.x-TS.p.x)*TS.r.x+(_fw.z-TS.p.z)*TS.r.z;e.br=-1;e.dist+=wrapD(mod(bs),e.s);e.s=mod(e.dist);}
+  sample(bs);e.x=(_fw.x-TS.p.x)*TS.r.x+(_fw.z-TS.p.z)*TS.r.z;e.br=-1;e.dist+=wrapD(mod(bs),e.s);e.s=mod(e.dist);projectTo(e,_fw.x,_fw.z);}
 // While two roads overlap, the player is simply on whichever road's centre they're nearer (a small margin stops it
 // flickering), so they can feint toward one and cut back to the other at the last moment and the game follows. AI cars
 // only switch where the roads run the same way and then hold on for a moment, which keeps their lane-keeping steady.
@@ -734,7 +739,7 @@ const _fa=new V3();
 function parallel(b,sMain,bs){sample(sMain);_fa.copy(TS.f);sampleB(b,bs);return _fa.x*TS.f.x+_fa.z*TS.f.z>.85;}
 function forkCheck(e){
   if(e.forkLock>0){e.forkLock-=1/60;return;}
-  const free=e===player,lock=free?0:.4;
+  const free=e===player,lock=free?.12:.4; // (a moment's lock even for the player, so a car right on the middle line can't flicker between roads)
   if(e.br<0){for(const b of BR){const d=wrapD(e.s,b.s0);if(d<0||d>b.span)continue;const sep=sepM(b,d);if(sep>=GAP)continue;
       const o=offM(b,d),hy=free?.5:sep>GAP-6?0:1.5;
       if(Math.abs(o)>(free?1:3)&&Math.abs(e.x-o)<Math.abs(e.x)-hy&&(free||parallel(b,e.s,bsM(b,d)))){toBranch(e,b,bsM(b,d));e.forkLock=lock;return;}}}
@@ -748,8 +753,11 @@ const MARKS=layoutPoints(LAYOUTS[MAP_ID]);
 // a gap slides along the lap (up to 480 m either way, never onto the start) until there's room after the far side to land flat out and see the
 // next bend coming, as for the ramps
 const GAPS=(LAYOUTS[MAP_ID].gaps||[]).map(([e,f,len])=>{const [a,b]=MARKS.edge[e];let s0=mod((a+(((b-a)%1+1)%1)*f)*L);
-  const ok=s=>{for(let d=-60;d<len+280;d+=6){sample(s+d);if(Math.abs(TS.c)>1/150)return false;}return true;};
-  search:for(let k=0;k<80;k++)for(const sg of [-1,1]){const t=mod(s0+sg*k*6);if(ok(t)&&Math.abs(wrapD(t,0))>300){s0=t;break search;}}
+  // and well clear of a fork, so both roads stay whole where they share the tarmac
+  const ok=s=>{for(let d=-60;d<len+280;d+=6){sample(s+d);if(Math.abs(TS.c)>1/150)return false;}
+    for(let d=-200;d<len+120;d+=6)for(const b of BR){const dd=wrapD(s+d,b.s0);if(dd>-60&&dd<b.span+40&&(dd<0||dd>b.span||sepM(b,dd)<GAP+20))return false;}
+    return true;};
+  search:for(let k=0;k<L/12;k++)for(const sg of [-1,1]){const t=mod(s0+sg*k*6);if(ok(t)&&Math.abs(wrapD(t,0))>300){s0=t;break search;}}
   return {s0,s1:mod(s0+len),len};});
 // the tunnel: up to a tenth of the lap, as near the middle of the lap as it can be, on a stretch where no other road
 // (a fork, or the lap passing back over itself) comes anywhere near its walls, and clear of the start and the gaps
@@ -797,6 +805,12 @@ const HW=new Float32Array(NS).fill(ROAD_HALF),EL=new Uint8Array(NS),ER=new Uint8
   for(let k=0;k<NS;k++){let t=0;for(let j=-n;j<=n;j++)t+=tw[(k+j+NS)%NS];HW[k]=t/(2*n+1);}
   for(const g of GAPS)for(let k=0;k<NS;k++){const d=wrapD(k/NS*L,g.s0);if(d>=0&&d<g.len){GAPK[k]=1;EL[k]=ER[k]=EDGE.cliff;}}
 }
+// run-off width each side. It narrows gradually (1 m in 5) into a walled stretch, so its barrier funnels a car in the
+// run-off back to the road instead of ending in mid-air with the wall starting beside the car
+const ROL=new Float32Array(NS),ROR=new Float32Array(NS);
+{const step=L/NS,W=Math.ceil(70/step);
+  for(const [E,RO] of [[EL,ROL],[ER,ROR]])for(let k=0;k<NS;k++){let m=VERGE[E[k]];
+    if(m>0)for(let j=-W;j<=W;j++){const v=VERGE[E[(k+j+NS)%NS]]+Math.abs(j)*step*.2;if(v<m)m=v;}RO[k]=m;}}
 const kOf=s=>Math.round(mod(s)/L*NS)%NS;
 const hwAt=(br,s)=>{if(br>=0)return ROAD_HALF;const f=mod(s)/L*NS,i=f|0;return lerp(HW[i%NS],HW[(i+1)%NS],f-i);};
 const edgeAt=(br,s,side)=>br>=0?0:(side>0?ER:EL)[kOf(s)];
@@ -893,7 +907,7 @@ const kerbMat=new THREE.MeshStandardMaterial({map:kerbTex,roughness:.7});
 const VERGE_COL={city:'#2a2430',canyon:'#a8714a',alpine:'#e8eef8',coast:'#d8c08c',tokyo:'#2c2c34',jungle:'#3f6a2c',volcano:'#2a1612',arctic:'#e4eef8'}[MAP.scenery];
 const vergeTex=canvasTex(128,128,(g,w,h)=>{g.fillStyle=VERGE_COL;g.fillRect(0,0,w,h);const r=mulberry32(14);for(let i=0;i<1500;i++){g.fillStyle=`rgba(${r()>.5?'255,255,255':'0,0,0'},${r()*.12})`;g.fillRect(r()*w,r()*h,3,3);}});
 vergeTex.wrapS=vergeTex.wrapT=THREE.RepeatWrapping;const vergeMat=rnTex(new THREE.MeshStandardMaterial({map:vergeTex,roughness:1}),{tex:LOOK.verge[0],scale:LOOK.verge[1],tint:LOOK.verge[2]});
-const outer=(k,side)=>HW[k]+VERGE[(side>0?ER:EL)[k]];
+const outer=(k,side)=>HW[k]+(side>0?ROR:ROL)[k];
 for(const side of [-1,1]){
   const E=side>0?ER:EL;
   for(const run of runs(NS,k=>E[k]===0&&!GAPK[k]&&mainWallAt(k,side),true)){
@@ -1093,7 +1107,7 @@ function chevrons(br,len,place){
 }
 chevrons(-1,L,(s,side)=>{const k=kOf(s),e=(side>0?ER:EL)[k];
   if(GAPK[k]||(wrapD(s,TUNNEL.s0)>-20&&wrapD(s,TUNNEL.s1)<20)||(!e&&!mainWallAt(k,side)))return null;
-  return HW[k]+(e===EDGE.kerb?VERGE[e]+.6:e===EDGE.cliff?1.1:.6);});
+  return HW[k]+(e?outer(k,side)-HW[k]+.6:.6);});
 for(const b of BR)chevrons(b.i,b.len,(s,side)=>Math.sign(offB(b,s))===side&&sepB(b,s)<GAP?null:ROAD_HALF+.6);
 
 // ---------------------------------------------------------------- scenery helpers
@@ -1397,6 +1411,8 @@ for(const b of BR){
   else put([.5,.35,.65],0,'hump',1/100);
 }
 function rEnd(r,x){const T=r.T,t=clamp((x-r.x)/T.w+.5,0,1);return r.flip>0?lerp(T.hl,T.hr,t):lerp(T.hr,T.hl,t);}
+// near a ramp: from `before` metres short of it to the end of it, within `side` metres of its sides
+function onRamp(br,s,x,before,side){return RAMPS.some(r=>{const d=dAlong(br,s,r.s);return r.br===br&&d>-before&&d<r.T.len+2&&Math.abs(x-r.x)<r.T.w/2+side;});}
 function rampHeight(br,s,x){for(const r of RAMPS){if(r.br!==br)continue;const into=dAlong(br,s,r.s);if(into>=0&&into<=r.T.len&&Math.abs(x-r.x)<r.T.w/2+1)return {r,h:into/r.T.len*rEnd(r,x)};}return null;}
 {
   const texCache={};
@@ -1708,13 +1724,15 @@ const PICK=[];
   const glow=new THREE.SpriteMaterial({map:softTex,color:0x3fc8ff,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:.7});
   const addPick=(s,x,y,br=-1)=>{const g=new THREE.Group();add(g,canGeo,canMat,0,0,0);add(g,capGeo,capMat,0,.72,0);const sp=new THREE.Sprite(glow);sp.scale.set(3.2,3.2,1);g.add(sp);
     scene.add(g);PICK.push({s,x,y,g,off:0,br,ms:mainS(br,s)});placeAt(g,br,s,x,y+1);};
-  [[.09,3.25],[.23,-9.75],[.34,9.75],[.42,-3.25],[.58,-3.25],[.66,9.75],[.74,-9.75],[.90,3.25]].forEach(([u,x])=>{if(GAPS.some(g=>{const d=wrapD(U(u),g.s0);return d>-60&&d<g.len+30;}))return;for(let k=0;k<3;k++)addPick(U(u)+k*12,fitX(-1,U(u)+k*12,x*RW),0);});
+  [[.09,3.25],[.23,-9.75],[.34,9.75],[.42,-3.25],[.58,-3.25],[.66,9.75],[.74,-9.75],[.90,3.25]].forEach(([u,x])=>{if(GAPS.some(g=>{const d=wrapD(U(u),g.s0);return d>-60&&d<g.len+30;}))return;
+    for(let k=0;k<3;k++){const s=U(u)+k*12,cx=fitX(-1,s,x*RW);if(!onRamp(-1,s,cx,4,2))addPick(s,cx,0);}});
   RAMPS.filter(r=>r.T===RAMP_TYPES.mega).forEach(r=>[[15,5.2],[30,7],[45,7.2]].forEach(([d,y])=>addPick(r.s+r.T.len+d,r.x,y,r.br)));
   // the nitro route: three rows of canisters across all four lanes
   for(const b of BR)if(b.kind==='long')for(const f of [.16,.3,.75,.86])for(const x of LANES)for(let k=0;k<2;k++)addPick(b.len*f+k*12,x,0,b.i);
 }
 // boost pads: free speed for 1.6 s, no nitro used
-const PADS=[[.03,3.25],[.03,-3.25],[.27,3.25],[.48,3.25],[.60,-9.75],[.77,-3.25],[.91,-9.75]].filter(([u])=>!GAPS.some(g=>{const d=wrapD(U(u),g.s0);return d>-60&&d<g.len+30;})).map(([u,x])=>({s:U(u),x:fitX(-1,U(u),x*RW),br:-1}));
+const PADS=[[.03,3.25],[.03,-3.25],[.27,3.25],[.48,3.25],[.60,-9.75],[.77,-3.25],[.91,-9.75]].filter(([u])=>!GAPS.some(g=>{const d=wrapD(U(u),g.s0);return d>-60&&d<g.len+30;})).map(([u,x])=>({s:U(u),x:fitX(-1,U(u),x*RW),br:-1}))
+  .filter(pd=>!onRamp(-1,pd.s,pd.x,12,5));
 for(const b of BR)if(b.kind==='long')for(const [f,x] of [[.1,-9.75],[.1,9.75],[.48,-3.25],[.48,3.25],[.68,-9.75]])PADS.push({s:b.len*f,x:x*RW,br:b.i});
 const padTex=canvasTex(64,128,(g,w,h)=>{g.clearRect(0,0,w,h);g.fillStyle='rgba(125,255,176,.9)';for(let y=0;y<h;y+=64){g.beginPath();g.moveTo(4,y+40);g.lineTo(w/2,y+8);g.lineTo(w-4,y+40);g.lineTo(w-4,y+58);g.lineTo(w/2,y+26);g.lineTo(4,y+58);g.fill();}});
 padTex.wrapT=THREE.RepeatWrapping;padTex.repeat.set(1,2.5);
@@ -2019,7 +2037,7 @@ function laneClear(br,s,x,range){
     for(const q of PADS)if(q.br===br&&Math.abs(dAlong(br,s,q.s))<35&&Math.abs(q.x-x)<4)return false;
     for(const q of OBST)if(q.br===br&&Math.abs(dAlong(br,s,q.s))<45+len&&Math.abs(q.x-x)<5)return false;
     if(br<0&&s>TUNNEL.s0-30&&s<TUNNEL.s1+10)return false;
-    if(br<0&&GAPS.some(g=>{const d=wrapD(s,g.s0);return d>-260&&d<g.len+50;}))return false;
+    if(br<0&&GAPS.some(g=>{const d=wrapD(s,g.s0);return d>-260&&d<g.len+150;}))return false;   // (not where a jump lands)
     return laneClear(br,s,x,22+len);};
   let nPlaced=0;
   const place=(br,s,lane)=>{const type=(nPlaced++%6===3)?'bus':TRAFFIC_TYPES[(r()*TRAFFIC_TYPES.length)|0],len=(TSIZE[type]||[4.3])[0],x=fitX(br,s,LANES[lane]);
@@ -2834,7 +2852,7 @@ function setViewShift(on){
 }
 
 // ---------------------------------------------------------------- hud update
-const H={posOf:$('posOf'),lapLbl:$('lapLbl'),modeLine:$('modeLine'),hint:$('hint'),pos:$('pos'),lap:$('lap'),time:$('time'),spd:$('spd'),nfill:$('nfill'),nlabel:$('nlabel'),ptimer:$('ptimer'),pmark:$('pmark'),ptap:$('ptap'),tN:$('tN'),cd:$('countdown')};
+const H={posOf:$('posOf'),lapLbl:$('lapLbl'),modeLine:$('modeLine'),hint:$('hint'),pos:$('pos'),lap:$('lap'),time:$('time'),spd:$('spd'),nfill:$('nfill'),nlabel:$('nlabel'),nbar:$('nbar'),pmark:$('pmark'),tN:$('tN'),cd:$('countdown')};
 {const z=$('pzone').style;z.left=(PW0/PT*100)+'%';z.width=((PW1-PW0)/PT*100)+'%';}
 let lastHud={};
 function setText(el,k,v){if(lastHud[k]!==v){lastHud[k]=v;el.textContent=v;}}
@@ -2854,11 +2872,12 @@ function updateHud(){
   H.nfill.style.width=(p.nitro*100).toFixed(1)+'%';
   const lvl=p.nitroLevel,col=lvl?NT[lvl].col:'var(--nitro)';
   H.nfill.style.background=lvl>=2?col:'linear-gradient(90deg,#ff7a18,var(--nitro))';H.nfill.style.boxShadow='0 0 18px '+col;
-  setText(H.nlabel,'nl',lvl?NT[lvl].name:p.nitro>=.97?'FULL \u00b7 DOUBLE-TAP FOR SHOCKWAVE':p.slip>0?'SLIPSTREAM \u00b7 CHARGING':'NITRO');
+  const e=G.raceTime-p.nitroStart,show=lvl===1&&e<PT,hot=show&&e>=PW0&&e<=PW1;
+  setText(H.nlabel,'nl',hot?'TAP NOW FOR PERFECT!':show?'TAP IN THE BLUE FOR PERFECT':lvl?NT[lvl].name:p.nitro>=.97?'FULL \u00b7 DOUBLE-TAP FOR SHOCKWAVE':p.slip>0?'SLIPSTREAM \u00b7 CHARGING':'NITRO');
   H.nlabel.style.color=!lvl&&p.slip>0&&p.nitro<.97?'var(--perfect)':col;
-  const e=G.raceTime-p.nitroStart,show=lvl===1&&e<PT,hot=show&&e>=PW0&&e<=PW1;H.ptimer.hidden=!show;
-  if(show){H.pmark.style.left=(e/PT*100).toFixed(1)+'%';if(hot!==H.hot){H.hot=hot;H.ptimer.classList.toggle('hot',hot);H.tN.classList.toggle('perfect',hot);H.ptap.textContent=hot?'TAP NOW!':'TAP IN THE BLUE FOR PERFECT';}}
-  else if(H.hot){H.hot=false;H.ptimer.classList.remove('hot');H.tN.classList.remove('perfect');}
+  if(show!==H.show){H.show=show;H.nbar.classList.toggle('timing',show);}
+  if(show)H.pmark.style.left=(e/PT*100).toFixed(1)+'%';
+  if(hot!==H.hot){H.hot=hot;H.nbar.classList.toggle('hot',hot);H.nlabel.classList.toggle('hot',hot);H.tN.classList.toggle('perfect',hot);}
   H.hint.hidden=!(p.air&&!p.spin&&p.airMax-p.airT>.6&&G.mode==='race');
   // corner call-out: the tightest bend in the next 260 m
   const cw=$('corner');let tc=0,td=0;
