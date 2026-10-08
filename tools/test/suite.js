@@ -158,6 +158,13 @@ T.probes=function(){const p=player,out=[];G.modeSel='classic';G.lapsSel=5;startR
       const w0=p.stats.wrecks;for(let i=0;i<10;i++){p.botSteer=0;p.botBrake=false;update(1/60);}p.botSteer=undefined;p.botBrake=undefined;
       if((p.stats.wrecks>w0)!==want)T.note(MAP_ID+' landing a roll at '+Math.round(ang*57.3)+'° '+(want?'did not wreck':'wrecked'));p.wreck=0;}
     OBST.forEach((o,i)=>o.dead=ob[i]);}}
+  // more airtime, more barrel rolls, every one landed on the wheels: a twist roll over 0.8 / 1.6 / 2.6 s of flight
+  {const ob=OBST.map(o=>o.dead);OBST.forEach(o=>o.dead=1); // (clear of roadworks)
+  for(const [air,want] of [[.8,1],[1.6,2],[2.6,3]]){T.setAt(-1,T.clear(L*.7),0,40);const vy=air*24/2;p.air=true;p.y=0;p.vy=vy;p.airT=0;p.airMax=air;
+    p.stunt=twistRoll(1,air);p.stunt.ang=0;p.rampType=RAMP_TYPES.twist;const w0=p.stats.wrecks,k0=p.stats.stunts;
+    for(let i=0;i<Math.ceil(air*60)+10&&p.air;i++){p.botSteer=0;p.botBrake=false;update(1/60);}p.botSteer=undefined;p.botBrake=undefined;
+    if(p.stats.wrecks>w0)T.note(MAP_ID+' a '+air+' s twist roll wrecked');else if(p.stats.stunts-k0!==want)T.note(MAP_ID+' a '+air+' s twist roll gave '+(p.stats.stunts-k0)+' rolls, not '+want);p.wreck=0;}
+  OBST.forEach((o,i)=>o.dead=ob[i]);}
   // a twist ramp taken properly always lands its barrel roll on the wheels, at any speed and anywhere across it
   {const ob=OBST.map(o=>o.dead);OBST.forEach(o=>o.dead=1);
     for(const r of RAMPS.filter(r=>r.T.roll))for(const v of [45,60,75,92])for(const dx of [-1.5,0,1.5]){
