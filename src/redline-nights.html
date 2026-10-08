@@ -387,7 +387,8 @@ renderer.toneMapping=THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure=MAP.exposure;
 const MAXANISO=renderer.capabilities.getMaxAnisotropy();
 const scene=new THREE.Scene();
-scene.fog=new THREE.Fog(MAP.fog[0],MAP.fog[1],MAP.fog[2]);
+// the haze starts well out (the road 3-4 s ahead at top speed has to read clearly) and keeps the far distance
+scene.fog=new THREE.Fog(MAP.fog[0],Math.max(MAP.fog[1]*2.5,320),Math.max(MAP.fog[2]*1.25,1400));
 const camera=new THREE.PerspectiveCamera(64,1,0.3,6000);
 scene.add(camera);
 
@@ -761,13 +762,13 @@ function advance(e,d){
 const GAP=2*ROAD_HALF;     // two roads drive as one wide road exactly while their surfaces touch
 // the drivable span of x for a car: one road, or both while a branch and the main road overlap
 // returns [lo, hi, openLo, openHi]: a walled side stops the car at its line, an open side is the edge of the world
-function limits(e){let lo=-LIM,hi=LIM,oLo=false,oHi=false;
+function limits(e,own){let lo=-LIM,hi=LIM,oLo=false,oHi=false;
   if(e.br<0){const k=kOf(e.s),hw=hwAt(-1,e.s);
     if(EL[k]){lo=-(hw+Math.max(ROL[k]-1.1,-1.4));oLo=true;}else lo=-(hw-1.4);
     if(ER[k]){hi=hw+Math.max(ROR[k]-1.1,-1.4);oHi=true;}else hi=hw-1.4;
-    for(const b of BR){const d=wrapD(e.s,b.s0);if(d<0||d>b.span||sepM(b,d)>=GAP)continue;
+    if(!own)for(const b of BR){const d=wrapD(e.s,b.s0);if(d<0||d>b.span||sepM(b,d)>=GAP)continue;
     const o=offM(b,d);lo=Math.min(lo,o-LIM);hi=Math.max(hi,o+LIM);}}
-  else{const b=BR[e.br];if(sepB(b,e.bs)<GAP){const o=offB(b,e.bs);lo=Math.min(lo,o-LIM);hi=Math.max(hi,o+LIM);}}
+  else{const b=BR[e.br];if(!own&&sepB(b,e.bs)<GAP){const o=offB(b,e.bs);lo=Math.min(lo,o-LIM);hi=Math.max(hi,o+LIM);}}
   return [lo,hi,oLo,oHi];}
 const _fw=new V3();
 // move a car onto the branch or back onto the main road, keeping its exact spot in the world
@@ -797,24 +798,38 @@ function forkCheck(e){
   else{const b=BR[e.br],sep=sepB(b,e.bs);if(sep>=GAP)return;const o=offB(b,e.bs),hy=free?.5:sep>GAP-6?0:1.5;
     if(Math.abs(o)>(free?1:3)&&Math.abs(e.x-o)<Math.abs(e.x)-hy&&(free||parallel(b,msB(b,e.bs),e.bs))){toMain(e,b);e.forkLock=lock;}}
 }
-// move a car that has gone past its road's edge onto the other road of a fork, if that's where it now is
-function onOtherRoad(e){
-  const save={br:e.br,bs:e.bs,s:e.s,dist:e.dist,x:e.x};
+// The roads are one surface: where a fork's two paths overlap the car is simply on tarmac. Which path it is counted on
+// is only bookkeeping (lap progress, the map, pickups): the one whose centre it's nearer, among those whose surface it's
+// on (or, on neither, the one it's least far off). It never moves or turns the car.
+function pickRoad(e){
+  const score=()=>{const [lo,hi]=limits(e,true),m=Math.min(e.x-lo,hi-e.x);return m>=0?1e3-Math.abs(e.x):m;};
+  const save=()=>({br:e.br,bs:e.bs,s:e.s,dist:e.dist,x:e.x}),here=save();let best=here,bm=score()+.5; // (a little in favour of where it is)
   for(const b of BR){
-    if(e.br<0){const d=wrapD(e.s,b.s0);if(d<0||d>b.span)continue;toBranch(e,b,bsM(b,d));}
-    else if(e.br===b.i)toMain(e,b);else continue;
-    const [lo,hi]=limits(e);if(e.x>=lo&&e.x<=hi){e.forkLock=.12;return true;}
-    Object.assign(e,save);}
-  return false;}
+    // (only once the two centres have parted: right at a junction they're the same line and the count would flicker)
+    if(here.br<0){const d=wrapD(here.s,b.s0);if(d<0||d>b.span||Math.abs(offM(b,d))<1)continue;toBranch(e,b,bsM(b,d));}
+    else if(here.br===b.i){if(Math.abs(offB(b,here.bs))<1)continue;toMain(e,b);}else continue;
+    const m=score();if(m>bm){bm=m;best=save();}Object.assign(e,here);}
+  Object.assign(e,best);}
 // this map's alternative routes, laid out by hand in LAYOUTS
 for(const q of layoutBranches(LAYOUTS[MAP_ID])){const b=buildBranchPts(q.pts,q.kind);b.i=BR.length;BR.push(b);}
 // section and gap positions from the layout's corners (fractions of the lap)
 const MARKS=layoutPoints(LAYOUTS[MAP_ID]);
 // a gap slides along the lap (up to 480 m either way, never onto the start) until there's room after the far side to land flat out and see the
 // next bend coming, as for the ramps
+// A jump flies straight on (nothing bends its flight to follow the road), so a ramp only goes where a straight line off
+// its lip, from anywhere across it, stays over the road for a whole flat-out flight (at 330 km/h, plus a little).
+// FLY(T): that flight's length from the lip; fliesOn: does the straight line from the ramp's foot (br, s), along the
+// road there (a car rolls up the ramp on the heading it arrived with) and from each x, stay within hw - 2.5 of the road
+const FLY=T=>{const vy=Math.min(T.vmax,92*T.launch),h=Math.max(T.hl,T.hr);return 92*(vy+Math.sqrt(vy*vy+48*h))/24+10;};
+const _fp=new V3(),_ff=new V3(),_fr=new V3();
+function fliesOn(br,lip,F,xs,hw){sampleAt(br,lip);_fp.copy(TS.p);_ff.set(TS.f.x,0,TS.f.z).normalize();_fr.copy(TS.r);
+  for(let d=0;d<=F;d+=6){sampleAt(br,lip+d);
+    for(const x of xs){const lx=_fp.x+_fr.x*x+_ff.x*d-TS.p.x,lz=_fp.z+_fr.z*x+_ff.z*d-TS.p.z;if(Math.abs(lx*TS.r.x+lz*TS.r.z)>hw(lip+d)-2.5)return false;}}
+  return true;}
 const GAPS=(LAYOUTS[MAP_ID].gaps||[]).map(([e,f,len])=>{const [a,b]=MARKS.edge[e];let s0=mod((a+(((b-a)%1+1)%1)*f)*L);
   // and well clear of a fork, so both roads stay whole where they share the tarmac
-  const ok=(s,run,rad,st)=>{const d0=wrapD(s,0);if(d0>=0?d0<=st:d0>=-300)return false;for(let d=-60;d<len+run;d+=6){sample(s+d);if(Math.abs(TS.c)>1/rad)return false;}
+  const ok=(s,run,rad,st)=>{const d0=wrapD(s,0);if(d0>=0?d0<=st:d0>=-300)return false;
+    if(!fliesOn(-1,s-18,18+FLY({vmax:15,launch:.2,hl:3.2,hr:3.2}),[-10,0,10],()=>12.5*RW))return false;for(let d=-100;d<len+run;d+=6){sample(s+d);if(Math.abs(TS.c)>1/rad)return false;} // (a straight run-up: a jump flies on the line you take off on)
     for(let d=-200;d<len+120;d+=6)for(const b of BR){const dd=wrapD(s+d,b.s0);if(dd>-60&&dd<b.span+40&&(dd<0||dd>b.span||sepM(b,dd)<GAP+20))return false;}
     return true;};
   // strictest first: a long flat run-out, and far enough from the grid that the pack has spread out before anyone jumps; then less run-out
@@ -1234,7 +1249,7 @@ function impTrees(name,items,tint){
   const mat=new THREE.MeshStandardMaterial({map:t,alphaTest:.45,side:THREE.DoubleSide,roughness:.9,color:tint===undefined?0xffffff:tint});
   chunked(impGeo(name),mat,items,420,{fir_a:.6,fir_b:.6,jacaranda:.12,quiver:.3}[name]);} // footprint at car height: the branches or just the trunk
 const _yAxis=new V3(0,1,0);
-function updatePropChunks(){const lim=(MAP.fog[2]+250)**2,c=camera.position;for(const im of PROP_CHUNKS){const d=im.userData.c;im.visible=(d.x-c.x)**2+(d.z-c.z)**2<lim;}}
+function updatePropChunks(){const lim=(scene.fog.far+250)**2,c=camera.position;for(const im of PROP_CHUNKS){const d=im.userData.c;im.visible=(d.x-c.x)**2+(d.z-c.z)**2<lim;}}
 // the boulder mesh replaces the stand-in rocks once it has loaded
 function boulders(list,standIn,tint){
   if(!THREE.GLTFLoader||!list.length)return;
@@ -1444,14 +1459,14 @@ const RAMP_TYPES={
 // nearest spot to fraction u where the road runs nearly straight from 40 m before to `need` metres after, away from forks
 // and from spots already taken: ramps need a run-up and somewhere to land
 const TAKEN=[];
-function flatS(u,need,maxC=1/260,gap=70){
+function flatS(u,need,maxC=1/260,gap=70,fly=null){
   // inside a fork's stretch the main road is fine once it is well clear of the other road (not near either junction)
-  const ok=s=>{for(let d=-40;d<need;d+=6){sample(s+d);if(Math.abs(TS.c)>maxC)return false;
+  const ok=s=>{for(let d=-(fly?60:40);d<need;d+=6){sample(s+d);if(Math.abs(TS.c)>maxC)return false;
       for(const b of BR){const dd=wrapD(s+d,b.s0);if(dd>-80&&dd<b.span+40&&(dd<0||dd>b.span||sepM(b,dd)<GAP+10))return false;}}
     if(wrapD(s,TUNNEL.s0)>-need-40&&wrapD(s,TUNNEL.s1)<40)return false;
     if(GAPS.some(g=>{const d=wrapD(s,g.s0);return d>-need-80&&d<g.len+80;}))return false;
     if(wrapD(s,0)>-need-90&&wrapD(s,0)<90)return false;        // keep the start grid and finish line clear
-    return TAKEN.every(t=>Math.abs(wrapD(s,t))>gap);};
+    return TAKEN.every(t=>Math.abs(wrapD(s,t))>gap)&&(!fly||fly(s));};
   for(let k=0;k<500;k++)for(const sg of [1,-1]){const s=mod(u*L+sg*k*6);if(ok(s)){TAKEN.push(s);return s;}}
   return null;}
 // a ramp needs road with no bend too tight to take flat out (the flight itself bends with the road) for the run-up, the
@@ -1459,13 +1474,19 @@ function flatS(u,need,maxC=1/260,gap=70){
 // with no time to react)
 const RUNOUT={hump:140,hop:120,kicker:220,twist:240,mega:290};
 // the same on a fork's own road: away from where it shares the main road, and dropped if there's no such straight
-function flatB(b,f,need,maxC=1/150){
-  const ok=bs=>{if(bs<40||bs+need>b.len-30)return false;for(let d=-40;d<need;d+=6){sampleB(b,bs+d);if(Math.abs(TS.c)>maxC)return false;if(sepB(b,bs+d)<GAP+2)return false;}return true;};
+function flatB(b,f,need,maxC=1/150,fly=null){
+  const ok=bs=>{if(bs<60||bs+need>b.len-30)return false;if(fly&&!fly(bs))return false;for(let d=-60;d<need;d+=6){sampleB(b,bs+d);if(Math.abs(TS.c)>maxC)return false;if(sepB(b,bs+d)<GAP+2)return false;}return true;};
   for(let k=0;k<400;k++)for(const sg of [1,-1]){const bs=b.len*f+sg*k*6;if(ok(bs))return bs;}
   return null;}
 const RAMPS=[[.06,'hump',0],[.12,'kicker',-6.5],[.18,'twist',6.5,1],[.30,'mega',0],[.38,'kicker',-9.75],[.45,'twist',-3.25,-1],
   [.55,'hump',0],[.62,'mega',3.25],[.69,'kicker',-3.25],[.80,'twist',9.75,-1],[.87,'kicker',6.5],[.94,'mega',-6.5]]
-  .map(([u,type,x,flip])=>{const s=flatS(u,RUNOUT[type],1/150);return s===null?null:{s,x:fitX(-1,s,x*RW),T:RAMP_TYPES[type],flip:flip||1,br:-1};}).filter(Boolean);
+  .map(([u,type,x,flip])=>{
+    // where there's no straight long enough for this ramp's flight, a smaller ramp with a shorter flight goes there instead
+    for(const ty of {mega:['mega','kicker','hop'],kicker:['kicker','hop'],twist:['twist','hop'],hump:['hump'],hop:['hop']}[type]){
+      const T=RAMP_TYPES[ty],xs=s=>{const c=fitX(-1,s,x*RW);return [c-T.w/2+1,c,c+T.w/2-1];};
+      const s=flatS(u,RUNOUT[ty],1/150,70,s=>fliesOn(-1,s,T.len+FLY(T),xs(s),q=>hwAt(-1,q)));
+      if(s!==null)return {s,x:fitX(-1,s,x*RW),T,flip:ty==='twist'?flip||1:1,br:-1};}
+    return null;}).filter(Boolean);
 // every gap has a full-width jump ramp running right up to its edge
 // (as wide as the road and its run-off: running wide onto the verge still launches you)
 for(const g of GAPS){const w=2*(hwAt(-1,g.s0)+VERGE[EDGE.cliff]);RAMPS.push({s:mod(g.s0-RAMP_TYPES.gap.len),x:0,T:Object.assign({},RAMP_TYPES.gap,{w}),flip:1,br:-1});}
@@ -1473,7 +1494,7 @@ for(const g of GAPS){const w=2*(hwAt(-1,g.s0)+VERGE[EDGE.cliff]);RAMPS.push({s:m
 for(const b of BR){
   // tried at a few spots along the route; never where its flight would carry a car over the route's canister rows
   const rows=[.16,.3,.75,.86].map(f=>b.len*f);
-  const put=(fs,x,type,maxC)=>{for(const f of fs){const s=flatB(b,f,RUNOUT[type],maxC);
+  const put=(fs,x,type,maxC)=>{const T=RAMP_TYPES[type];for(const f of fs){const s=flatB(b,f,RUNOUT[type],maxC,bs=>bs+T.len+FLY(T)<b.len-10&&fliesOn(b.i,bs,T.len+FLY(T),[x-T.w/2+1,x,x+T.w/2-1],()=>ROAD_HALF));
     if(s!==null&&RAMPS.every(r=>r.br!==b.i||Math.abs(r.s-s)>RUNOUT[type])&&rows.every(q=>q<s-20||q>s+RUNOUT[type]*.7)){RAMPS.push({s,x,T:RAMP_TYPES[type],flip:1,br:b.i});return;}}};
   if(b.kind==='long'){put([.58,.45,.68,.36],LANES[2],'mega',1/90);put([.4,.5,.62,.22],LANES[1],'kicker',1/75);
     put([.5,.4,.62,.24,.7],LANES[1],'hop',1/80);put([.66,.36,.2,.55],LANES[2],'hop',1/80);}
@@ -2487,6 +2508,7 @@ function endDrift(quiet){
 // and tap-to-drift, which lets the rear tyres go and holds the slide at the angle you steer for. The track position
 // (s, x) is recomputed from the world position every frame, so laps, ramps, pickups, traffic and the AI work as before;
 // anything else that changes p.speed or p.x (crashes, pads, barrels) is picked up at the start of the next step.
+const WALL_WRECK=24; // m/s straight into a wall that wrecks the car (a scrape along it never does)
 const PH={ab:1.35,k2:1.35*1.35,a0f:.11,a0r:.085,steer:.55,steerV:17};
 const _w=new V3();
 function trackFrame(e){sampleE(e);const l=Math.hypot(TS.f.x,TS.f.z);return {fx:TS.f.x/l,fz:TS.f.z/l,rx:TS.r.x,rz:TS.r.z,px:TS.p.x,pz:TS.p.z};}
@@ -2513,9 +2535,6 @@ function updateOOB(p,dt){
   const t=trackFrame(p);let wx=t.px+t.rx*p.x,wz=t.pz+t.rz*p.x;wx+=p.wvx*dt;wz+=p.wvz*dt;p.wvx*=1-dt*.3;p.wvz*=1-dt*.3;projectTo(p,wx,wz);
   p.speed=p._spd=Math.hypot(p.wvx,p.wvz);
   if(o.t>1.1)respawn(p);}
-// the road's turn rate under the car: only a jump's flight uses it (it bends with the road below, so a jump lands at
-// the same offset it took off at). On the ground nothing steers the car but the driver.
-function roadCurve(p){sampleE(p);return TS.c/Math.max(.4,1+TS.c*p.x);}
 function carPhysics(p,dt,steer,brake,racing){
   const sp=p.spec,hand=sp.handling;
   if(p.psi===undefined)alignToTrack(p,p.speed);
@@ -2543,7 +2562,6 @@ function carPhysics(p,dt,steer,brake,racing){
   p.gripR+=((p.drift?.5:1)-p.gripR)*Math.min(1,(p.drift?6:2.5)*dt);
   // engine and brakes
   const top=sp.top+NB[p.nitroLevel]+(p.padT>0?14:0)+p.slip*4,fin=G.mode==='finish';
-  const cRoad=roadCurve(p);
   const N=4,h=dt/N;let latSum=0,beta=0;
   for(let i=0;i<N;i++){
     const hx=Math.cos(p.psi),hz=Math.sin(p.psi),nx=-hz,nz=hx;
@@ -2553,14 +2571,9 @@ function carPhysics(p,dt,steer,brake,racing){
     else if(brake&&!p.drift&&p.brakeT>.14)fx=-46*(1.12-.12*sp.mass)*Math.sign(u||1);
     else if((p.drift?V:u)<top){const uu=p.drift?V:u;fx=(p.nitroLevel?NT[p.nitroLevel].push:p.padT>0?34:(uu<40?24:3+21*(1-uu/top)))*sp.accel;}
     else if(!(p.air&&p.purple))fx=-(u-top)*1.4;
-    if(p.air){ // no tyres in the air: hold course, a little air control
+    if(p.air){ // no tyres in the air: the car flies on where it was going (nothing bends it toward the road) and eases
+      // round to face where it's flying (no spin carried over from a drift), with a touch of air control
       fx=(p.purple?5:0)+NT[p.nitroLevel].air*sp.accel;
-      // in the air the car eases round to face where it's flying (no spin carried over from a drift) with a touch of air control
-      // the flight bends with the road below it (Asphalt's jump assist), so a jump off a ramp before a bend lands on the road
-      // at the same offset instead of flying straight on into the barrier
-      const om=-cRoad*u*h,co=Math.cos(om),so=Math.sin(om),vx0=p.wvx;p.wvx=vx0*co-p.wvz*so;p.wvz=vx0*so+p.wvz*co;p.psi+=om;
-      // and sideways drift across the road fades away in flight, so a long jump holds its line (Asphalt's air stability)
-      {const vl=p.wvx*t.rx+p.wvz*t.rz,k=vl*(1-Math.exp(-1.6*h));p.wvx-=t.rx*k;p.wvz-=t.rz*k;}
       let dpsi=Math.atan2(p.wvz,p.wvx)-p.psi;dpsi=Math.atan2(Math.sin(dpsi),Math.cos(dpsi));p.yawR=dpsi*3+p.steerS*.4;
       p.wvx+=hx*fx*h;p.wvz+=hz*fx*h;p.psi+=p.yawR*h;wx+=p.wvx*h;wz+=p.wvz*h;continue;}
     // steering angle: finer as speed rises, and wider in a drift so you can counter-steer
@@ -2604,15 +2617,11 @@ function carPhysics(p,dt,steer,brake,racing){
   if(p.drift){p.slipA=Math.min(1,Math.abs(beta)/.9);p.nitro=Math.min(1,p.nitro+.2*(.6+p.slipA)*dt);p.driftM=(p.driftM||0)+Math.hypot(p.wvx,p.wvz)*dt;
     if(Math.hypot(p.wvx,p.wvz)<22||(p.noSteerT>.15&&Math.abs(beta)<.06))endDrift();}
   if(!p.drift)p.slipA=0;
-  // back onto the track
-  projectTo(p,wx,wz);
-  // walls: the car bounces off, losing the speed it carried into the wall plus friction in proportion to that impact (a
-  // scrape costs a little, a slam a lot, but sliding along a wall doesn't bleed speed away), and gets turned to follow it
-  let [lo,hi,oLo,oHi]=limits(p);
-  // past its own road's edge where the two roads of a fork part: if that spot is on the other road, the car is simply on
-  // that road now (it was counted on the one whose centre was nearer). No wall, no shove, no turn toward either road
-  if((p.x<lo||p.x>hi)&&!p.air&&onOtherRoad(p))[lo,hi,oLo,oHi]=limits(p);
-  t=trackFrame(p);
+  // back onto the track, on whichever path of a fork it's on (bookkeeping only)
+  projectTo(p,wx,wz);pickRoad(p);
+  // walls: nothing but the driver steers the car. A wall stops it at its line and takes the speed it carried into it,
+  // and never turns it or slides it along; hit one hard and you're wrecked
+  const [lo,hi,oLo,oHi]=limits(p);t=trackFrame(p);
   // on the kerb and verge of an open edge: rumble and lose speed
   if(p.br<0&&!p.air&&p.nitroLevel!==2){const hw=hwAt(-1,p.s),sd=Math.sign(p.x);if(Math.abs(p.x)>hw-.8&&(sd>0?oHi:oLo)){const k=1-dt*(Math.abs(p.x)>hw+1.4?.45:.2);p.wvx*=k;p.wvz*=k;G.shake=Math.max(G.shake,.12);}}
   // past the barrier at the end of a run-off: in the air the car flies on; landing more than a few metres beyond it (it
@@ -2620,19 +2629,14 @@ function carPhysics(p,dt,steer,brake,racing){
   const open=(p.x<lo&&oLo)||(p.x>hi&&oHi);
   if(open&&(p.air||Math.abs(p.x-(p.x>hi?hi:lo))>3)){if(racing&&!p.air)goOOB(p,p.x>hi?1:-1,Math.hypot(p.wvx,p.wvz));}
   else if(p.x<lo||p.x>hi){const side=p.x>hi?1:-1,lim=side>0?hi:lo;
-    // where a fork's roads part, a car that's on neither of them (well past its own road's edge, and not on the other)
-    // arrived straddling the two: that's the divider, not a nudge onto one road or the other
-    if(racing&&p===player&&!p.air&&p.wreck<=0&&p.ghost<=0&&Math.abs(p.x-lim)>1&&BR.some(b=>p.br===b.i?Math.abs(p.bs-b.split)<25:Math.abs(wrapD(p.s,msB(b,b.split)))<25)){
-      p.x=lim;wreckPlayer();toast('HIT THE DIVIDER','danger','PICK A ROAD BEFORE THE SPLIT');}
-    // normally a wall stops you dead on its line; a car landing from a jump well past it is eased back over a few frames
-    p.x=!open&&Math.abs(p.x-lim)>1?p.x-side*Math.min(Math.abs(p.x-lim),25*dt):lim;
-    const vr=p.wvx*t.rx+p.wvz*t.rz,vf=p.wvx*t.fx+p.wvz*t.fz,hit=Math.max(0,vr*side),V0=Math.hypot(vr,vf);
+    const vr=p.wvx*t.rx+p.wvz*t.rz,vf=p.wvx*t.fx+p.wvz*t.fz,hit=Math.max(0,vr*side),crash=racing&&p===player&&p.wreck<=0&&p.ghost<=0;
+    // where a fork's paths part, a car on neither of them (well past the edge) arrived straddling the two: the divider
+    if(crash&&!p.air&&Math.abs(p.x-lim)>1&&BR.some(b=>p.br===b.i?Math.abs(p.bs-b.split)<25:Math.abs(wrapD(p.s,msB(b,b.split)))<25)){
+      wreckPlayer();toast('HIT THE DIVIDER','danger','PICK A ROAD BEFORE THE SPLIT');}
+    else if(crash&&hit>WALL_WRECK){wreckPlayer();toast('HIT THE WALL','danger','STEER OR DRIFT BEFORE THE BEND');}
+    p.x=lim;
     const vr2=hit>0?-vr*.3:vr,vf2=vf-Math.sign(vf)*Math.min(Math.abs(vf),hit*.35+2*dt);
     p.wvx=t.fx*vf2+t.rx*vr2;p.wvz=t.fz*vf2+t.rz*vr2;
-    // the wall turns the nose a few degrees back toward the road (more for a harder hit), so a car that touches it eases
-    // off by about a metre rather than being held against it
-    const th=Math.atan2(Math.sin(p.psi)*t.fx-Math.cos(p.psi)*t.fz,Math.cos(p.psi)*t.fx+Math.sin(p.psi)*t.fz),thT=-side*Math.min(.12,.05+hit*.004);
-    if(V0>6&&(th-thT)*side>0){p.psi-=(th-thT)*.5;p.yawR*=.4;}else if(V0<=6&&th*side>0){p.psi-=th;p.yawR*=.4;}
     if(!p.wallT&&hit>4){G.shake=Math.max(G.shake,clamp(hit/30,.3,1));sfx(hit>15?'crash':'knock');if(hit>18)toast('WALL','danger','BRAKE OR DRIFT BEFORE THE BEND');}
     p.wallT=.15;
     if(rnd()<.8){const wp=new V3(t.px+t.rx*(p.x+side*1.1),TS.p.y+.6,t.pz+t.rz*(p.x+side*1.1));for(let i=0;i<2;i++)emit(wp,new V3((rnd()-.5)*8,rnd()*5,(rnd()-.5)*8),.35,.35,.05,0xffc060,true);}
@@ -2690,7 +2694,6 @@ function updatePlayer(dt){
   st.top=Math.max(st.top,p.speed);
 
   // move + ramps. The inside of a bend is a shorter way round than the outside, so the racing line matters.
-  forkCheck(p);
   if(racing&&p.br<0)for(const b of BR){const d=wrapD(b.s0,p.s),key=b.i+':'+p.lastLap;
     if(d>150&&d<330&&!p.forkHint[key]){p.forkHint[key]=1;toast('FORK AHEAD','plain','KEEP '+(b.side<0?'LEFT':'RIGHT')+' FOR THE '+b.label.toUpperCase());}}
   const ev=rampStep(p,dt);
@@ -2796,7 +2799,13 @@ function updateTraffic(dt){
     }else if(t.down&&Math.abs(wrapD(t.s,player.s))>320){t.down=false;placeTraffic(t);}
   }
 }
-function overlap(a,b){if(a.br!==b.br)return null;const ds=dAlong(a.br,posOf(b),posOf(a)),dx=b.x-a.x,ln=((b.len||CAR_LEN)+CAR_LEN)/2,wd=((b.w||CAR_W)+CAR_W)/2;
+// two cars touch where they are in the world: on a fork's overlap they may be counted on different paths
+const _oa=new V3(),_ob=new V3();
+function overlap(a,b){let ds,dx;
+  if(a.br===b.br){ds=dAlong(a.br,posOf(b),posOf(a));dx=b.x-a.x;}
+  else{sampleE(b);_ob.copy(TS.p).addScaledVector(TS.r,b.x);sampleE(a);_oa.copy(TS.p).addScaledVector(TS.r,a.x);
+    if(_ob.distanceToSquared(_oa)>100)return null;_ob.sub(_oa);ds=_ob.dot(TS.f);dx=_ob.x*TS.r.x+_ob.z*TS.r.z;}
+  const ln=((b.len||CAR_LEN)+CAR_LEN)/2,wd=((b.w||CAR_W)+CAR_W)/2;
   return Math.abs(ds)<ln&&Math.abs(dx)<wd?{ds,dx,ln,wd}:null;}
 function nudge(e,d){if(e.br>=0){const b=BR[e.br];e.bs=Math.max(0,e.bs+d);e.dist+=d*b.span/b.len;}else e.dist+=d;e.s=mod(e.dist);}
 // late at a split: a car that reaches the nose of the divider while still straddling the two roads crashes into it.
@@ -2922,12 +2931,12 @@ function updateSlipTrails(dt){
 }
 // ---------------------------------------------------------------- camera
 const camPos=new V3(),camLook=new V3(),camOff=new V3(),_v=new V3(),_d=new V3();let camInit=false;
-const camRoad={br:-1,fy:0,off:0},wrapA=a=>Math.atan2(Math.sin(a),Math.cos(a));
+let camYawW=0;const wrapA=a=>Math.atan2(Math.sin(a),Math.cos(a));
 // something knocked flying that comes within r of the camera is hidden for those frames rather than filling the screen
 function nearCam(pos,r){return pos.distanceToSquared(camera.position)<r*r;}
 // C cycles the view. Chase views trail the car and swing a little with its heading; hood and bumper ride on the car.
 // CHASE is the low, close Asphalt view: about roof height, a couple of metres off the back bumper, the car low in the frame
-const CAMS=[{n:'CHASE',back:5,up:1.55,ahead:10,lh:.8},{n:'HIGH CHASE',back:8,up:2.9,ahead:12,lh:1.1},{n:'FAR CHASE',back:12,up:4.3,ahead:14,lh:1.4},
+const CAMS=[{n:'CHASE',back:5.8,up:2.3,ahead:12,lh:1},{n:'HIGH CHASE',back:8,up:2.9,ahead:12,lh:1.1},{n:'FAR CHASE',back:12,up:4.3,ahead:14,lh:1.4},
   {n:'HOOD',fp:'hood'},{n:'BUMPER',fp:'bumper'}];
 let camMode=clamp(+store.get('rn-cam')||0,0,CAMS.length-1);
 function cycleCam(){camMode=(camMode+1)%CAMS.length;store.set('rn-cam',camMode);camInit=false;$('camBtn').textContent=CAMS[camMode].n;if(G.mode==='race'||G.mode==='countdown')toast(CAMS[camMode].n,'plain','CAMERA · C');syncPrefs();}
@@ -2946,23 +2955,18 @@ function cameraFollow(dt){
   }else{
     const dm=playerCar.dim;let back=(C.back||9.2)+clamp(dm.front-2.2,-.6,1.5)+clamp(p.speed/90,0,1)*.5+NT[p.nitroLevel].push/60,up=(C.up||3.3)+clamp(dm.h-1.25,-.2,1.2)*.8; // sized to the car
     if(camera.aspect<.8){back+=1.3;up+=.3;} // portrait phone: a step further back so the car doesn't fill the width
-    // the chase camera follows mostly the car and a little the road. Where a fork's two roads overlap, the car is counted
-    // on one road or the other, and their directions differ; the switch must not swing the view (that reads as the car
-    // being steered), so the road's direction carries on from where it was and eases over to the new road's
-    const fy=Math.atan2(f.z,f.x);
-    if(!camInit){camRoad.off=0;camRoad.br=p.br;}else if(camRoad.br!==p.br){camRoad.off+=wrapA(camRoad.fy-fy);camRoad.br=p.br;}
-    camRoad.off*=Math.exp(-dt*3);camRoad.fy=fy;
-    const ry=fy+camRoad.off,cyFull=p.camYaw||0;
-    _d.copy(f).multiplyScalar(Math.cos(cyFull)).addScaledVector(r,-Math.sin(cyFull));const carY=Math.atan2(_d.z,_d.x);
-    const cyaw=ry+.85*wrapA(carY-ry),fh=Math.hypot(f.x,f.z);_d.set(Math.cos(cyaw)*fh,f.y,Math.sin(cyaw)*fh);
-    f.set(Math.cos(ry)*fh,f.y,Math.sin(ry)*fh);
+    // the chase camera follows the car alone: mostly where it's going, a little where it points (so a drift doesn't swing
+    // the view round with the body). The road has no say, so a bend or a fork never turns the view; only the car does
+    const V=Math.hypot(p.wvx,p.wvz),yV=V>3?Math.atan2(p.wvz,p.wvx):p.psi,want=p.psi+.7*wrapA(yV-p.psi);
+    camYawW=camInit?camYawW+wrapA(want-camYawW)*(1-Math.exp(-dt*10)):want;
+    const fh=Math.hypot(f.x,f.z);_d.set(Math.cos(camYawW)*fh,f.y,Math.sin(camYawW)*fh);
     if(G.mode==='finish'){G.finishT+=dt;const a=G.finishT*.5;_v.copy(base).addScaledVector(f,Math.cos(a)*-10).addScaledVector(r,Math.sin(a)*10).addScaledVector(u,3.5);}
     else _v.copy(base).addScaledVector(_d,-back).addScaledVector(u,up+p.y*.5);
     // the camera rides with the car and only its offset from the car is smoothed (smoothing the world position made it
     // trail further behind the faster the car went)
     _v.sub(base);if(!camInit){camOff.copy(_v);camInit=true;}
     camOff.lerp(_v,1-Math.exp(-dt*(G.mode==='finish'?2:9)));camPos.copy(base).add(camOff);
-    camLook.copy(base).addScaledVector(f,G.mode==='finish'?0:(C.ahead||10)).addScaledVector(u,(C.lh||1.2)+p.y*.6);
+    camLook.copy(base).addScaledVector(_d,G.mode==='finish'?0:(C.ahead||10)+clamp(p.speed/90,0,1)*8) // (further ahead the faster you go).addScaledVector(u,(C.lh||1.2)+p.y*.6);
   }
   camera.position.copy(camPos);
   // shake is a smooth wobble (a fresh random jolt every frame reads as the screen glitching)

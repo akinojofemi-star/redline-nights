@@ -16,7 +16,10 @@ Redline Nights is an Asphalt 9-style arcade street racer, built and maintained f
 - **Finish with a deploy.** Pushing to `main` is the deploy. Then wait for the Pages run to pass and confirm the new code is live (curl the page and grep for a new identifier).
 
 **Driving model** (each of these was an explicit request)
-- **No auto-steering anywhere**, and nothing that looks like it: the camera must not swing when the car is switched between roads. The car only turns when the player steers: no road-following, no self-centring, no pull toward a fork road. The only remaining assist is that a jump's flight bends with the road below it.
+- **Nothing moves or turns the car but the driver.** That rules out road-following, self-centring, any pull toward a fork path, a wall that turns the nose, a slide back onto the road, and a flight that bends with the road (jumps fly straight). The user was explicit: "a car should not be nudged".
+- **The chase camera follows the car, never the road.**
+- **A fork is one surface with two paths, not two roads.** Which path a car is counted on (`pickRoad`) is bookkeeping only (laps, map, pickups). It must never affect physics, walls, contact or the camera.
+- **Don't make the turn, hit something hard, and you're wrecked.** That means the divider, or a wall hit faster than `WALL_WRECK` (24 m/s straight into it). Scraping along a wall never wrecks.
 - **Players choose any fork, as late as they like.** Arriving straddling the divider crashes them.
 - **The game should punish bad steering, not forgive it.** Wide run-offs and solid barriers are the safety net.
 
@@ -198,6 +201,14 @@ Gotcha: Rimac material names match the wheel rule (`^rim`), so rename them first
 Mac builds need `identity: '-'` and `hardenedRuntime: false` (already set). Delete removed builds with `rm "${SH:?}"/…` (a safety check blocks a bare `$SH`).
 
 ## Recent history (newest first)
+
+- **No nudging at all, and visibility (2026-10-08):**
+  - Removed every nudge: walls turning the nose and sliding the car back onto the road, path switching that drove the walls and the camera, and the in-air bend and sideways damping. For the player, `pickRoad` replaces `forkCheck`: it picks the nearest path centre among the paths the car is on, and never switches within 1 m of a junction.
+  - Walls stop the car at their line and take the speed it carried into them. A hit faster than `WALL_WRECK` wrecks. Car contact works across fork paths: `overlap` uses world positions when two cars are counted on different paths.
+  - Chase camera: its direction comes from the car only (70% velocity, 30% heading, lightly smoothed). The default CHASE view is raised to up 2.3 / back 5.8 / ahead 12, with up to 8 m more look-ahead at speed.
+  - Fog starts at least 320 m out (2.5× each map's value) and is full at 1400 m or more (1.25×).
+  - Jumps: flights are straight now, so `fliesOn` only places a ramp or gap where a straight line off it (from anywhere across its width) stays over the road for a 330 km/h flight. Ramps need a 60 m straight run-up and gaps 100 m. A ramp with no such spot falls back to a smaller one (mega → kicker → hop, twist or kicker → hop). Tokyo's gap is now 366 m after the start, the only spot that fits.
+  - Bot wrecks went from about 0.5 to 3–7 per 2-lap race, and lap times rose 5–15%. The game is harder by design now.
 
 - **Forks, ramps from the air, drift feel (2026-10-08):**
   - Forks no longer pull the car. Three causes: (1) the chase camera snapped up to 25° in a frame when the car was switched between the two overlapping roads; it now carries the road's direction across a switch and eases over (`camRoad` in `cameraFollow`). (2) A car physically on the other road when the overlap ended was slid onto the road it was counted on and its nose turned up to 38°; `onOtherRoad` now moves it to the road it's actually on. (3) A car on the seam between the roads (on neither) was eased onto one; now it's a divider crash. The divider block is drawn on the real seam between the road edges (it was up to ~5 m off where roads meet at an angle).

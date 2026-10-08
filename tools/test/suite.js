@@ -11,7 +11,7 @@ T.drive=function(opt,st){const p=player;const u=p.speed,pos=posOf(p),hand=p.spec
   let tx=opt.lane!==undefined?opt.lane:clamp(-Math.sign(worst)*Math.min(hw*.45,Math.abs(worst)*300),-hw*.5,hw*.5);
   if(opt.route&&p.br<0)for(const b of BR){const d=wrapD(b.s0,p.s),d2=wrapD(p.s,b.s0);
     if(b.kind!==opt.route){if((d>0&&d<260)||(d2>0&&d2<b.span&&sepM(b,d2)<GAP))tx=-b.side*9;continue;}
-    if(d>0&&d<260)tx=b.side*9;else if(d2>0&&d2<b.span&&sepM(b,d2)<GAP)tx=offM(b,d2);}
+    if(d>0&&d<260)tx=b.side*9;else if(d2>0&&d2<b.span&&sepM(b,d2)<GAP)tx=offM(b,Math.min(b.span,d2+40));}
   if(opt.avoid){ // steer round roadblocks and traffic in the lane ahead
     for(const o of [...OBST.filter(o=>!o.dead),...traffic.filter(t=>!t.down&&!(t.flying>0))]){if(o.br!==p.br)continue;const d=dAlong(p.br,o.s!==undefined&&o.kind?o.s:posOf(o),pos);
       if(d>0&&d<70&&Math.abs(o.x-tx)<4.5)tx=o.x+(tx>o.x?5:-5)*(Math.abs(o.x+5)<hw-3||Math.abs(o.x-5)>=hw-3?1:-1);}}
@@ -80,7 +80,9 @@ T.probes=function(){const p=player,out=[];G.modeSel='classic';G.lapsSel=5;startR
     T.run(60*7,{lane:r.x},()=>{if(p.air&&!did&&p.airT>.05){brakeTap();brakeTap();did=true;}return did&&!p.air;});
     if(!did)T.note(MAP_ID+' air 360: never got airborne');else if(p.stats.stunts<=n0)T.note(MAP_ID+' air 360 did not pay out (spin '+!!p.spin+')');}}
   // ground 360 pays nitro
-  {T.setAt(-1,T.clear(L*.5),laneX(p,1),50);p.nitro=.2;T.run(30,{});const n0=p.nitro;brakeTap();brakeTap();T.run(60,{});if(!(p.nitro>n0+.05))T.note(MAP_ID+' ground 360 gave no nitro ('+n0.toFixed(2)+'->'+p.nitro.toFixed(2)+')');}
+  {const ob=OBST.map(o=>o.dead);OBST.forEach(o=>o.dead=1); // (clear of roadworks, which would wreck the car first)
+   T.setAt(-1,T.clear(L*.5),laneX(p,1),50);p.nitro=.2;T.run(30,{});const n0=p.nitro;brakeTap();brakeTap();T.run(60,{});if(!(p.nitro>n0+.05))T.note(MAP_ID+' ground 360 gave no nitro ('+n0.toFixed(2)+'->'+p.nitro.toFixed(2)+')');
+   OBST.forEach((o,i)=>o.dead=ob[i]);}
   // gaps: cleared at racing speed
   GAPS.forEach((g,i)=>{T.setAt(-1,g.s0-160,0,72);p.stats.oob=0;let air=false;const r=T.run(60*8,{lane:0,noBrake:true},()=>{if(p.air)air=true;return air&&!p.air||p.oob;});
     if(p.oob||p.stats.oob)T.note(MAP_ID+' gap '+i+' at '+Math.round(g.s0)+': fell in at '+Math.round(p.speed*3.6)+' km/h');else if(!air)T.note(MAP_ID+' gap '+i+' no jump');});
@@ -139,10 +141,10 @@ T.probes=function(){const p=player,out=[];G.modeSel='classic';G.lapsSel=5;startR
   {const r=RAMPS.find(r=>r.br<0&&r.T!==RAMP_TYPES.gap&&r.T!==RAMP_TYPES.mega);if(r){T.setAt(-1,r.s+r.T.len-4,r.x,50);p.air=true;p.y=rEnd(r,r.x)+.8;p.vy=-2;p.airT=.5;
     let up=false;for(let i=0;i<20&&!up;i++){p.botSteer=0;p.botBrake=false;update(1/60);up=p.air&&p.vy>0;}p.botSteer=undefined;p.botBrake=undefined;
     if(!up)T.note(MAP_ID+' skimming a ramp in the air did not launch the car');}}
-  // forks: driving through with no steering, switching roads must not swing the camera (that reads as being steered)
+  // forks: driving through with no steering, nothing but a wall may swing the camera (a swing reads as being steered)
   for(const b of BR){T.setAt(-1,msB(b,b.split)-70,offM(b,Math.max(0,wrapD(msB(b,b.split),b.s0)-1))/2,50);camInit=false;
     const v0=new THREE.Vector3(),v1=new THREE.Vector3();cameraFollow(1/60);camera.getWorldDirection(v0);let worst=0;
-    for(let i=0;i<90&&p.wreck<=0;i++){p.botSteer=0;p.botBrake=false;update(1/60);cameraFollow(1/60);camera.getWorldDirection(v1);worst=Math.max(worst,v1.angleTo(v0)*57.3);v0.copy(v1);}
+    for(let i=0;i<90&&p.wreck<=0;i++){p.botSteer=0;p.botBrake=false;update(1/60);cameraFollow(1/60);camera.getWorldDirection(v1);if(p.wallT<=0)worst=Math.max(worst,v1.angleTo(v0)*57.3);v0.copy(v1);}
     p.botSteer=undefined;p.botBrake=undefined;p.wreck=0;if(worst>8)T.note(MAP_ID+' '+b.kind+' fork: camera swung '+worst.toFixed(0)+'° in one frame');}
   const gl=renderer.getContext().getError();if(gl)T.note(MAP_ID+' GL error '+gl);
   return 'probes done';};
