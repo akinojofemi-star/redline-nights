@@ -1,4 +1,4 @@
-// Redline Nights desktop app.
+// Racing Heritage desktop app.
 // - Serves the game from a small local web server (the game loads its car models over HTTP).
 // - Hosting on the LAN: a WebSocket relay on port 47800 that friends connect to, plus a UDP beacon on port 47801 so
 //   their lobby lists your game automatically. The relay is dumb: it passes messages between the host's lobby and
@@ -40,7 +40,7 @@ async function createWindow() {
   const port = await startStatic();
   win = new BrowserWindow({
     width: 1360, height: 820, minWidth: 900, minHeight: 600, backgroundColor: '#0e0a16', autoHideMenuBar: true,
-    title: 'Redline Nights', icon: path.join(APP_DIR, 'icon.png'),
+    title: 'Racing Heritage', icon: path.join(APP_DIR, 'icon.png'),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, backgroundThrottling: false }
   });
   win.loadURL(`http://127.0.0.1:${port}/shell.html`);

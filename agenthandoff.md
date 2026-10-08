@@ -1,8 +1,8 @@
-# Redline Nights: agent handoff
+# Racing Heritage (formerly Redline Nights): agent handoff
 
 Last updated 2026-10-07 (evening). Read this before changing anything.
 
-Redline Nights is an Asphalt 9-style arcade street racer, built and maintained for the user (repo owner `akinojofemi-star`).
+Racing Heritage (renamed from Redline Nights; the repo, URL, file names and `rn-` storage keys keep the old name) is an Asphalt 9-style arcade street racer, built and maintained for the user (repo owner `akinojofemi-star`).
 
 - **Main product:** the browser game at https://akinojofemi-star.github.io/redline-nights/
 - **Also:** Electron desktop apps (Windows, Mac, Linux), which share the same game code.
@@ -70,7 +70,7 @@ Redline Nights is an Asphalt 9-style arcade street racer, built and maintained f
 **Versions**
 - `package.json` is 1.6.4.
 - The latest GitHub release is **v1.6.3** (desktop).
-- Multiplayer protocol is `VER = '1.6'` in `app/shell.html`. Bump it when the network messages change, because only matching versions can play together.
+- Multiplayer protocol is `VER = '1.7'` in `app/shell.html`. Bump it when the network messages change, because only matching versions can play together.
 - `MODEL_VER = 9` in the game. Bump it when car models are re-exported.
 
 ## Game architecture (`src/redline-nights.html`)
@@ -180,6 +180,7 @@ f.contentWindow.__ev('T.issues.join("\\n")');
 - **Surface coverage (after any road or edge change):** for every drivable point (step along each road; across from `limits()` lo to hi), cast a `THREE.Raycaster` straight down from 3 m above the road against the scene's visible, non-instanced meshes (set `ray.camera=camera`). A point with no hit within 1.2 m of road height is a hole. One-sided materials facing down count as holes, which is the point. It takes about 25 s per map and blocks the page, so poll with short waits.
 - **Screenshots:** iframes render black with `toDataURL`. Navigate the pane itself to `game.html?test=1&n=<unique>#map` instead (a hash-only change doesn't reload). Render, then POST `renderer.domElement.toDataURL()` to `tools/test/recv.py` (port 8791). `tools/test/sheet.swift` makes contact sheets.
 - **Phones:** use the browser pane's mobile preset (375×812) and a custom 812×375 for landscape. Reset to desktop afterwards.
+- **Online smoothness:** wrap each lobby's `WebSocket` in the duo page to delay sends and receives by 30–70 ms each, with occasional 150–350 ms stalls, from a seeded random sequence so builds can be compared. Step both games by the real elapsed time (stepping 1/60 per tick runs slower than real time and biases the result). Compare B's remote car `car.g.position` with A's real one: distance, and the second difference for roughness. Single runs are very noisy, so always compare several seeds in the same frame setup.
 - **Online:** run `npx wrangler dev --port 8787` in `server/`, open `app/duo.html?server=ws://localhost:8787` (two lobbies side by side) and drive them by clicking buttons (`hostOnline`, `code` + `joinCode`, `ready`, `start`). A hidden pane doesn't run `requestAnimationFrame`, so step the games with `iframe.contentWindow.__rn.step(dt)`.
 
 ## Car models
@@ -205,6 +206,14 @@ Gotcha: Rimac material names match the wheel rule (`^rim`), so rename them first
 Mac builds need `identity: '-'` and `hardenedRuntime: false` (already set). Delete removed builds with `rm "${SH:?}"/…` (a safety check blocks a bare `$SH`).
 
 ## Recent history (newest first)
+
+- **Renamed to Racing Heritage; looks, smoothness, online (2026-10-08):**
+  - Every visible name changed to Racing Heritage: titles, logo, home-screen name, desktop title, an in-game billboard, the server's text reply. The server change takes effect only after `wrangler deploy`. Internal names stay.
+  - Ramps all share one look: a dark deck with amber chevrons and white edges, dark metal sides, amber rails on both edges and a white lip.
+  - World textures: `rnTile` in `rnTex` blends each texture with a bigger, rotated copy of itself under a wandering mask, plus a gentle large-scale brightness variation, so tiling no longer shows.
+  - Cars: `ENV` is now a prefiltered environment built from the map's sky (gradient in linear light, lifted at night), a ring of horizon lights, an overhead glow and the sun or moon. The old canvas cube is the fallback. Paint is `MeshPhysicalMaterial` with a clear coat; glass and chrome are sharper.
+  - Smoothness: every shader is compiled during the countdown (`prewarm`, hidden objects included), and again just after a car model arrives. Before, 28 shaders compiled on the first race frame (212 ms) and more mid-race. Frame steps near the recent average use the average (`dtAvg`). A few per-frame allocations were removed.
+  - Online: 20 car updates a second (`MP_RATE`, was 15). Remote cars keep the old smoothing in `mpApply`: a spring rewrite tested worse and was dropped. Remote drift smoke shows. Bumps are felt on both screens (`mpBump` sends `{t:'ev',type:'bump'}`, applied unless that player's own game registered the contact in the last 0.25 s). `VER` bumped to 1.7.
 
 - **Acceleration curves, class balance, lobby stats, canisters (2026-10-08):**
   - `engineAcc(spec,u,top)` is the one engine curve, used by the physics and by the menu's 0–200 stat (`accelTime`). Pull is strongest at a standstill and eases smoothly to zero at top speed, with no step. The shape depends on drivetrain (`POWER`, `DRIVE` by model): EVs launch hardest and fade most, hybrids launch strong, turbos are the default, and high-revving cars without turbos launch softer and pull to the top.

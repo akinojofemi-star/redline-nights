@@ -1,10 +1,10 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Redline Nights</title>
+<title>Racing Heritage</title>
 <!-- added to a phone's home screen it opens full screen, with no browser bars (the only full screen an iPhone allows) -->
 <link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#0e0a16">
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Redline">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Heritage">
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Saira+Condensed:ital,wght@1,700;1,900&display=swap">
@@ -60,13 +60,13 @@ button.on{background:var(--ok);color:var(--ink);border-color:var(--ok)}
 .sep{height:1px;background:var(--line);margin:20px 0}
 </style></head>
 <body>
-<iframe id="game" title="Redline Nights" allow="autoplay; fullscreen"></iframe>
+<iframe id="game" title="Racing Heritage" allow="autoplay; fullscreen"></iframe>
 <div id="lobby"><div class="card" id="card"></div></div>
 <script>
 (() => {
 'use strict';
 // ---------------------------------------------------------------- state
-const VER = '1.6';                           // multiplayer protocol: only matching versions can play together
+const VER = '1.7';                           // multiplayer protocol: only matching versions can play together
 const $ = id => document.getElementById(id);
 const store = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
 const APP = !!window.rn;                     // inside the desktop app (LAN hosting available)
@@ -126,7 +126,7 @@ addEventListener('message', e => {
 function show(on) { $('lobby').hidden = !on; }
 
 // ---------------------------------------------------------------- networking: one host hub, any number of clients
-// Everyone in a game connects to a room: the Redline Nights game server for online games (found by room code), or the
+// Everyone in a game connects to a room: the Racing Heritage game server for online games (found by room code), or the
 // desktop app's relay for LAN games. Both route messages between players with the same small protocol (server/
 // worker.js, lan.js). The host's lobby is the hub: it keeps the player list and settings and starts races. Car states
 // go from each player straight to everyone else through the room; everything else goes to or from the host.
@@ -288,7 +288,7 @@ function joinRoom(kind, target, label) {
     onError: msg => fail(msg === 'no-room' ? (online ? 'No game with room code ' + target + '. Check the code with the host, and that they’re still in the lobby.' : 'That game has closed.')
       : msg !== 'unreachable' ? msg
       : online ? 'Couldn’t reach the game server. Check your internet connection and try again.'
-      : 'Couldn’t reach ' + net.label + '. Check the address, that you’re on the same network, and that the host’s firewall allows Redline Nights.'),
+      : 'Couldn’t reach ' + net.label + '. Check the address, that you’re on the same network, and that the host’s firewall allows Racing Heritage.'),
     onDrop: () => fail(online ? 'Lost the connection to the game server.' : 'Lost the connection to the host.')
   }));
 }
@@ -353,13 +353,13 @@ function render() {
   wire();
 }
 function homeHTML() {
-  if (S.invite) return `<h1>Redline<span>Nights</span></h1>
+  if (S.invite) return `<h1>Racing<span>Heritage</span></h1>
   <p class="tag">You’ve been invited to race in room <b style="color:var(--nitro)">${esc(S.invite)}</b>.</p>
   <div class="lbl">Your name</div>
   <div class="row"><input id="name" maxlength="16" value="${esc(S.name)}"></div>
   <div class="row" style="margin-top:18px"><button class="go" id="joinInvite">JOIN RACE</button><button id="noInvite">Not now</button></div>
   <div class="msg ${S.err ? 'err' : ''}">${esc(S.msg)}</div>`;
-  return `<h1>Redline<span>Nights</span></h1>
+  return `<h1>Racing<span>Heritage</span></h1>
   <p class="tag">Race solo, with friends anywhere online, or on the same network.</p>
   <div class="lbl">Your name</div>
   <div class="row"><input id="name" maxlength="16" value="${esc(S.name)}"></div>
@@ -367,7 +367,7 @@ function homeHTML() {
   <div class="msg ${S.err ? 'err' : ''}">${esc(S.msg)}</div>
   <div class="sep"></div>
   <h2>Online</h2>
-  <p class="tag" style="margin-top:0">Friends anywhere, through the Redline Nights game server. Works in the browser and the app.</p>
+  <p class="tag" style="margin-top:0">Friends anywhere, through the Racing Heritage game server. Works in the browser and the app.</p>
   <div class="row" style="margin-top:12px"><button class="go" id="hostOnline" style="background:var(--perfect)">HOST ONLINE</button></div>
   <div class="lbl">Join with a room code</div>
   <div class="row"><input id="code" class="code" maxlength="5" placeholder="CODE"><button id="joinCode">Join</button></div>
@@ -395,7 +395,7 @@ function lobbyHTML() {
   const net = S.net; if (!net) return homeHTML();
   const host = net.isHost;
   const players = host ? [...net.players.values()] : (S.lobby ? S.lobby.players : []);
-  if (!host && !S.lobby) return `<h1>Redline<span>Nights</span></h1><div class="msg">${esc(S.msg)}</div><div class="row" style="margin-top:16px"><button id="leave">Cancel</button></div>`;
+  if (!host && !S.lobby) return `<h1>Racing<span>Heritage</span></h1><div class="msg">${esc(S.msg)}</div><div class="row" style="margin-top:16px"><button id="leave">Cancel</button></div>`;
   const racing = host ? net.racing : S.lobby.racing;
   const cars = S.info ? S.info.cars : [];
   const myCls = (cars.find(c => c.id === S.car) || {}).cls || 'A';
@@ -422,7 +422,7 @@ function lobbyHTML() {
       <label class="check"><input type="checkbox" id="contact" ${st.contact ? 'checked' : ''}>Contact</label>
       <label class="check"><input type="checkbox" id="knock" ${st.knock ? 'checked' : ''}>Knockdowns</label></div>`
     : `<div class="lbl">Race</div><div class="tag">${esc(mapName(st.map))} · ${st.laps} lap${st.laps > 1 ? 's' : ''} · ${st.ai ? st.ai + ' AI' : 'no AI'} · ${[st.slip && 'slipstream', st.contact && 'contact', st.contact && st.knock && 'knockdowns'].filter(Boolean).join(', ') || 'no contact'}</div>`;
-  return `<h1>Redline<span>Nights</span></h1>${head}
+  return `<h1>Racing<span>Heritage</span></h1>${head}
   <div class="lbl">Drivers ${players.length}/6</div><div class="list">${plist}</div>
   ${setHTML}
   <div class="lbl">Your car</div>

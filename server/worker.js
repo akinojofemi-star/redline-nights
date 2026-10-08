@@ -1,4 +1,4 @@
-// Redline Nights online game server (Cloudflare Worker + one Durable Object per room).
+// Racing Heritage online game server (Cloudflare Worker + one Durable Object per room).
 // Every player in a room keeps a WebSocket to the room; the room passes messages between them. It speaks the same
 // small protocol as the desktop app's LAN relay (lan.js), so the lobby uses one code path for both:
 //   member -> room   {type:'hello', role:'host'|'client'}           first message; host gets id 'H', clients 'N1', 'N2'…
@@ -14,7 +14,7 @@ export default {
   async fetch(req, env) {
     const url = new URL(req.url);
     const m = url.pathname.match(/^\/room\/([A-Za-z0-9]{5})$/);
-    if (!m) return new Response('Redline Nights game server\n', { headers: { 'content-type': 'text/plain' } });
+    if (!m) return new Response('Racing Heritage game server\n', { headers: { 'content-type': 'text/plain' } });
     if (req.headers.get('Upgrade') !== 'websocket') return new Response('Expected a WebSocket', { status: 426 });
     const room = env.ROOMS.get(env.ROOMS.idFromName(m[1].toUpperCase()));
     return room.fetch(req);
