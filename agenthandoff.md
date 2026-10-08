@@ -193,7 +193,9 @@ The models are real cars from Sketchfab (mostly CC BY-NC-SA, so the game must st
 3. Run `texsplit.py`: it bakes texture × vertex colour into the `Col` attribute and splits two-tone black and chrome.
 4. Decimate per class, then export a GLB with only the `Col` layer.
 5. Run `python3 tools/blender/glb2json.py <dir>` to produce `app/models/<id>.json`.
-6. Bump `MODEL_VER`.
+6. Bump `MODEL_VER` (now 10).
+
+Smoothing pass (2026-10-08, all 43 cars): weld paint vertices at 0.5 mm, 4 rounds of vertex smoothing (factor 0.45) on interior paint vertices only, shade every face smooth, then a Weighted Normal modifier (face area, weight 50, keep sharp). Export with `export_vertex_color='ACTIVE'`. Transferring normals from a heavily smoothed copy of the paint was tried and dropped: it gives dark blotches because many paint faces point inward. The models depend on double-sided materials. For more real detail, the cars must be re-imported from Sketchfab at a higher polygon budget. The per-car `prepare_car` rules were never saved, so that means about 4 hours of work.
 
 Gotcha: Rimac material names match the wheel rule (`^rim`), so rename them first.
 
@@ -206,6 +208,12 @@ Gotcha: Rimac material names match the wheel rule (`^rim`), so rename them first
 Mac builds need `identity: '-'` and `hardenedRuntime: false` (already set). Delete removed builds with `rm "${SH:?}"/…` (a safety check blocks a bare `$SH`).
 
 ## Recent history (newest first)
+
+- **2K textures, better car paint (2026-10-08):**
+  - Desktop loads 2K colour maps (`<name>_c2.jpg`, listed in `TEX2K`) for asphalt, concrete, dirt, grass, ice, paving, dark rock, layered rock, sand and snow. They are the original ambientCG CC0 sources (Asphalt031, Concrete034, Ground037, Grass004, Ice002, PavingStones070, Rock035, Rock051, Ground054, Snow006), saved at quality 70. Normal and roughness maps stay 1K. Phones stay 1K. The metal and stone-wall originals couldn't be identified, so those stay 1K, and facades are unchanged because their window glow maps line up with the current images. To download from ambientCG, use curl with a browser user agent on `https://ambientcg.com/get?file=<ID>_2K-JPG.zip`.
+  - Paint colours were sRGB hex values used as linear, which washed every car out. `paintCol` converts them, and the paint picker uses it too. Paint is slightly less mirror-like now (roughness .3, clear-coat roughness .07) so leftover facets in the meshes show less.
+  - Picking a car preloads every model in its class, so the race doesn't wait on the download.
+  - Every car got the smoothing pass described under Car models.
 
 - **Renamed to Racing Heritage; looks, smoothness, online (2026-10-08):**
   - Every visible name changed to Racing Heritage: titles, logo, home-screen name, desktop title, an in-game billboard, the server's text reply. The server change takes effect only after `wrangler deploy`. Internal names stay.

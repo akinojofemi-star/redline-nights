@@ -399,7 +399,9 @@ scene.add(camera);
 // faces take it side-on, flat faces from above. A material can keep its own map as an overlay drawn on top (the lane
 // markings on a road, say).
 const TEXL=new THREE.TextureLoader(),PTEX={};
-function ptex(name,kind){const k=name+kind;if(!PTEX[k]){const t=TEXL.load('tex/'+name+'_'+kind+'.jpg');t.wrapS=t.wrapT=THREE.RepeatWrapping;
+// sharper 2K colour maps of the same scans for these (not on a phone, to spare its memory and data)
+const TEX2K=SMALL?new Set():new Set(['asphalt','concrete','dirt','grass','ice','paving','rockDark','rockLayer','sand','snow']);
+function ptex(name,kind){const k=name+kind;if(!PTEX[k]){const t=TEXL.load('tex/'+name+'_'+kind+(kind==='c'&&TEX2K.has(name)?'2':'')+'.jpg');t.wrapS=t.wrapT=THREE.RepeatWrapping;
   t.anisotropy=MAXANISO;PTEX[k]=t;}return PTEX[k];}
 const TEX_HAS={facadeNight:'e',facadeBrick:'e'};
 function rnTex(mat,o){
@@ -1602,7 +1604,10 @@ const MAT={
   shadow:new THREE.MeshBasicMaterial({map:shadowTex,transparent:true,depthWrite:false,color:0x000000})
 };
 // car paint: a metallic base under a glossy clear coat, like the real thing
-function paintMat(c){return new THREE.MeshPhysicalMaterial({color:c,metalness:.3,roughness:.42,clearcoat:1,clearcoatRoughness:.04,envMap:ENV,envMapIntensity:1});}
+// (paint colours are written as screen colours, so they're taken into linear light first: used as they are, every
+// paint came out washed out and pastel, the orange as a pale peach)
+const paintCol=c=>new THREE.Color(c).convertSRGBToLinear();
+function paintMat(c){return new THREE.MeshPhysicalMaterial({color:paintCol(c),metalness:.6,roughness:.3,clearcoat:1,clearcoatRoughness:.07,envMap:ENV,envMapIntensity:1.8});}
 function add(g,geo,mat,x,y,z){const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);g.add(m);return m;}
 // Car bodies are a side profile (z forward, y up) with cut-out wheel arches, extruded across the width,
 // then pulled in toward the roof (tumblehome) and at the nose and tail corners.
@@ -1708,7 +1713,7 @@ function makeCar(color,{shape=SEDAN,flames=false}={}){
   return car;
 }
 // Blender-modelled bodies (models/<id>.glb). Materials are matched by name so paint colour and lighting stay consistent.
-const MODEL_CACHE={},MODEL_VER=9; // bump when the Blender models are re-exported
+const MODEL_CACHE={},MODEL_VER=10; // bump when the Blender models are re-exported
 function loadModel(id){
   if(!THREE.GLTFLoader)return Promise.reject(new Error('no loader'));
   return MODEL_CACHE[id]||(MODEL_CACHE[id]=new Promise((res,rej)=>new THREE.GLTFLoader().load('models/'+id+'.json?v='+MODEL_VER,g=>res(g.scene),undefined,rej)));
@@ -3224,7 +3229,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden){clearKeys(
 // ---------------------------------------------------------------- menu wiring
 const paints=$('paints');
 PAINTS.forEach(([name,c],i)=>{const b=document.createElement('button');b.className='sw';b.style.setProperty('--c','#'+c.toString(16).padStart(6,'0'));b.setAttribute('aria-label',name+' paint');b.title=name;b.setAttribute('aria-pressed',String(i===G.paint));
-  b.onclick=()=>{G.paint=i;store.set('rn-paint',String(i));playerCar.paint.color.setHex(c);[...paints.children].forEach((x,j)=>x.setAttribute('aria-pressed',String(j===i)));};paints.appendChild(b);});
+  b.onclick=()=>{G.paint=i;store.set('rn-paint',String(i));playerCar.paint.color.copy(paintCol(c));[...paints.children].forEach((x,j)=>x.setAttribute('aria-pressed',String(j===i)));};paints.appendChild(b);});
 function accelTime(spec,target){let v=0,t=0;while(v<target&&t<30){v+=engineAcc(spec,v,spec.top)*.01;t+=.01;}return t;}
 const STATS=[
   ['Top speed',c=>(c.top-70)/24,c=>Math.round(c.top*3.6)+' km/h'],
@@ -3237,6 +3242,8 @@ const statEl=$('carStats');
 STATS.forEach(([k])=>{const sp=document.createElement('span');sp.textContent=k;const bar=document.createElement('div');bar.className='sbar';bar.appendChild(document.createElement('i'));statEl.append(sp,bar,document.createElement('em'));});
 function pickCar(i){
   setPlayerCar(i);const c=player.spec;
+  // fetch this class's car models now (not on a phone), so rivals show as real cars from the first frame of the race
+  if(!SMALL)CARS.forEach(x=>{if(x.cls===c.cls)loadModel(x.shape.model).catch(()=>{});});
   $('carName').textContent=c.name;$('carCls').textContent=c.cls;$('carCls').style.setProperty('--cc',CLS_COL[c.cls]);
   const inCls=CARS.filter(x=>x.cls===c.cls);$('carIdx').textContent=(inCls.indexOf(c)+1)+'/'+inCls.length+' in '+c.cls;$('carBlurb').textContent=c.blurb;
   [...$('classSeg').children].forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.cls===c.cls)));
