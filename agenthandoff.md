@@ -19,7 +19,9 @@ Redline Nights is an Asphalt 9-style arcade street racer, built and maintained f
 - **Nothing moves or turns the car but the driver.** That rules out road-following, self-centring, any pull toward a fork path, a wall that turns the nose, a slide back onto the road, and a flight that bends with the road (jumps fly straight). The user was explicit: "a car should not be nudged".
 - **The chase camera follows the car, never the road.**
 - **A fork is one surface with two paths, not two roads.** Which path a car is counted on (`pickRoad`) is bookkeeping only (laps, map, pickups). It must never affect physics, walls, contact or the camera.
-- **Don't make the turn, hit something hard, and you're wrecked.** That means the divider, or a wall hit faster than `WALL_WRECK` (24 m/s straight into it). Scraping along a wall never wrecks.
+- **Walls wreck only on a near head-on hit at speed:** over 110 km/h and more than 55° to the wall (`WALL_WRECK`). Any glancing hit, however fast, just bounces. Hitting the divider always wrecks.
+- **Flips:** a normal ramp never rolls a car whose four wheels are all on it, at any angle. Only one side's wheels on the ramp starts a roll (`edgeRoll`). Rolls are physical: a rate from the launch, with steering in the air speeding or slowing it. Landing more than 50° off upright (on the side or roof) wrecks. Twist ramps always roll you, at a set rate.
+- **Every metre a car may drive must show a surface under it.** Check with the ray scan (see Testing).
 - **Players choose any fork, as late as they like.** Arriving straddling the divider crashes them.
 - **The game should punish bad steering, not forgive it.** Wide run-offs and solid barriers are the safety net.
 
@@ -174,6 +176,7 @@ f.contentWindow.__ev('T.issues.join("\\n")');
 - An occasional race note of a player 0.6–0.8 m outside limits during a wall bounce, or an out-of-bounds where the bot runs off a gap's cliff edge.
 
 **Other checks**
+- **Surface coverage (after any road or edge change):** for every drivable point (step along each road; across from `limits()` lo to hi), cast a `THREE.Raycaster` straight down from 3 m above the road against the scene's visible, non-instanced meshes (set `ray.camera=camera`). A point with no hit within 1.2 m of road height is a hole. One-sided materials facing down count as holes, which is the point. It takes about 25 s per map and blocks the page, so poll with short waits.
 - **Screenshots:** iframes render black with `toDataURL`. Navigate the pane itself to `game.html?test=1&n=<unique>#map` instead (a hash-only change doesn't reload). Render, then POST `renderer.domElement.toDataURL()` to `tools/test/recv.py` (port 8791). `tools/test/sheet.swift` makes contact sheets.
 - **Phones:** use the browser pane's mobile preset (375×812) and a custom 812×375 for landscape. Reset to desktop afterwards.
 - **Online:** run `npx wrangler dev --port 8787` in `server/`, open `app/duo.html?server=ws://localhost:8787` (two lobbies side by side) and drive them by clicking buttons (`hostOnline`, `code` + `joinCode`, `ready`, `start`). A hidden pane doesn't run `requestAnimationFrame`, so step the games with `iframe.contentWindow.__rn.step(dt)`.
@@ -201,6 +204,11 @@ Gotcha: Rimac material names match the wheel rule (`^rim`), so rename them first
 Mac builds need `identity: '-'` and `hardenedRuntime: false` (already set). Delete removed builds with `rm "${SH:?}"/…` (a safety check blocks a bare `$SH`).
 
 ## Recent history (newest first)
+
+- **Invisible road, flips, wall wrecks (2026-10-08):**
+  - The left kerb and run-off were built mirrored, so they faced down and were invisible from above on every map with open left edges (Volcano and Coast worst). They're now built facing up.
+  - Where a fork meets the main road at an angle, the shared drivable area reached into a corner with no surface; tarmac aprons now cover it on both roads. A downward-ray scan of every drivable point finds 0 uncovered spots on all 9 maps.
+  - Rolls, roof landings and the wall rule as above. Ramps only lift a car with at least one wheel on them (half the ramp's width plus `WHEEL`).
 
 - **No nudging at all, and visibility (2026-10-08):**
   - Removed every nudge: walls turning the nose and sliding the car back onto the road, path switching that drove the walls and the camera, and the in-air bend and sideways damping. For the player, `pickRoad` replaces `forkCheck`: it picks the nearest path centre among the paths the car is on, and never switches within 1 m of a junction.

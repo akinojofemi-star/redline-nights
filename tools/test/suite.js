@@ -146,6 +146,26 @@ T.probes=function(){const p=player,out=[];G.modeSel='classic';G.lapsSel=5;startR
     const v0=new THREE.Vector3(),v1=new THREE.Vector3();cameraFollow(1/60);camera.getWorldDirection(v0);let worst=0;
     for(let i=0;i<90&&p.wreck<=0;i++){p.botSteer=0;p.botBrake=false;update(1/60);cameraFollow(1/60);camera.getWorldDirection(v1);if(p.wallT<=0)worst=Math.max(worst,v1.angleTo(v0)*57.3);v0.copy(v1);}
     p.botSteer=undefined;p.botBrake=undefined;p.wreck=0;if(worst>8)T.note(MAP_ID+' '+b.kind+' fork: camera swung '+worst.toFixed(0)+'° in one frame');}
+  // flips: a normal ramp taken on all four wheels never rolls the car, whatever the angle; one side's wheels on it does
+  {const r=RAMPS.find(r=>r.br<0&&!r.T.roll&&r.T!==RAMP_TYPES.gap&&r.T.w<10);if(r){const ob=OBST.map(o=>o.dead);OBST.forEach(o=>o.dead=1);
+    const take=(x,a)=>{T.setAt(-1,r.s-12,x,55);p.psi+=a;p.wvx=Math.cos(p.psi)*55;p.wvz=Math.sin(p.psi)*55;let st=null;
+      for(let i=0;i<50&&!st;i++){p.botSteer=0;p.botBrake=false;update(1/60);if(p.air&&p.stunt)st=p.stunt.t;}
+      p.botSteer=undefined;p.botBrake=undefined;p.wreck=0;p.air=false;p.y=0;p.vy=0;p.stunt=null;p.tricks=[];return st;};
+    for(const a of [-.26,0,.26]){const st=take(r.x-Math.tan(a)*(12+r.T.len/2),a);if(st!=='jump')T.note(MAP_ID+' all four wheels on a ramp at '+Math.round(a*57.3)+'° gave '+st);}
+    const st=take(r.x+r.T.w/2,0);if(st!=='roll')T.note(MAP_ID+' one side\'s wheels on a ramp gave '+st+', not a roll');
+    // landing a roll on the roof wrecks; landing it upright doesn't
+    for(const [ang,want] of [[Math.PI,true],[Math.PI*2+.2,false]]){T.setAt(-1,T.clear(L*.6),0,40);p.air=true;p.y=.4;p.vy=-6;p.airT=1;p.stunt={t:'roll',dir:1,w:0,ang};
+      const w0=p.stats.wrecks;for(let i=0;i<10;i++){p.botSteer=0;p.botBrake=false;update(1/60);}p.botSteer=undefined;p.botBrake=undefined;
+      if((p.stats.wrecks>w0)!==want)T.note(MAP_ID+' landing a roll at '+Math.round(ang*57.3)+'° '+(want?'did not wreck':'wrecked'));p.wreck=0;}
+    OBST.forEach((o,i)=>o.dead=ob[i]);}}
+  // walls: only driving nearly straight into one at speed wrecks; a fast glancing hit, or a slow head-on one, doesn't
+  {let s0=-1;for(let s=L*.1;s<L*.9&&s0<0;s+=20){let ok=true;for(let d=-20;d<80;d+=6){const k=kOf(s+d);sample(s+d);if(ER[k]!==0||Math.abs(TS.c)>1/500||inGap(-1,s+d)){ok=false;break;}}
+      if(ok&&!BR.some(b=>{const d=wrapD(s,b.s0);return d>-120&&d<b.span+120;}))s0=s;}
+    if(s0>=0){const ob=OBST.map(o=>o.dead);OBST.forEach(o=>o.dead=1);
+      for(const [deg,v,want] of [[20,80,false],[70,60,true],[70,20,false]]){const [,hi]=limits({br:-1,s:s0,x:0});T.setAt(-1,s0,hi-6,v);p.wallT=0;const a=deg/57.3;p.psi+=a;p.wvx=Math.cos(p.psi)*v;p.wvz=Math.sin(p.psi)*v;p._spd=v;
+        const w0=p.stats.wrecks;for(let i=0;i<60&&!(p.wallT>0)&&p.stats.wrecks===w0;i++){p.botSteer=0;p.botBrake=false;update(1/60);}update(1/60);p.botSteer=undefined;p.botBrake=undefined;
+        if((p.stats.wrecks>w0)!==want)T.note(MAP_ID+' wall hit at '+deg+'° and '+Math.round(v*3.6)+' km/h '+(want?'did not wreck':'wrecked'));p.wreck=0;}
+      OBST.forEach((o,i)=>o.dead=ob[i]);}}
   const gl=renderer.getContext().getError();if(gl)T.note(MAP_ID+' GL error '+gl);
   return 'probes done';};
 'suite ok'
