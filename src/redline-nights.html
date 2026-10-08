@@ -2484,7 +2484,7 @@ function knockTraffic(t,src){
   t.ang.set((rnd()-.5)*10,(rnd()-.5)*8,(rnd()-.5)*12).multiplyScalar(t.big?.4:1);t.flying=2.4;
 }
 function wreckPlayer(){
-  const p=player;p.wreck=1.1;p.drift=false;p.nitroLevel=0;p.spin=null;p.speed*=.5;p.stats.wrecks++;
+  const p=player;p.wreck=1.1;p.drift=false;p.nitroLevel=0;p.spin=null;p.stunt=null;p.settle=null;p.tricks=[];p.speed*=.5;p.stats.wrecks++;
   toast('WRECKED','danger');G.shake=1.2;sfx('crash');
 }
 function shockwave(){
@@ -2722,22 +2722,30 @@ function updatePlayer(dt){
   if(ev&&ev.launch){
     if(ev.chain&&p.tricks.length)trickPayout(p.tricks,p.rampType); // straight from one jump into the next: the first one's tricks still count
     const r=ev.r,T=r.T,off=p.x-r.x,rolling=ev.chain&&p.stunt&&p.stunt.t==='roll';p.tricks=[];p.rampType=T;p.purple=!!T.roll;
-    // a twist ramp lifts one side far higher by design, so it always rolls you, at a set rate: about one turn in the air
-    // at a normal speed, so a fast or slow take needs steering to land it. (A roll already going carries on.)
-    if(!rolling){p.stunt=T.roll?{t:'roll',dir:r.flip,w:6.2}:edgeRoll(r,off,p.vy);if(p.stunt.t==='roll')p.stunt.ang=0;}
+    // a twist ramp is built to roll you: its twist turns the car exactly once in the time it will be in the air (from the
+    // launch), so taken properly it always lands on its wheels, and steering in the air doesn't touch it. Clipping a
+    // normal ramp with one side's wheels is the roll that can go wrong. (A roll already going carries on.)
+    if(!rolling){p.stunt=T.roll?{t:'roll',dir:r.flip,w:Math.PI*2/Math.max(.35,p.airMax||1),fixed:true}:edgeRoll(r,off,p.vy);if(p.stunt.t==='roll')p.stunt.ang=0;}
+    // straight into another jump mid-roll: a twist roll re-times itself to finish its turn on the new landing
+    else if(p.stunt.fixed){const done=Math.abs(p.stunt.ang),to=Math.PI*2*Math.ceil((done+.5)/(Math.PI*2));p.stunt.w=(to-done)/Math.max(.35,p.airMax||1);}
     if(p.drift)endDrift();p.yawR=0;
     if(T===RAMP_TYPES.mega)toast('MEGA RAMP','perfect','DOUBLE-TAP BRAKE TO SPIN');
   }
   if(racing&&!p.air&&!p.oob&&!p.ramp&&inGap(p.br,p.s)){ // (still on the ramp's lip: it launches this step)
     const g=GAPS.find(g=>wrapD(p.s,g.s0)>=-1&&wrapD(p.s,g.s0)<g.len+1);goOOB(p,Math.sign(p.x)||1,p.speed,g);}
+  // a car that landed on its side tips back onto its wheels over half a second
+  if(p.settle){p.settle.t+=dt;if(p.settle.t>=.5)p.settle=null;}
   // a roll turns at its own rate; in the air, steering with it speeds it up and against it slows it, to land it upright
-  if(p.air&&p.stunt&&p.stunt.t==='roll')p.stunt.ang+=p.stunt.dir*(p.stunt.w+steer*p.stunt.dir*1.2)*dt;
+  if(p.air&&p.stunt&&p.stunt.t==='roll')p.stunt.ang+=p.stunt.dir*(p.stunt.w+(p.stunt.fixed?0:steer*p.stunt.dir*1.2))*dt;
   if(ev&&ev.landed){
     if(p.airT>.35)feed('AIR TIME '+p.airT.toFixed(2)+' S');
-    // landing more than 50 degrees off upright (on its side or its roof) is a wreck; a full roll landed clean pays out
-    if(p.stunt&&p.stunt.t==='roll'){const a=Math.abs(wrapA(p.stunt.ang));
-      if(a>50/57.3&&racing&&p.ghost<=0){p.tricks=[];p.spin=null;wreckPlayer();toast(a>2.1?'LANDED ON THE ROOF':'LANDED ON ITS SIDE','danger','LEVEL IT OUT BEFORE YOU LAND');}
-      else if(Math.abs(p.stunt.ang)>5.2)p.tricks.push('BARREL ROLL');}
+    // landing a roll: upside down (more than 120 degrees off upright) is a wreck. On its side the car tips back onto its
+    // wheels and carries on, a little slower; within 50 degrees it's a clean landing. A roll that got most of the way round
+    // (to its side or better) still counts as a barrel roll
+    if(p.stunt&&p.stunt.t==='roll'){const a=Math.abs(wrapA(p.stunt.ang)),turned=Math.abs(p.stunt.ang)>Math.PI*2-120/57.3;
+      if(a>120/57.3&&racing&&p.ghost<=0){p.tricks=[];p.spin=null;wreckPlayer();toast('LANDED ON THE ROOF','danger','LEVEL IT OUT BEFORE YOU LAND');}
+      else{if(a>50/57.3){p.settle={a:wrapA(p.stunt.ang),t:0};p.speed*=.85;G.shake=Math.max(G.shake,.8);sfx('knock');if(!turned)toast('SAVED IT','plain','LANDED ON ITS SIDE');}
+        if(turned)p.tricks.push('BARREL ROLL');}}
     G.shake=Math.max(G.shake,.4);sfx('land');p.svy=(p.svy||0)-Math.min(9,(ev.impact||6)*.45)*(.8+.2*p.spec.mass);
     sampleE(p);const wp=TS.p.clone().addScaledVector(TS.r,p.x);for(let i=0;i<8;i++)emit(wp,new V3((rnd()-.5)*6,rnd()*2,(rnd()-.5)*6),.7,1,3.5,0x6a5a70,false);
     if(p.spin){p.spin=null;p.speed*=.8;p.tricks=[];G.shake=.9;toast('SLOPPY LANDING','danger','FINISH THE SPIN BEFORE YOU LAND');}
@@ -2909,6 +2917,7 @@ function poseRacer(e,dt){
     const k=clamp(e.airT/((e.airMax||1)*.85),0,1),ang=e.stunt.ang!==undefined?e.stunt.ang:(1-Math.pow(1-k,2.2))*Math.PI*2*e.stunt.dir;
     if(e.stunt.t==='roll')roll+=ang;else yaw-=ang;
   }
+  if(e.settle){const k=clamp(e.settle.t/.5,0,1);roll+=e.settle.a*(1-k)*(1-k);}
   if(e.spin){const k=clamp(e.spin.t/e.spin.dur,0,1);yaw-=(k<.5?2*k*k:1-Math.pow(2-2*k,2)/2)*Math.PI*2*e.spin.dir;}
   b.rotation.set(pitch,yaw,roll);
   const spin=e.speed*dt/.38;c.wheels.forEach(w=>w.rotation.x+=spin);

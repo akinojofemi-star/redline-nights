@@ -65,7 +65,7 @@ T.race=function(carIdx,mode,opt){opt=opt||{};const tag=MAP_ID+'/'+CARS[carIdx].s
   return res;};
 // ------------------------------------------------------------------ feature probes on this map
 T.clear=s=>{for(let k=0;k<200;k++){const t=mod(s+k*15);if(!GAPS.some(g=>{const d=wrapD(t,g.s0);return d>-200&&d<g.len+150;})&&!BR.some(b=>{const d=wrapD(t,b.s0);return d>-150&&d<b.span+100;})&&!RAMPS.some(r=>r.br<0&&Math.abs(wrapD(t,r.s))<120)&&Math.abs(wrapD(t,TUNNEL.s0+(TUNNEL.s1-TUNNEL.s0)/2))>(TUNNEL.s1-TUNNEL.s0)/2+60)return t;}return s;};
-T.setAt=function(br,s,x,spd){const p=player;G.mode='race';G.paused=false;p.oob=null;p.wreck=0;p.ghost=0;p.air=false;p.y=0;p.vy=0;p.ramp=null;p.spin=null;p.drift=false;p.nitroLevel=0;
+T.setAt=function(br,s,x,spd){const p=player;G.mode='race';G.paused=false;p.oob=null;p.wreck=0;p.stunt=null;p.settle=null;p.tricks=[];p.ghost=0;p.air=false;p.y=0;p.vy=0;p.ramp=null;p.spin=null;p.drift=false;p.nitroLevel=0;
   p.br=br;if(br<0){p.dist=s;p.s=mod(s);}else{p.bs=s;p.dist=mainS(br,s);p.s=mod(p.dist);}p.x=x;alignToTrack(p,spd);p.speed=spd;p.lastLap=p.lastLap||0;};
 T.run=function(frames,opt,until){const st={cd:0,drifts:0,nitros:0,perfectAt:0};for(let i=0;i<frames;i++){T.drive(opt||{},st);update(1/60);if(!T.check(st,MAP_ID+' probe'))return false;if(until&&until())return true;}return null;};
 T.probes=function(){const p=player,out=[];G.modeSel='classic';G.lapsSel=5;startRace();G.countdown=0;G.mode='race';
@@ -153,16 +153,26 @@ T.probes=function(){const p=player,out=[];G.modeSel='classic';G.lapsSel=5;startR
       p.botSteer=undefined;p.botBrake=undefined;p.wreck=0;p.air=false;p.y=0;p.vy=0;p.stunt=null;p.tricks=[];return st;};
     for(const a of [-.26,0,.26]){const st=take(r.x-Math.tan(a)*(12+r.T.len/2),a);if(st!=='jump')T.note(MAP_ID+' all four wheels on a ramp at '+Math.round(a*57.3)+'° gave '+st);}
     const st=take(r.x+r.T.w/2,0);if(st!=='roll')T.note(MAP_ID+' one side\'s wheels on a ramp gave '+st+', not a roll');
-    // landing a roll on the roof wrecks; landing it upright doesn't
-    for(const [ang,want] of [[Math.PI,true],[Math.PI*2+.2,false]]){T.setAt(-1,T.clear(L*.6),0,40);p.air=true;p.y=.4;p.vy=-6;p.airT=1;p.stunt={t:'roll',dir:1,w:0,ang};
+    // landing a roll on the roof wrecks; landing it upright, or on its side (it tips back onto its wheels), doesn't
+    for(const [ang,want] of [[Math.PI,true],[Math.PI*2+.2,false],[Math.PI/2,false],[Math.PI*2-1.6,false]]){T.setAt(-1,T.clear(L*.6),0,40);p.air=true;p.y=.4;p.vy=-6;p.airT=1;p.stunt={t:'roll',dir:1,w:0,ang};
       const w0=p.stats.wrecks;for(let i=0;i<10;i++){p.botSteer=0;p.botBrake=false;update(1/60);}p.botSteer=undefined;p.botBrake=undefined;
       if((p.stats.wrecks>w0)!==want)T.note(MAP_ID+' landing a roll at '+Math.round(ang*57.3)+'° '+(want?'did not wreck':'wrecked'));p.wreck=0;}
     OBST.forEach((o,i)=>o.dead=ob[i]);}}
+  // a twist ramp taken properly always lands its barrel roll on the wheels, at any speed and anywhere across it
+  {const ob=OBST.map(o=>o.dead);OBST.forEach(o=>o.dead=1);
+    for(const r of RAMPS.filter(r=>r.T.roll))for(const v of [45,60,75,92])for(const dx of [-1.5,0,1.5]){
+      T.setAt(r.br,r.s-12,r.x+dx,v);p.wallT=0;const w0=p.stats.wrecks,k0=p.stats.stunts;let flew=false;
+      for(let i=0;i<300;i++){p.botSteer=0;p.botBrake=false;p.nitroLevel=0;update(1/60);if(p.air)flew=true;if(flew&&!p.air)break;if(p.stats.wrecks>w0)break;}
+      p.botSteer=undefined;p.botBrake=undefined;
+      if(p.stats.wrecks>w0)T.note(MAP_ID+' twist ramp at '+Math.round(r.s)+' wrecked at '+Math.round(v*3.6)+' km/h (x '+dx+')');
+      else if(flew&&p.stats.stunts===k0)T.note(MAP_ID+' twist ramp at '+Math.round(r.s)+' gave no barrel roll at '+Math.round(v*3.6)+' km/h');
+      p.wreck=0;p.air=false;p.y=0;p.stunt=null;p.tricks=[];}
+    OBST.forEach((o,i)=>o.dead=ob[i]);}
   // walls: only driving nearly straight into one at speed wrecks; a fast glancing hit, or a slow head-on one, doesn't
   {let s0=-1;for(let s=L*.1;s<L*.9&&s0<0;s+=20){let ok=true;for(let d=-20;d<80;d+=6){const k=kOf(s+d);sample(s+d);if(ER[k]!==0||Math.abs(TS.c)>1/500||inGap(-1,s+d)){ok=false;break;}}
-      if(ok&&!BR.some(b=>{const d=wrapD(s,b.s0);return d>-120&&d<b.span+120;}))s0=s;}
+      if(ok&&!BR.some(b=>{const d=wrapD(s,b.s0);return d>-120&&d<b.span+120;})&&!RAMPS.some(r=>r.br<0&&Math.abs(wrapD(s,r.s))<60))s0=s;} // (clear of forks and ramps)
     if(s0>=0){const ob=OBST.map(o=>o.dead);OBST.forEach(o=>o.dead=1);
-      for(const [deg,v,want] of [[20,80,false],[70,60,true],[70,20,false]]){const [,hi]=limits({br:-1,s:s0,x:0});T.setAt(-1,s0,hi-6,v);p.wallT=0;const a=deg/57.3;p.psi+=a;p.wvx=Math.cos(p.psi)*v;p.wvz=Math.sin(p.psi)*v;p._spd=v;
+      for(const [deg,v,want,gap] of [[20,80,false,6],[70,60,true,6],[70,14,false,3]]){const [,hi]=limits({br:-1,s:s0,x:0});T.setAt(-1,s0,hi-gap,v);p.wallT=0;const a=deg/57.3;p.psi+=a;p.wvx=Math.cos(p.psi)*v;p.wvz=Math.sin(p.psi)*v;p._spd=v;
         const w0=p.stats.wrecks;for(let i=0;i<60&&!(p.wallT>0)&&p.stats.wrecks===w0;i++){p.botSteer=0;p.botBrake=false;update(1/60);}update(1/60);p.botSteer=undefined;p.botBrake=undefined;
         if((p.stats.wrecks>w0)!==want)T.note(MAP_ID+' wall hit at '+deg+'° and '+Math.round(v*3.6)+' km/h '+(want?'did not wreck':'wrecked'));p.wreck=0;}
       OBST.forEach((o,i)=>o.dead=ob[i]);}}
