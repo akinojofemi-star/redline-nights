@@ -1828,12 +1828,23 @@ function smash(o,src){
 // nitro canisters: rows on the road, plus arcs in the air after each mega ramp
 const PICK=[];
 {
-  const canGeo=new THREE.CylinderGeometry(.42,.42,1.2,14),capGeo=new THREE.CylinderGeometry(.26,.26,.24,10);
-  const canMat=new THREE.MeshStandardMaterial({color:0x3fc8ff,emissive:0x1aa8ff,emissiveIntensity:1.1,metalness:.3,roughness:.3});
-  const capMat=new THREE.MeshStandardMaterial({color:0xf6efe4,roughness:.4});
-  const glow=new THREE.SpriteMaterial({map:softTex,color:0x3fc8ff,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:.7});
-  const addPick=(s,x,y,br=-1)=>{const g=new THREE.Group();add(g,canGeo,canMat,0,0,0);add(g,capGeo,capMat,0,.72,0);const sp=new THREE.Sprite(glow);sp.scale.set(3.2,3.2,1);g.add(sp);
-    scene.add(g);PICK.push({s,x,y,g,off:0,br,ms:mainS(br,s)});placeAt(g,br,s,x,y+1);};
+  // made to be seen from well down the road: a big bright canister, a glow and a tall beam of light that show through the
+  // haze (no fog on them), and a ring of light on the road under it
+  const canGeo=new THREE.CylinderGeometry(.55,.55,1.55,16),capGeo=new THREE.CylinderGeometry(.34,.34,.3,12);
+  const canMat=new THREE.MeshStandardMaterial({color:0x5fd8ff,emissive:0x22b8ff,emissiveIntensity:1.9,metalness:.3,roughness:.3});
+  const capMat=new THREE.MeshStandardMaterial({color:0xf6efe4,emissive:0x406070,roughness:.4});
+  const glow=new THREE.SpriteMaterial({map:softTex,color:0x5fd8ff,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:.95,fog:false});
+  const beamTex=canvasTex(16,128,(g,w,h)=>{const gr=g.createLinearGradient(0,h,0,0);gr.addColorStop(0,'rgba(60,200,255,.95)');gr.addColorStop(.4,'rgba(40,180,255,.6)');gr.addColorStop(1,'rgba(40,180,255,0)');
+    g.fillStyle=gr;g.fillRect(0,0,w,h);const gx=g.createLinearGradient(0,0,w,0);gx.addColorStop(0,'rgba(0,0,0,1)');gx.addColorStop(.5,'rgba(0,0,0,0)');gx.addColorStop(1,'rgba(0,0,0,1)');
+    g.globalCompositeOperation='destination-out';g.fillStyle=gx;g.fillRect(0,0,w,h);});
+  const beamMat=new THREE.MeshBasicMaterial({map:beamTex,transparent:true,depthWrite:false,side:THREE.DoubleSide,fog:false}); // (solid cyan, not added light: it shows against a bright sky too)
+  const beamGeo=new THREE.PlaneGeometry(2.2,18).translate(0,9-.9,0),beamGeo2=beamGeo.clone().rotateY(Math.PI/2);
+  const ringTex=canvasTex(64,64,(g,w,h)=>{const gr=g.createRadialGradient(w/2,h/2,8,w/2,h/2,w/2);gr.addColorStop(0,'rgba(90,200,255,0)');gr.addColorStop(.6,'rgba(110,215,255,.8)');gr.addColorStop(1,'rgba(90,200,255,0)');g.fillStyle=gr;g.fillRect(0,0,w,h);});
+  const ringMat=new THREE.MeshBasicMaterial({map:ringTex,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,fog:false});
+  const ringGeo=new THREE.PlaneGeometry(3.4,3.4).rotateX(-Math.PI/2);
+  const addPick=(s,x,y,br=-1)=>{const g=new THREE.Group();add(g,canGeo,canMat,0,0,0);add(g,capGeo,capMat,0,.92,0);const sp=new THREE.Sprite(glow);sp.scale.set(5,5,1);g.add(sp);
+    g.add(new THREE.Mesh(beamGeo,beamMat),new THREE.Mesh(beamGeo2,beamMat));const ring=y?null:new THREE.Mesh(ringGeo,ringMat);if(ring)g.add(ring);
+    scene.add(g);PICK.push({s,x,y,g,ring,off:0,br,ms:mainS(br,s)});placeAt(g,br,s,x,y+1);};
   [[.09,3.25],[.23,-9.75],[.34,9.75],[.42,-3.25],[.58,-3.25],[.66,9.75],[.74,-9.75],[.90,3.25]].forEach(([u,x])=>{if(GAPS.some(g=>{const d=wrapD(U(u),g.s0);return d>-60&&d<g.len+30;}))return;
     for(let k=0;k<3;k++){const s=U(u)+k*12,cx=fitX(-1,s,x*RW);if(!onRamp(-1,s,cx,4,2))addPick(s,cx,0);}});
   RAMPS.filter(r=>r.T===RAMP_TYPES.mega).forEach(r=>[[15,5.2],[30,7],[45,7.2]].forEach(([d,y])=>addPick(r.s+r.T.len+d,r.x,y,r.br)));
@@ -1857,6 +1868,8 @@ function updateFeatures(dt){
   const p=player,racing=G.mode==='race';
   lampMat.color.setHex(Math.floor(G.t*3)%2?0xffb02e:0x40280c);
   padTex.offset.y=(padTex.offset.y-dt*1.8)%1;
+  // canisters are each player's own: every game collects them for its own car only and never shares a pickup, so one
+  // player (or a rival) taking a canister never takes it from anyone else; it's there for every car that reaches it
   // a canister is collected when the car passes through it in the world, whichever road (main or fork) either is on,
   // checked along the whole path the car took since the last frame so a fast car or a long frame can't skip it
   sampleE(p);const pw1=TS.p.clone().addScaledVector(TS.r,p.x).addScaledVector(TS.u,p.y+.7),pw0=p._pw&&p._pw.distanceToSquared(pw1)<400?p._pw:pw1;p._pw=pw1;
@@ -1864,7 +1877,8 @@ function updateFeatures(dt){
   for(const k of PICK){
     if(k.off>0){k.off-=dt;if(k.off<=0){if(Math.abs(wrapD(k.ms,p.s))>200)k.g.visible=true;else k.off=.5;}continue;}
     if(Math.abs(wrapD(k.ms,p.s))>600)continue;
-    placeAt(k.g,k.br,k.s,k.x,k.y+1+Math.sin(G.t*3+k.s)*.25+(k.br<0?0:.03));k.g.rotateY(G.t*2.5);
+    const bob=Math.sin(G.t*3+k.s)*.25;placeAt(k.g,k.br,k.s,k.x,k.y+1+bob+(k.br<0?0:.03));k.g.rotateY(G.t*2.5);
+    if(k.ring)k.ring.position.y=-1-bob+.06; // (the ring stays on the road while the canister bobs)
     const q=k.g.position,tq=clamp(((q.x-pw0.x)*seg.x+(q.y-pw0.y)*seg.y+(q.z-pw0.z)*seg.z)/sl2,0,1);
     if(racing&&p.wreck<=0&&!p.oob&&q.distanceToSquared(pw0.clone().addScaledVector(seg,tq))<(k.y>0?3.6:3.1)**2){
       k.off=12;k.g.visible=false;p.nitro=Math.min(1,p.nitro+.1);sfx('ping');
@@ -1960,6 +1974,16 @@ const NB=NT.map(n=>n.top),BURN=NT.map(n=>n.burn),GRAV=24;
 // shape: proportions for the stand-in body shown while the Sketchfab model loads.
 const REAL=(name,cls,kmh,t100,kg,handling,nitro,blurb,shape)=>({name,cls,real:{kmh,t100,kg},top:70+(kmh-220)*.12,
   accel:clamp(1.5-(t100-2)*.11,.8,1.45),handling,nitro,mass:kg/1400,blurb,shape});
+// How each car's pull fades with speed, by what drives it: an electric car has all its torque at once and fades the most
+// toward its top speed; a hybrid's motors fill the bottom end; a turbo pulls evenly; a high-revving engine with no
+// turbos starts softer but keeps pulling hard right up to the top. launch: x the car's accel; curve: how late it fades
+const POWER={ev:{launch:1.12,curve:1.3},hybrid:{launch:1.06,curve:1.7},turbo:{launch:1,curve:2.1},na:{launch:.93,curve:2.8}};
+const DRIVE={models:'ev',taycan:'ev',nevera:'ev',nsx:'hybrid',sf90:'hybrid',laferrari:'hybrid',p1:'hybrid',revuelto:'hybrid',
+  mx5:'na',gr86:'na',p911:'na',r8:'na',huracan:'na',f812:'na',svj:'na'};
+// the engine's push (m/s^2) at speed u toward a top speed of `top`: strongest at a standstill, easing smoothly to nothing
+// at the top (no step anywhere in the curve)
+function engineAcc(spec,u,top){const P=POWER[DRIVE[spec.shape.model]||'turbo'];
+  return 26*spec.accel*P.launch*(spec.bal||1)*(1-Math.pow(clamp(u/top,0,1),P.curve));}
 const SH_ROADSTER={len:3.92,wid:1.74,wr:.32,zf:1.24,zr:-1.07,noseH:.72,cowlZ:-.05,beltH:.92,roofF:-.45,roofR:-1.05,roofH:1.23,deckZ:-1.32,deckH:.95,tailH:.92,style:'notch',grille:'wide',head:'eye',exh:[-.4,.4],tumble:.24};
 const SH_HATCH={len:4.2,wid:1.8,wr:.34,zf:1.3,zr:-1.31,noseH:.78,cowlZ:.7,beltH:.98,roofF:.02,roofR:-1.45,roofH:1.45,tailH:.9,style:'hatch',grille:'wide',wing:'roof',exh:[-.55,.55]};
 const SH_COUPE={len:4.7,wid:1.9,wr:.36,zf:1.5,zr:-1.3,noseH:.85,cowlZ:.35,beltH:.99,roofF:-.25,roofR:-1.05,roofH:1.38,deckZ:-1.95,deckH:1.03,tailH:1.0,style:'fast',grille:'wide',tail:'pair',exh:[-.6,.6]};
@@ -1984,9 +2008,9 @@ const CARS=[
   REAL('Dodge Challenger SRT Hellcat','B',320,3.6,2000,.8,1.0,'Supercharged V8 muscle. A rocket in a straight line and a handful in the bends.',sh(SH_COUPE,'hellcat',{len:5.03,roofH:1.45})),
   REAL('Chevrolet Camaro ZL1','B',318,3.5,1750,.95,1.0,'Supercharged V8 coupe with real grip. Muscle that can corner.',sh(SH_COUPE,'camaro',{len:4.78,roofH:1.35})),
   REAL('BMW M4 Competition','B',290,3.9,1725,1.0,1.0,'Twin-turbo six with all-wheel drive. Quick everywhere, heavy in the bends.',sh(SH_COUPE,'m4',{len:4.79})),
-  REAL('Chevrolet Corvette C8','A',312,2.9,1655,1.1,1.0,'Mid-engined American V8. Supercar pace in the B class.',sh(SH_MID,'c8',{len:4.63})),
+  REAL('Chevrolet Corvette C8','B',312,2.9,1655,1.1,1.0,'Mid-engined American V8. Supercar pace in the B class.',sh(SH_MID,'c8',{len:4.63})),
   REAL('Tesla Model S Plaid','B',322,2.1,2190,.85,1.35,'Electric sedan with savage launch and a huge battery for nitro. Heavy in corners.',sh(SH_COUPE,'models',{len:4.97,roofH:1.44,grille:'none',exh:[]})),
-  REAL('Audi RS6 Avant','C',305,3.6,2075,.85,1.15,'Twin-turbo V8 estate. A family car that runs with supercars on the straights.',sh(SH_HATCH,'rs6',{len:5.0,roofH:1.47})),
+  REAL('Audi RS6 Avant','B',305,3.6,2075,.85,1.15,'Twin-turbo V8 estate. A family car that runs with supercars on the straights.',sh(SH_HATCH,'rs6',{len:5.0,roofH:1.47})),
   REAL('Porsche Taycan Turbo S','B',260,2.8,2295,.95,1.4,'Electric four-door with the biggest nitro tank in its class. Lower top speed, huge shove.',sh(SH_COUPE,'taycan',{len:4.96,roofH:1.38,grille:'none',exh:[]})),
   REAL('Nissan GT-R','B',315,2.8,1750,1.15,1.0,'All-wheel-drive brute. Launches hard and stays planted.',sh(SH_COUPE,'gtr',{len:4.71,tail:'quad',wing:'gt'})),
   REAL('Porsche 911 GT3','A',318,3.4,1435,1.35,.95,'Track-focused 911. The sharpest steering in the garage.',sh(SH_COUPE,'p911',{len:4.57,roofH:1.28,head:'round',wing:'swan'})),
@@ -2010,6 +2034,11 @@ const CARS=[
   REAL('Lamborghini Aventador SVJ','S',350,2.8,1525,1.0,1.0,'Naturally aspirated V12 with active aero. Wild, loud and planted at full speed.',sh(SH_MID,'svj',{len:4.94})),
   REAL('Rimac Nevera','S',412,1.9,2150,.9,1.45,'Four-motor electric hypercar. The hardest launch in the game and a giant battery for nitro, but heavy.',sh(SH_MID,'nevera',{len:4.75})),
 ];
+// class balance: each car's power (its whole pull curve) and, 60% as much, its top speed, scaled so that every car in a
+// class laps within about 1% of the others (a bot lap from the grid, with drift and Perfect nitro, on six maps), while
+// each keeps its own character: launch against top end, grip against weight. Re-tune with the sim in the handoff.
+const BAL={rx7:0.959,z370:0.965,mx5:1.048,gr86:1.01,golf:0.991,mini:1.047,silvia:0.971,yaris:1.019,focusrs:0.994,m2:0.958,civic:0.965,mustang:1.025,supra:1.026,wrx:1.034,nsx:1.011,hellcat:0.988,camaro:0.985,m4:1.061,c8:0.979,models:0.953,rs6:0.996,taycan:1.078,gtr:0.979,p911:1.031,r8:1.022,vantage:0.99,amggt:0.991,f812:0.984,fordgt:0.982,f8:0.99,p911t:0.999,huracan:1.003,sf90:1.028,mc720:0.995,revuelto:1.016,huayra:1.001,jesko:0.962,laferrari:1.02,p1:1.027,chiron:0.949,senna:1.065,svj:0.999,nevera:0.915};
+CARS.forEach(c=>{const k=BAL[c.shape.model]||1;c.bal=k;c.top*=1+(k-1)*.6;});
 const CLASSES=['D','C','B','A','S'];
 const CLASS_NAME={D:'Class D · street',C:'Class C · hot hatch and muscle',B:'Class B · sports',A:'Class A · supercar',S:'Class S · hypercar'};
 // Sketchfab models used for the cars and props (reduced, recoloured and rigged for the game). Licences require this credit.
@@ -2595,8 +2624,10 @@ function carPhysics(p,dt,steer,brake,racing){
     let u=p.wvx*hx+p.wvz*hz,w=p.wvx*nx+p.wvz*nz;const V=Math.hypot(u,w);
     let fx=0,fy=0,yawAcc=0;
     if(fin){const tgt=55;fx=clamp((tgt-u)*1.2,-20,12);}
-    else if(brake&&!p.drift&&p.brakeT>.14)fx=-46*(1.12-.12*sp.mass)*Math.sign(u||1);
-    else if((p.drift?V:u)<top){const uu=p.drift?V:u;fx=(p.nitroLevel?NT[p.nitroLevel].push:p.padT>0?34:(uu<40?24:3+21*(1-uu/top)))*sp.accel;}
+    // brake: slows the car while it's rolling forward; once it's stopped, holding brake reverses (steering works backwards
+    // too, like a real car), so a car stopped against a wall can always back off it
+    else if(brake&&!p.drift&&p.brakeT>.14)fx=u>1?-46*(1.12-.12*sp.mass):u>-12?-14:0;
+    else if((p.drift?V:u)<top){const uu=p.drift?V:u;fx=p.nitroLevel?NT[p.nitroLevel].push*sp.accel:p.padT>0?34*sp.accel:engineAcc(sp,uu,top);}
     else if(!(p.air&&p.purple))fx=-(u-top)*1.4;
     if(p.air){ // no tyres in the air: the car flies on where it was going (nothing bends it toward the road) and eases
       // round to face where it's flying (no spin carried over from a drift), with a touch of air control
@@ -3153,7 +3184,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden){clearKeys(
 const paints=$('paints');
 PAINTS.forEach(([name,c],i)=>{const b=document.createElement('button');b.className='sw';b.style.setProperty('--c','#'+c.toString(16).padStart(6,'0'));b.setAttribute('aria-label',name+' paint');b.title=name;b.setAttribute('aria-pressed',String(i===G.paint));
   b.onclick=()=>{G.paint=i;store.set('rn-paint',String(i));playerCar.paint.color.setHex(c);[...paints.children].forEach((x,j)=>x.setAttribute('aria-pressed',String(j===i)));};paints.appendChild(b);});
-function accelTime(spec,target){let v=0,t=0;const top=spec.top;while(v<target&&t<30){const a=(v<40?24:3+21*(1-v/top))*spec.accel;v+=a*.01;t+=.01;}return t;}
+function accelTime(spec,target){let v=0,t=0;while(v<target&&t<30){v+=engineAcc(spec,v,spec.top)*.01;t+=.01;}return t;}
 const STATS=[
   ['Top speed',c=>(c.top-70)/24,c=>Math.round(c.top*3.6)+' km/h'],
   ['0\u2013200',c=>(1.35-accelTime(c,55.6)/accelTime(CARS[2],55.6))/.6,c=>accelTime(c,55.6).toFixed(1)+' s'],
@@ -3347,7 +3378,8 @@ if(MP.on){
 if(/[?&]test=1/.test(location.search))window.__ev=src=>eval(src);   // test pages read the game's state through this
 // tell the lobby we're loaded, with what it needs to offer: cars, paints and maps
 function mpHello(){if(!MP.on)return;$('menu').hidden=true;setViewShift(false);
-  parent.postMessage({t:'ready',map:MAP_ID,cars:CARS.map(c=>({id:c.shape.model,name:c.name,cls:c.cls})),
+  parent.postMessage({t:'ready',map:MAP_ID,cars:CARS.map(c=>({id:c.shape.model,name:c.name,cls:c.cls,blurb:c.blurb,
+    stats:STATS.map(([k,f,v])=>[k,+clamp(f(c),.06,1).toFixed(3),v(c)])})), // (so the lobby can show the same stat bars as the menu)
     paints:PAINTS.map(([n,c])=>[n,'#'+c.toString(16).padStart(6,'0')]),maps:Object.entries(MAPS).map(([id,m])=>({id,name:m.name}))},'*');}
 // inside the app but playing solo: offer a way back to the lobby from the menu
 if(!MP.on&&window.parent!==window){const b=document.createElement('button');b.className='go alt';b.textContent='MULTIPLAYER';b.onclick=()=>parent.postMessage({t:'openLobby'},'*');$('raceBtn').after(b);}

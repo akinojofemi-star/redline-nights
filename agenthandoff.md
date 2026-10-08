@@ -171,11 +171,12 @@ f.contentWindow.__ev('T.issues.join("\\n")');
 
 **Known false alarms**
 - "player outside limits x = hi+5" comes from the out-of-bounds probe placing the car there on purpose.
-- A rare "could not stay on the main road" is the bot running wide.
+- A rare "could not stay on the main road" is the bot running wide. It can also appear on City's short fork in the first map of a long all-maps run; on its own it passes.
 - "results never shown" when `laps × lap time` exceeds `secs` (default 170 s). Pass a bigger `secs` for multi-lap races.
 - An occasional race note of a player 0.6–0.8 m outside limits during a wall bounce, or an out-of-bounds where the bot runs off a gap's cliff edge.
 
 **Other checks**
+- **Class balance sim (after any car or engine change):** for each car, on six maps (city, alpine, industrial, coast, canyon, arctic), start a classic race, then set `G.countdown=0` and `G.mode='race'`. Clear traffic (`t.down=true`), rivals (`r.out=true`) and roadworks (`OBST.length=0`: dead blocks revive). Drive one lap with `T.drive({drift:true,nitro:'perfect',avoid:true})` and sum the lap times. Within a class, set `k *= 1 + gain × (time / class mean − 1)` with gain 1.5, then 1.2, then 1, clamping `k` to 0.85–1.15. Apply `k` to `c.bal` and `c.top = top0 × (1 + (k − 1) × 0.6)`. Bot noise is about ±1%, so keep each car's best pass and confirm with one more run.
 - **Surface coverage (after any road or edge change):** for every drivable point (step along each road; across from `limits()` lo to hi), cast a `THREE.Raycaster` straight down from 3 m above the road against the scene's visible, non-instanced meshes (set `ray.camera=camera`). A point with no hit within 1.2 m of road height is a hole. One-sided materials facing down count as holes, which is the point. It takes about 25 s per map and blocks the page, so poll with short waits.
 - **Screenshots:** iframes render black with `toDataURL`. Navigate the pane itself to `game.html?test=1&n=<unique>#map` instead (a hash-only change doesn't reload). Render, then POST `renderer.domElement.toDataURL()` to `tools/test/recv.py` (port 8791). `tools/test/sheet.swift` makes contact sheets.
 - **Phones:** use the browser pane's mobile preset (375×812) and a custom 812×375 for landscape. Reset to desktop afterwards.
@@ -204,6 +205,13 @@ Gotcha: Rimac material names match the wheel rule (`^rim`), so rename them first
 Mac builds need `identity: '-'` and `hardenedRuntime: false` (already set). Delete removed builds with `rm "${SH:?}"/…` (a safety check blocks a bare `$SH`).
 
 ## Recent history (newest first)
+
+- **Acceleration curves, class balance, lobby stats, canisters (2026-10-08):**
+  - `engineAcc(spec,u,top)` is the one engine curve, used by the physics and by the menu's 0–200 stat (`accelTime`). Pull is strongest at a standstill and eases smoothly to zero at top speed, with no step. The shape depends on drivetrain (`POWER`, `DRIVE` by model): EVs launch hardest and fade most, hybrids launch strong, turbos are the default, and high-revving cars without turbos launch softer and pull to the top.
+  - Class balance: `BAL[model]` scales a car's pull, and 60% as much its top speed, so every car laps within about 1% of its class average. The Corvette C8 and the Audi RS6 moved to class B.
+  - The multiplayer lobby shows the chosen car's stat bars and description. The game sends them with its car list in the `ready` message.
+  - Reverse: holding brake once the car has stopped reverses it (up to about 45 km/h), and steering works backwards. Before, a car stopped nose-first against a wall could never get off it. The test bot backs off walls the same way.
+  - Canisters: bigger and brighter, with an 18 m solid cyan beam and a ring on the road (no fog on either). They are per player by design: each game collects for its own car only and never syncs pickups, so taking one never takes it from anyone else.
 
 - **Invisible road, flips, wall wrecks (2026-10-08):**
   - The left kerb and run-off were built mirrored, so they faced down and were invisible from above on every map with open left edges (Volcano and Coast worst). They're now built facing up.

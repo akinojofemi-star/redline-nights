@@ -52,6 +52,11 @@ button.on{background:var(--ok);color:var(--ink);border-color:var(--ok)}
 .check{display:flex;align-items:center;gap:8px;font-size:14px}
 .check input{width:18px;height:18px}
 .hint{font-size:12px;color:var(--dim);line-height:1.5;margin-top:8px}
+.stats{display:grid;grid-template-columns:auto 1fr auto;gap:6px 12px;align-items:center;font-size:12px;margin-top:10px}
+.stats span{letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.stats em{font-style:normal;font-variant-numeric:tabular-nums;text-align:right;min-width:7ch}
+.stats .bar{height:8px;background:rgba(255,255,255,.1);transform:skewX(-18deg);position:relative;overflow:hidden}
+.stats .bar i{position:absolute;inset:0 auto 0 0;background:var(--hud)}
 .sep{height:1px;background:var(--line);margin:20px 0}
 </style></head>
 <body>
@@ -334,6 +339,12 @@ const mapName = id => ((S.info && S.info.maps.find(m => m.id === id)) || { name:
 const carName = id => ((S.info && S.info.cars.find(c => c.id === id)) || { name: id }).name;
 const paintHex = i => S.info ? S.info.paints[(i | 0) % S.info.paints.length][1] : '#888';
 
+// the chosen car's stats, the same bars as the game's own menu (the game sends them with its car list)
+function carStats(c) {
+  if (!c || !c.stats) return '';
+  return `<div class="stats">${c.stats.map(([k, f, v]) => `<span>${esc(k)}</span><div class="bar"><i style="width:${Math.round(f * 100)}%"></i></div><em>${esc(v)}</em>`).join('')}</div>`
+    + (c.blurb ? `<div class="hint">${esc(c.blurb)}</div>` : '');
+}
 function render() {
   if (document.activeElement && document.activeElement.id === 'steer') { S.later = true; return; } // don't yank the slider mid-drag
   const c = $('card');
@@ -417,6 +428,7 @@ function lobbyHTML() {
   <div class="lbl">Your car</div>
   <div class="grid2"><select id="cls">${classes.map(k => `<option ${k === myCls ? 'selected' : ''}>${k}</option>`).join('')}</select>
   <select id="car">${cars.filter(c => c.cls === myCls).map(c => `<option value="${c.id}" ${c.id === S.car ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></div>
+  ${carStats(cars.find(c => c.id === S.car))}
   <div class="lbl">Paint</div><div class="paints" id="paints">${(S.info ? S.info.paints : []).map(([n, h], i) => `<button title="${esc(n)}" style="background:${h}" aria-pressed="${i === S.paint}" data-p="${i}"></button>`).join('')}</div>
   <div class="lbl">Steering sensitivity</div><div class="steer"><input type="range" id="steer" min="50" max="160" step="10" value="${steerPct()}"><b id="steerVal">${steerPct()}%</b></div>
   <div class="row" style="margin-top:22px">

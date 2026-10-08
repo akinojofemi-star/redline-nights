@@ -27,6 +27,11 @@ T.drive=function(opt,st){const p=player;const u=p.speed,pos=posOf(p),hand=p.spec
   if(opt.nitro&&!p.nitroLevel&&p.nitro>.5&&!fast&&!p.drift&&vs>u*1.3&&!p.air){pressNitro();st.nitros++;
     if(opt.nitro==='perfect')st.perfectAt=G.raceTime+.7;else if(opt.nitro==='pulse')st.perfectAt=G.raceTime+.15;}
   if(st.perfectAt&&G.raceTime>=st.perfectAt){if(p.nitroLevel===1)pressNitro();st.perfectAt=0;}
+  // stuck against a wall (nose into it, barely moving): back off it like a player would, holding brake to reverse and
+  // steering the nose round toward the road, then drive on
+  if(st){if(p.speed<3&&p.wallT>0&&G.mode==='race'&&p.wreck<=0)st.pin=(st.pin||0)+1/60;else if(!(st.rev>0))st.pin=0;
+    if(st.pin>.6&&!(st.rev>0)){st.rev=1.1;st.pin=0;}
+    if(st.rev>0){st.rev-=1/60;const t=trackFrame(p),th=Math.atan2(Math.sin(p.psi)*t.fx-Math.cos(p.psi)*t.fz,Math.cos(p.psi)*t.fx+Math.sin(p.psi)*t.fz);steer=Math.sign(th)||1;brk=true;}}
   p.botSteer=steer;p.botBrake=brk;
 };
 // ------------------------------------------------------------------ invariants, checked every frame
