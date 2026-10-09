@@ -71,7 +71,7 @@ Racing Heritage (renamed from Redline Nights; the repo, URL, file names and `rn-
 - `package.json` is 1.6.4.
 - The latest GitHub release is **v1.6.3** (desktop).
 - Multiplayer protocol is `VER = '1.7'` in `app/shell.html`. Bump it when the network messages change, because only matching versions can play together.
-- `MODEL_VER = 9` in the game. Bump it when car models are re-exported.
+- `MODEL_VER = 11` in the game. Bump it when car models are re-exported.
 
 ## Game architecture (`src/redline-nights.html`)
 
@@ -188,13 +188,25 @@ f.contentWindow.__ev('T.issues.join("\\n")');
 
 The models are real cars from Sketchfab (mostly CC BY-NC-SA, so the game must stay non-commercial). Credits are in `CREDITS` in the game.
 
-**Pipeline** (Blender 5.2 through MCP; the add-on listens on :9876):
-1. Load `tools/blender/carlib.py` and `sfab.py` into Blender, putting the helpers on `builtins` because each MCP call gets a fresh namespace.
-2. Import from Sketchfab, then `prepare_car(id, rules)`.
-3. Run `texsplit.py`: it bakes texture × vertex colour into the `Col` attribute and splits two-tone black and chrome.
-4. Decimate per class, then export a GLB with only the `Col` layer.
-5. Run `python3 tools/blender/glb2json.py <dir>` to produce `app/models/<id>.json`.
-6. Bump `MODEL_VER` (now 10).
+**Pipeline** (Blender 5.2 through MCP; the add-on listens on :9876). `tools/blender/newcar.py` runs it end to end:
+1. Exec `carlib.py`, `sfab.py`, `texsplit.py` and `newcar.py`, in that order, into one dict put on `builtins` (each MCP call gets a fresh namespace). Set `RAW_DIR` to a scratch folder for the raw imports. After each Blender start, set `scene.blendermcp_use_sketchfab = True`. The Sketchfab key lives in the add-on preferences: use it only through the add-on.
+2. Import from Sketchfab (`import_asset`, target size about 4.6), then `report(rules)` to see the dimensions and the biggest materials with the class each would get.
+3. `build(id, rules, split=...)`:
+   - `texsplit` bakes texture × vertex colour into `Col` and splits two-tone parts. `split` defaults to `('paint','trim','chrome')`. Drop `'paint'` when white patches appear (a livery or light paint read as chrome).
+   - `prepare_car` assigns the game materials and rigs the wheels.
+   - `per_class_decimate` welds the body at 0.2 mm, then decimates each material on its own to `BUDGET` (paint 11k, black/trim 6k, glass 4k, chrome 2.5k, each light 1.5k). A whole-body collapse decimate shreds Sketchfab meshes split at every seam.
+   - `smooth`, then export a GLB to `/tmp/rh_glb`.
+4. Run `python3 ../tools/blender/glb2json.py <dir>` from `app/` to produce `app/models/<id>.json`. Copy only the new GLBs into a fresh directory first.
+   - Then run `python3 ../tools/blender/darktrim.py models/<id>.json`. Forza-sourced textures often bake light grey into parts that are black on the real car, and the game shows the trim's baked colour, so they come out white. The script scales the trim's mean colour down to 3.5% when it is above 15%. Most cars sit at 0.5–5%.
+5. Bump `MODEL_VER` (now 11).
+
+Rule gotchas:
+- Interiors often share materials with the outside. Delete interior objects by name first (`SM_Interior`, `SteeringWheel`, `INTERIOR`, `BONNETCAM`, `polySurface*`), or tell them apart by phong number.
+- A `windowinside` → delete rule took the Alpine's whole body with it.
+- `carlib` has a gloss `black` material for texsplit.
+- On Forza-sourced models (`…RewardRecycled…`), `Coloured_Material` is the black secondary zone: grilles, sills, mirrors, diffuser and window surrounds. It defaults to paint, so add `(r'coloured_material','black')` unless it really is the body colour (on the A110 the body paint is `WindowInside`).
+
+**Provenance:** many Sketchfab car models (ddiaz-design and others) are ripped from games. Material names show it: "RewardRecycled" is Forza, "nfsm" is NFS Mobile, and one name says "from_CSR2". The game must stay non-commercial. Rejected for unclear origin or broken geometry: VTX_car's AMG ONE, LSxSEPTIC's AMG GT Black Series, several GR Corollas.
 
 Smoothing pass (2026-10-08, all 43 cars): weld paint vertices at 0.5 mm, 4 rounds of vertex smoothing (factor 0.45) on interior paint vertices only, shade every face smooth, then a Weighted Normal modifier (face area, weight 50, keep sharp). Export with `export_vertex_color='ACTIVE'`. Transferring normals from a heavily smoothed copy of the paint was tried and dropped: it gives dark blotches because many paint faces point inward. The models depend on double-sided materials. For more real detail, the cars must be re-imported from Sketchfab at a higher polygon budget. The per-car `prepare_car` rules were never saved, so that means about 4 hours of work.
 
@@ -209,6 +221,20 @@ Gotcha: Rimac material names match the wheel rule (`^rim`), so rename them first
 Mac builds need `identity: '-'` and `hardenedRuntime: false` (already set). Delete removed builds with `rm "${SH:?}"/…` (a safety check blocks a bare `$SH`).
 
 ## Recent history (newest first)
+
+- **25 new cars (2026-10-09), 68 in all:** five per class, all from ddiaz-design on Sketchfab.
+
+  | Class | New cars |
+  |---|---|
+  | S | Aston Martin Valhalla, Mercedes-AMG ONE, Porsche 918 Spyder, Ferrari Daytona SP3, Koenigsegg Regera |
+  | A | Corvette Z06, Ferrari 296 GTB, McLaren Artura, 911 GT2 RS, Aston Martin DBS GT Zagato |
+  | B | 718 Cayman GT4, Lotus Emira, Maserati MC20, BMW M5 CS, Jaguar F-Type SVR |
+  | C | Audi RS3, Hyundai Elantra N, AMG A45 S, Alpine A110, Lancer Evo X |
+  | D | AE86 Trueno, Honda S2000, Mazda RX-8, Fiesta ST, Integra Type R |
+
+  - The new cars were balanced against the class mean of the existing cars, which kept their `BAL` values.
+  - The default car is now found by id (`civic`), not by index.
+  - `MODEL_VER` 11, `VER` 1.11.
 
 - **Shockwave push, three more maps, boost-pad fix (2026-10-09):**
   - **Shockwave contact:** while a shockwave runs (`nitroLevel 3`), touching any rival or online player throws it aside with `shove(o, side)`, and takes it down too when knockdowns are on. The blast does the same to everyone in reach (before, with knockdowns off it only slowed AI rivals). AI cars carry `r.shove`, a 16 m/s sideways slide that decays, with no steering back until it's spent, clamped by walls; wrecked ones slide too. Online players get `mpBump` with `lat:±16`.
