@@ -166,7 +166,7 @@ f.contentWindow.__ev('T.probes()');            // feature probes on this map; pr
 f.contentWindow.__ev(`T.race(5,'classic',{drift:true,nitro:'perfect',avoid:true})`);  // a full race driven through the controls
 f.contentWindow.__ev('T.issues.join("\\n")');
 ```
-- **Maps:** `city`, `canyon`, `alpine`, `coast`, `tokyo`, `jungle`, `volcano`, `arctic`, `industrial`, `eifel`, `sakura`, `desert`, `autumn`, `moon`, `tropic`, `savanna`.
+- **Maps:** `city`, `canyon`, `alpine`, `coast`, `tokyo`, `jungle`, `volcano`, `arctic`, `industrial`, `eifel`, `sakura`, `desert`, `autumn`, `moon`, `tropic`, `savanna`, `highland`, `retro`, `bayou`.
 - **`T.probes()` covers:** every ramp, air and ground 360s, gaps, both fork routes, divider crashes, canisters, pads, roadworks, traffic, nitro rams, Shockwave, all nitro types, drift, out of bounds, the cameras and ghost mode.
 - **`T.race(carIdx, mode, opt)`:** checks every frame for NaN values, cars escaping walls, stuck cars and whether the results screen appears.
 
@@ -209,6 +209,14 @@ Gotcha: Rimac material names match the wheel rule (`^rim`), so rename them first
 Mac builds need `identity: '-'` and `hardenedRuntime: false` (already set). Delete removed builds with `rm "${SH:?}"/…` (a safety check blocks a bare `$SH`).
 
 ## Recent history (newest first)
+
+- **Shockwave push, three more maps, boost-pad fix (2026-10-09):**
+  - **Shockwave contact:** while a shockwave runs (`nitroLevel 3`), touching any rival or online player throws it aside with `shove(o, side)`, and takes it down too when knockdowns are on. The blast does the same to everyone in reach (before, with knockdowns off it only slowed AI rivals). AI cars carry `r.shove`, a 16 m/s sideways slide that decays, with no steering back until it's spent, clamped by walls; wrecked ones slide too. Online players get `mpBump` with `lat:±16`.
+  - **Highland Loch** (`highland`, 4.9 km): rain, a wet road, overcast, steep green glens, a zig-zag of switchbacks, a ruined castle (towers and curtain walls), dry-stone walls, sheep and lochs.
+  - **Retro Wave** (`retro`, 4.6 km): square corners. The ground is the canvas grid (`GROUND_LOOK.grid`), with a striped synthwave sun, wireframe mountains and neon pylons. The shortcut is a "hyperlane" across the middle, about 650 m shorter.
+  - **Bayou Nights** (`bayou`, 4.9 km): moonlit night, cypress trees over dark pools, stilt shacks with lantern glows, lanterns on posts, fireflies (`wx:'fireflies'`, additive, rising) and a cliff-edged causeway. A shortcut there would have had to cross the bottom wiggle, so the nitro route goes round outside it and the shortcut cuts inside the eastern bulge.
+  - **Boost pads:** a pad in a ramp's flight path (same lane, up to `T.len+FLY(T)` past the ramp) moves to just past the landing. Two new maps had a start pad that cars flew over.
+  - `VER` 1.10.
 
 - **Three more maps (2026-10-09):**
   - **Lunar Base** (`moon`, 5.8 km): a black sky with stars, grey regolith terrain, craters (flattened torus rims over dark floors), white domes with glowing bands, masts with red lights, and a lit Earth with a blue halo overhead. Base lamps along the track. The crater rim has kerbs on its inside: a twist ramp there rolled cars off a 5 m cliff run-off.
