@@ -1014,6 +1014,11 @@ const ROL=new Float32Array(NS),ROR=new Float32Array(NS);
   for(const [E,RO] of [[EL,ROL],[ER,ROR]])for(let k=0;k<NS;k++){let m=VERGE[E[k]];
     if(m>0)for(let j=-W;j<=W;j++){const v=VERGE[E[(k+j+NS)%NS]]+Math.abs(j)*step*.2;if(v<m)m=v;}RO[k]=m;}}
 const kOf=s=>Math.round(mod(s)/L*NS)%NS;
+// grip: the weather takes some away on a whole map (rain, ice, a cold pass), and the surface under the car more
+// (loose dirt, cobbles). It scales the tyres' limit, so cornering, braking and launch traction all fall with it.
+const WX_GRIP=MAP.wet?.86:MAP_ID==='arctic'?.8:MAP_ID==='alpine'?.9:1,SURF_GRIP=[1,.82,.93],SURF_NAME=['ASPHALT','DIRT','COBBLES'];
+const surfAt=(br,s)=>br>=0?0:SURF[(mod(s)/L*NS|0)%NS];
+const gripAt=(br,s)=>WX_GRIP*SURF_GRIP[surfAt(br,s)];
 const hwAt=(br,s)=>{if(br>=0)return ROAD_HALF;const f=mod(s)/L*NS,i=f|0;return lerp(HW[i%NS],HW[(i+1)%NS],f-i);};
 const edgeAt=(br,s,side)=>br>=0?0:(side>0?ER:EL)[kOf(s)];
 const inGap=(br,s)=>br<0&&GAPK[kOf(s)]===1;
@@ -1069,6 +1074,7 @@ const LOOK=Object.assign({
   retro:{road:.18,verge:['concrete',3,0x7a2a9a],wall:['metal',3,0x6a3a9a]},
   bayou:{road:.28,verge:['grass',3,0x5a7a44],ground:['dirt',7,0x4a5a34],wall:['stonewall',3,0x8a8a70],dirt:'sand',dirtTint:0x5a4430}
 }[MAP.scenery],MAP_ID==='industrial'?{wall:['metal',3,0xc8b8a8],ground:['concrete',7,0x6a6460]}:{});
+const LOOK_DUST=new THREE.Color(LOOK.dirtTint||0x8a6a4a).lerp(new THREE.Color(0xd8c8a8),.12).getHex(); // dust thrown up off dirt
 const roadTexOf=(skip,plain)=>canvasTex(512,512,(g,w,h)=>{
   g.clearRect(0,0,w,h);
   const ux=x=>(x+ROAD_HALF)/(2*ROAD_HALF)*w,keep=x=>skip!=='both'&&Math.sign(x)!==skip;
@@ -2360,7 +2366,9 @@ function initAudio(){
     AU.o1.connect(AU.f);AU.o2.connect(AU.f);AU.f.connect(AU.eg);AU.eg.connect(AU.master);AU.o1.start();AU.o2.start();
     const buf=ctx.createBuffer(1,ctx.sampleRate*2,ctx.sampleRate),d=buf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;AU.noise=buf;
     const mk=(type,freq,q)=>{const s=ctx.createBufferSource();s.buffer=buf;s.loop=true;const f=ctx.createBiquadFilter();f.type=type;f.frequency.value=freq;f.Q.value=q;const g=ctx.createGain();g.gain.value=0;s.connect(f);f.connect(g);g.connect(AU.master);s.start();return g;};
-    AU.ng=mk('bandpass',1400,.8);AU.wg=mk('lowpass',500,.5);AU.sg=mk('bandpass',3200,3);
+    AU.ng=mk('bandpass',1400,.8);AU.wg=mk('lowpass',500,.5);AU.sg=mk('bandpass',3200,3);AU.gg=mk('bandpass',700,.7); // nitro, wind, tyres, gravel
+    // electric motor whine / turbo whistle: one sine, its pitch and level set per drivetrain
+    AU.o3=ctx.createOscillator();AU.o3.type='sine';AU.tg=ctx.createGain();AU.tg.gain.value=0;AU.o3.connect(AU.tg);AU.tg.connect(AU.master);AU.o3.start();
   }catch(e){AU.ctx=null;}
 }
 function sfx(type){
@@ -2369,22 +2377,41 @@ function sfx(type){
     const o=ctx.createOscillator(),g=ctx.createGain();o.type='triangle';const f0=type==='shock'?220:type==='perfect'?660:520;
     o.frequency.setValueAtTime(f0,t);o.frequency.exponentialRampToValueAtTime(f0*2.2,t+.18);g.gain.setValueAtTime(.18,t);g.gain.exponentialRampToValueAtTime(.001,t+.35);o.connect(g);g.connect(AU.master);o.start(t);o.stop(t+.4);
   }
+  if(type==='bov'){ // a turbo's blow-off: a short hiss as the throttle shuts
+    const s=ctx.createBufferSource();s.buffer=AU.noise;const f=ctx.createBiquadFilter();f.type='bandpass';f.frequency.value=2600;f.Q.value=1.4;const g=ctx.createGain();
+    g.gain.setValueAtTime(.09,t);g.gain.exponentialRampToValueAtTime(.001,t+.32);s.connect(f);f.connect(g);g.connect(AU.master);s.start(t,rnd()*1.5);s.stop(t+.35);}
   if(type==='crash'||type==='knock'||type==='shock'||type==='land'){
     const s=ctx.createBufferSource();s.buffer=AU.noise;const f=ctx.createBiquadFilter();f.type='lowpass';f.frequency.value=type==='land'?400:1200;const g=ctx.createGain();
     const v=type==='land'?.25:type==='crash'?.6:.45;g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+(type==='crash'?.9:.4));s.connect(f);f.connect(g);g.connect(AU.master);s.start(t);s.stop(t+1);
     const o=ctx.createOscillator(),og=ctx.createGain();o.frequency.setValueAtTime(140,t);o.frequency.exponentialRampToValueAtTime(40,t+.3);og.gain.setValueAtTime(.35,t);og.gain.exponentialRampToValueAtTime(.001,t+.35);o.connect(og);og.connect(AU.master);o.start(t);o.stop(t+.4);
   }
 }
-const GEARS=[0,62,115,165,215,268,325,999];
+// the engine note by what drives the car. Gears are spaced over the car's own top speed (an electric car has one).
+// na: revs higher and brighter; turbo: a whistle that rises with the revs and a blow-off on each shift and lift;
+// hybrid: a turbo engine with a motor's whine under it at low speed; ev: no gears, just a motor whine and a hum
+const GEARS=[0,.19,.35,.5,.65,.8,.95,9];
+const ENGINE_NOTE={turbo:{f0:48,fr:110,cut:1,vol:.07},na:{f0:56,fr:150,cut:1.35,vol:.075},hybrid:{f0:48,fr:115,cut:1.05,vol:.065},ev:{f0:34,fr:30,cut:.45,vol:.03}};
 function updateAudio(){
-  if(!AU.ctx)return;const t=AU.ctx.currentTime,p=player,racing=G.mode!=='menu';
-  const kmh=p.speed*3.6;let g=0;while(kmh>GEARS[g+1])g++;const rpm=.25+.75*clamp((kmh-GEARS[g])/(GEARS[g+1]-GEARS[g]),0,1);
-  const f=48+rpm*110+(p.nitroLevel?18:0);
-  AU.o1.frequency.setTargetAtTime(f,t,.04);AU.o2.frequency.setTargetAtTime(f*.5,t,.04);AU.f.frequency.setTargetAtTime(350+rpm*1900+(p.nitroLevel?800:0),t,.05);
-  AU.eg.gain.setTargetAtTime(racing&&!G.paused?.07:0,t,.1);
+  if(!AU.ctx)return;const t=AU.ctx.currentTime,p=player,racing=G.mode!=='menu'&&!G.paused;
+  const kind=DRIVE[p.spec.shape.model]||'turbo',E=ENGINE_NOTE[kind],topK=Math.max(150,p.spec.top*3.6+20),kmh=p.speed*3.6;
+  if(AU.kind!==kind){AU.kind=kind;AU.o1.type=kind==='ev'?'triangle':'sawtooth';AU.o2.type=kind==='ev'?'sine':'square';}
+  let g=0,rpm;if(kind==='ev')rpm=.15+.85*clamp(kmh/topK,0,1);
+  else{while(kmh>GEARS[g+1]*topK)g++;rpm=.25+.75*clamp((kmh-GEARS[g]*topK)/((GEARS[g+1]-GEARS[g])*topK),0,1);}
+  // a shift: the note dips for a moment, and a turbo blows off
+  if(AU.gear!==undefined&&g>AU.gear&&racing&&kind!=='ev'){AU.eg.gain.setValueAtTime(E.vol*.35,t);if(kind!=='na')sfx('bov');}
+  const brk=p.brakeT>.14;if(brk&&!AU.brk&&racing&&p.speed>25&&(kind==='turbo'||kind==='hybrid'))sfx('bov');AU.brk=brk;AU.gear=g;
+  const f=E.f0+rpm*E.fr+(p.nitroLevel?18:0);
+  AU.o1.frequency.setTargetAtTime(f,t,.04);AU.o2.frequency.setTargetAtTime(f*.5,t,.04);AU.f.frequency.setTargetAtTime((350+rpm*1900+(p.nitroLevel?800:0))*E.cut,t,.05);
+  AU.eg.gain.setTargetAtTime(racing?E.vol*(brk?.7:1):0,t,.1);
+  // the sine: a motor's whine (ev, and a hybrid's at low speed) or a turbo's whistle
+  const wh=kind==='ev'?[300+kmh*6,.05]:kind==='hybrid'?[260+kmh*5,.03*clamp(1-kmh/120,0,1)]:kind==='turbo'?[1800+rpm*2600,brk?0:.008*rpm]:[0,0];
+  if(wh[1]>0)AU.o3.frequency.setTargetAtTime(wh[0],t,.05);AU.tg.gain.setTargetAtTime(racing?wh[1]:0,t,.08);
   AU.ng.gain.setTargetAtTime(racing&&!G.paused&&p.nitroLevel?.1+p.nitroLevel*.03:0,t,.08);
   AU.wg.gain.setTargetAtTime(racing&&!G.paused?clamp(p.speed/100,0,1)*.12:0,t,.2);
-  AU.sg.gain.setTargetAtTime(racing&&!G.paused&&p.drift?.05:0,t,.06);
+  // tyres: a drift screams; near the grip limit in a hard bend they squeal; dirt crunches under the wheels
+  const sq=p.drift?.05:!p.air?clamp(((p.betaAbs||0)-.05)/.1,0,1)*.035:0;
+  AU.sg.gain.setTargetAtTime(racing&&!G.paused?sq:0,t,.06);
+  AU.gg.gain.setTargetAtTime(racing&&!G.paused&&p.surf===1&&!p.air?clamp(p.speed/40,0,1)*.09:0,t,.1);
 }
 function setMuted(m){AU.muted=m;store.set('rn-muted',m?'1':'0');if(AU.master)AU.master.gain.value=m?0:.5;}
 
@@ -2499,8 +2526,14 @@ const CARS=[
 // class balance: each car's power (its whole pull curve) and, 60% as much, its top speed, scaled so that every car in a
 // class laps within about 1% of the others (a bot lap from the grid, with drift and Perfect nitro, on six maps), while
 // each keeps its own character: launch against top end, grip against weight. Re-tune with the sim in the handoff.
-const BAL={rx7:0.959,z370:0.965,mx5:1.048,gr86:1.01,golf:0.991,mini:1.047,silvia:0.971,yaris:1.019,focusrs:0.994,m2:0.958,civic:0.965,mustang:1.025,supra:1.026,wrx:1.034,nsx:1.011,hellcat:0.988,camaro:0.985,m4:1.061,c8:0.979,models:0.953,rs6:0.996,taycan:1.078,gtr:0.979,p911:1.031,r8:1.022,vantage:0.99,amggt:0.991,f812:0.984,fordgt:0.982,f8:0.99,p911t:0.999,huracan:1.003,sf90:1.028,mc720:0.995,revuelto:1.016,huayra:1.001,jesko:0.962,laferrari:1.02,p1:1.027,chiron:0.949,senna:1.065,svj:0.999,nevera:0.915,
-  ae86:1.082,s2000:1.005,rx8:0.994,fiestast:1.082,integra:1.025,rs3:0.928,elantran:1.021,a45s:0.959,evox:1.02,caymangt4:1.049,emira:1.066,mc20:0.958,m5cs:0.998,z06:1.043,f296:0.983,artura:0.985,gt2rs:0.994,valhalla:1.031,amgone:1.012,p918:1.05,sp3:1.035,regera:0.905};
+const BAL={rx7:0.959,z370:0.978,mx5:1.028,gr86:1.013,golf:0.996,mini:1.048,silvia:0.974,yaris:1.014,ae86:1.083,
+  s2000:1.009,fiestast:1.083,integra:1.025,focusrs:0.994,m2:0.961,civic:0.958,mustang:1.022,supra:1.038,wrx:1.013,
+  rs3:0.938,elantran:1.021,a45s:0.95,a110:1.02,evox:1.02,nsx:1.003,hellcat:0.977,camaro:0.985,m4:1.061,c8:0.999,
+  models:0.953,rs6:0.983,taycan:1.085,gtr:0.979,caymangt4:1.024,emira:1.066,mc20:0.958,m5cs:1.01,ftype:0.994,
+  vantage:1.006,amggt:0.991,p911:1.031,r8:1.002,f812:0.972,fordgt:0.98,f8:0.969,p911t:0.998,huracan:1.003,mc720:1.001,
+  z06:1.054,f296:0.993,artura:1.002,gt2rs:0.997,dbsgt:0.996,sf90:1.017,revuelto:1.016,huayra:1.001,jesko:0.957,
+  laferrari:1.012,p1:1.027,chiron:0.94,senna:1.102,svj:1.024,nevera:0.904,valhalla:1.031,amgone:1.023,p918:1.061,
+  sp3:1.042,regera:0.899};
 CARS.forEach(c=>{const k=BAL[c.shape.model]||1;c.bal=k;c.top*=1+(k-1)*.6;});
 const CLASSES=['D','C','B','A','S'];
 const CLASS_NAME={D:'Class D · street',C:'Class C · hot hatch and muscle',B:'Class B · sports',A:'Class A · supercar',S:'Class S · hypercar'};
@@ -2597,10 +2630,17 @@ const MODES={
   rush:{name:'Knockdown Rush',blurb:'90 seconds to take down as many cars as you can. Rivals get back up, so keep hunting.'}
 };
 const ELIM_FIRST=30,ELIM_EVERY=20,RUSH_TIME=90;
-const SET={slip:store.get('rn-slip')!=='0',knock:store.get('rn-knock')!=='0',contact:store.get('rn-contact')!=='0'};
+const SET={slip:store.get('rn-slip')!=='0',knock:store.get('rn-knock')!=='0',contact:store.get('rn-contact')!=='0',diff:['easy','normal','hard'].includes(store.get('rn-diff'))?store.get('rn-diff'):'normal'};
+// how the rivals race at each difficulty. pace: m/s on their target speed; corner: how close to the limit they take
+// bends; band: how far they ease off when ahead / push when behind; nitro: how often they save it for a straight or a
+// fight (otherwise they fire it whenever); block: how often a leader moves over to cover a faster car behind; fork:
+// how often they pick the shorter route; slip: mistakes (running wide) per second in a bend
+const DIFF={easy:{pace:-3.5,corner:.92,band:[-.2,.1],nitro:.2,block:0,fork:.5,slip:.1},
+  normal:{pace:0,corner:1,band:[-.14,.17],nitro:.6,block:.3,fork:.65,slip:.04},
+  hard:{pace:2.2,corner:1.04,band:[-.07,.2],nitro:1,block:.7,fork:.9,slip:.012}};
 G.modeSel=MODES[store.get('rn-mode')]?store.get('rn-mode'):'classic';G.elimOrder=[];G.elimT=0;G.rushT=0;
 // Knockdown Rush always has contact; knockdowns need contact.
-function rulesFor(m){const rush=m==='rush',contact=rush||SET.contact;return {slip:SET.slip,contact,knock:rush||(contact&&SET.knock)};}
+function rulesFor(m){const rush=m==='rush',contact=rush||SET.contact;return {slip:SET.slip,contact,knock:rush||(contact&&SET.knock),diff:SET.diff};}
 G.rules=rulesFor(G.modeSel);
 let playerCar=null;
 const player={name:'You',car:null,spec:CARS[G.carIdx],isPlayer:true,dist:0,s:0,br:-1,bs:0,x:0,y:0,vy:0,vx:0,speed:0,air:false,ramp:null,wreck:0,ghost:0,
@@ -2856,7 +2896,7 @@ function resetRace(){
   G.laps=m==='elim'||m==='rush'?Infinity:G.lapsSel;G.raceTime=0;G.countdown=3;G.goT=0;G.finishT=0;G.elimT=ELIM_FIRST;G.elimOrder=[];G.rushT=RUSH_TIME;
   const grid=[[-6,LANES[1]],[-6,LANES[2]],[-15,LANES[1]],[-15,LANES[2]],[-24,LANES[1]]];
   assignRivals();
-  rivals.forEach((r,i)=>{r.br=-1;r.bs=0;r.forks={};r.skill=(r.spec.top+player.spec.top)/2-1.2+i*.3;Object.assign(r,{dist:grid[i][0],x:grid[i][1],y:0,vy:0,vx:0,speed:0,air:false,ramp:null,wreck:0,nitroT:0,finished:false,finishTime:0,yaw:0,roll:0,stunt:null,spin:null,padT:0});r.lane=LANES.indexOf(r.x);r.s=mod(r.dist);r.car.body.rotation.set(0,0,0);r.car.body.position.y=0;
+  rivals.forEach((r,i)=>{r.br=-1;r.bs=0;r.forks={};Object.assign(r,{tank:.2,mistake:0,blockCD:3,bump:0,tactic:undefined,thinkT:rnd()*.5});r.skill=(r.spec.top+player.spec.top)/2-1.2+i*.3;Object.assign(r,{dist:grid[i][0],x:grid[i][1],y:0,vy:0,vx:0,speed:0,air:false,ramp:null,wreck:0,nitroT:0,finished:false,finishTime:0,yaw:0,roll:0,stunt:null,spin:null,padT:0});r.lane=LANES.indexOf(r.x);r.s=mod(r.dist);r.car.body.rotation.set(0,0,0);r.car.body.position.y=0;
     r.out=m==='time';r.elim=false;r.car.g.visible=!r.out;});
   Object.assign(player,{br:-1,bs:0,forkHint:{},purple:false,dist:-24,x:LANES[2],y:0,vy:0,vx:0,speed:0,air:false,ramp:null,wreck:0,ghost:0,nitro:.35,nitroLevel:0,drift:false,driftAng:0,slipA:0,wallT:0,slideV:0,driftArm:-9,steerS:0,hd:0,hdT:0,lat:0,lng:0,lastSpeed:0,yaw:0,roll:0,stunt:null,spin:null,padT:0,tricks:[],lastBrakeTap:-9,brakeT:0,startTap:null,finished:false,finishTime:0,lastLap:0,stats:newStats(),
     elim:false,lapStart:0,lapTimes:[],slipT:0,slip:0,slipOn:false});
@@ -3116,8 +3156,10 @@ function carPhysics(p,dt,steer,brake,racing){
     const want=into>0?(brake?.8:.68):Math.max(0,Math.abs(p.betaT)-2.6*dt);
     p.betaT=-p.driftDir*(into>0?lerp(Math.abs(p.betaT),want,Math.min(1,8*dt)):want);}
   p.gripR+=((p.drift?.5:1)-p.gripR)*Math.min(1,(p.drift?6:2.5)*dt);
-  // engine and brakes
-  const top=sp.top+NB[p.nitroLevel]+(p.padT>0?14:0)+p.slip*4,fin=G.mode==='finish';
+  // the surface under the car (eased, so crossing onto dirt is felt over a car length, not as a step)
+  p.surf=surfAt(p.br,p.s);const gS=gripAt(p.br,p.s);p.surfG=p.surfG===undefined?gS:p.surfG+(gS-p.surfG)*Math.min(1,5*dt);const g=p.surfG;
+  // engine and brakes (loose dirt drags a little off the top speed)
+  const top=(sp.top+NB[p.nitroLevel]+(p.padT>0?14:0)+p.slip*4)*(p.surf===1?.97:1),fin=G.mode==='finish';
   const N=4,h=dt/N;let latSum=0,beta=0;
   for(let i=0;i<N;i++){
     const hx=Math.cos(p.psi),hz=Math.sin(p.psi),nx=-hz,nz=hx;
@@ -3126,8 +3168,8 @@ function carPhysics(p,dt,steer,brake,racing){
     if(fin){const tgt=55;fx=clamp((tgt-u)*1.2,-20,12);}
     // brake: slows the car while it's rolling forward; once it's stopped, holding brake reverses (steering works backwards
     // too, like a real car), so a car stopped against a wall can always back off it
-    else if(brake&&!p.drift&&p.brakeT>.14)fx=u>1?-46*(1.12-.12*sp.mass):u>-12?-14:0;
-    else if((p.drift?V:u)<top){const uu=p.drift?V:u;fx=p.nitroLevel?NT[p.nitroLevel].push*sp.accel:p.padT>0?34*sp.accel:engineAcc(sp,uu,top);}
+    else if(brake&&!p.drift&&p.brakeT>.14)fx=u>1?-46*(1.12-.12*sp.mass)*g:u>-12?-14:0;
+    else if((p.drift?V:u)<top){const uu=p.drift?V:u;fx=p.nitroLevel?NT[p.nitroLevel].push*sp.accel:p.padT>0?34*sp.accel:Math.min(engineAcc(sp,uu,top),(4.5+.0006*uu*uu)*9.8*g);} // (the tyres can only put down so much)
     else if(!(p.air&&p.purple))fx=-(u-top)*1.4;
     if(p.air){ // no tyres in the air: the car flies on where it was going (nothing bends it toward the road) and eases
       // round to face where it's flying (no spin carried over from a drift), with a touch of air control
@@ -3138,7 +3180,7 @@ function carPhysics(p,dt,steer,brake,racing){
     const dmax=(.06+.32/(1+Math.max(0,u)/6))*(.85+.15*hand)*(p.drift?1.8:1);
     p.delta=p.drift?p.steerS*dmax:clamp(Math.atan((p.rTp||0)*2*PH.ab/Math.max(u,4)),-dmax*1.6,dmax*1.6);
     // grip: more with speed (downforce), more with handling
-    const mu=(4.5+.0006*u*u)*(.8+.2*hand)*9.8,Ff=mu*.5,Fr=mu*.5*p.gripR*(p.drift?1:1.1);
+    const mu=(4.5+.0006*u*u)*(.8+.2*hand)*9.8*g,Ff=mu*.5,Fr=mu*.5*p.gripR*(p.drift?1:1.1);
     const ua=Math.max(Math.abs(u),4);
     const af=Math.atan2(w+PH.ab*p.yawR,ua)-p.delta,ar=Math.atan2(w-PH.ab*p.yawR,ua);
     let pathAx=0,pathAz=0,wT=0;
@@ -3149,7 +3191,7 @@ function carPhysics(p,dt,steer,brake,racing){
       const capD=mu*1.05*1.3,aLat=clamp(V*wT,-capD,capD),vl=Math.max(V,1);
       pathAx=-p.wvz/vl*aLat;pathAz=p.wvx/vl*aLat;
       const bb=Math.atan2(w,Math.max(u,1));
-      pathAx-=p.wvx/vl*(6+30*bb*bb);pathAz-=p.wvz/vl*(6+30*bb*bb);fx*=Math.max(.3,Math.cos(bb));
+      const scrub=(6+30*bb*bb)*(.55+.45*g);pathAx-=p.wvx/vl*scrub;pathAz-=p.wvz/vl*scrub; // (a slide on a loose surface scrubs off less)fx*=Math.max(.3,Math.cos(bb));
     }else{ // gripping: the tyres pull the car's path in line with its nose, up to the grip limit; past it the car slides
       const cap=mu*1.05;fy=clamp(-w*30,-cap,cap);fx-=Math.abs(fy)/cap*Math.abs(w)*.6;
     }
@@ -3202,6 +3244,7 @@ function carPhysics(p,dt,steer,brake,racing){
     if(hit>7&&p.drift)endDrift();
   }else if(p.wallT>0)p.wallT=Math.max(0,p.wallT-dt);
   // outputs for the rest of the game
+  p.betaAbs=Math.abs(beta);
   const V=Math.hypot(p.wvx,p.wvz),hx=Math.cos(p.psi),hz=Math.sin(p.psi);
   p.speed=p._spd=V;
   p.vx=p.wvx*t.rx+p.wvz*t.rz;
@@ -3211,6 +3254,14 @@ function carPhysics(p,dt,steer,brake,racing){
   if(dt>0)p.lng+=((V-(p.lastSpeed||0))/dt-p.lng)*Math.min(1,5*dt);if(!isFinite(p.lng))p.lng=0;p.lastSpeed=V;
   // suspension: the body sits on a spring that landings and bumps compress (heavier cars sink further)
   p.sy=p.sy||0;p.svy=p.svy||0;p.svy+=(-120*p.sy-11*p.svy)*dt;p.sy+=p.svy*dt;
+}
+// what the wheels throw up: dust off dirt, spray off a wet road (any racer, on the ground and moving)
+function surfaceFx(e){
+  if(e.air||e.y>.3||e.speed<14||e.wreck>0)return;const sf=e.surf!==undefined?e.surf:surfAt(e.br,e.s),wet=MAP.wet;
+  if(sf!==1&&!wet)return;if(rnd()>(e.isPlayer?.75:.35)*clamp(e.speed/45,0,1))return;
+  sampleE(e);const side=rnd()<.5?-.8:.8,p=TS.p.clone().addScaledVector(TS.r,e.x+side).addScaledVector(TS.f,-2).addScaledVector(TS.u,.25);
+  const v=TS.f.clone().multiplyScalar(-e.speed*.15).add(new V3((rnd()-.5)*2,1+rnd()*1.5,(rnd()-.5)*2));
+  if(sf===1)emit(p,v,1.1,.8,4.2,LOOK_DUST,false);else emit(p,v,.45,.4,2,0xc8d4e4,false);
 }
 function updatePlayer(dt){
   const p=player,st=p.stats,racing=G.mode==='race';
@@ -3249,6 +3300,10 @@ function updatePlayer(dt){
   if(p.padT>0)p.padT-=dt;
   p.brakeT=brake?p.brakeT+dt:0;
   carPhysics(p,dt,steer,brake,racing);
+  // tell the driver when the grip changes: the weather once at the start, then each change of surface
+  if(racing){if(!p.wxTold&&G.raceTime>1.2){p.wxTold=true;if(WX_GRIP<1)toast(MAP.wet?'WET ROAD':MAP_ID==='arctic'?'ICE':'COLD ROAD','plain','LESS GRIP · BRAKE EARLIER');}
+    if(p.surf!==p.surfWas){if(p.surfWas!==undefined&&p.surf!==0&&G.raceTime>2)toast(SURF_NAME[p.surf],'plain',p.surf===1?'LOOSE SURFACE · LESS GRIP':'BUMPY · LESS GRIP');p.surfWas=p.surf;}}
+  surfaceFx(p);
   if(p.air&&p.purple&&rnd()<.6){sampleE(p);emit(TS.p.clone().addScaledVector(TS.r,p.x).addScaledVector(TS.u,p.y+.6).addScaledVector(TS.f,-2.4),TS.f.clone().multiplyScalar(-p.speed*.3),.4,.8,.1,0xb678ff,true);}
   st.top=Math.max(st.top,p.speed);
 
@@ -3308,13 +3363,16 @@ function updatePlayer(dt){
 }
 
 // ---------------------------------------------------------------- update: rivals
-function lookAhead(br,pos,x,range){let best=null,bd=range;
+function lookAhead(br,pos,x,range,self){let best=null,bd=range;
+  // other racers count when they're slower: a rival plans a way past them as it would round a parked car
+  if(self)for(const o of [player,...rivals]){if(o===self||o.out||o.elim||o.br!==br||o.y>1.2||o.speed>self.speed-.5)continue;
+    const d=dAlong(br,posOf(o),pos);if(d>2&&d<bd&&Math.abs(o.x-x)<2.4){bd=d;best=o;}}
   for(const t of traffic){if(t.down||t.flying>0||t.br!==br)continue;const d=dAlong(br,posOf(t),pos);if(d>0&&d<bd&&Math.abs(t.x-x)<(t.w/2+1.4)){bd=d;best=t;}}
   for(const o of OBST){if(o.dead||o.br!==br)continue;const d=dAlong(br,o.s,pos);if(d>0&&d<bd&&Math.abs(o.x-x)<(o.w/2+1.4)){bd=d;best={speed:0};}}return best?{t:best,d:bd}:null;}
 // fastest a rival will take the road ahead: it brakes in time for each bend (grip close to a good drift)
 function cornerSpeed(r){let v=999;const pos=posOf(r),len=r.br<0?Infinity:BR[r.br].len;
   for(let d=0;d<=160;d+=10){if(pos+d>len)break;sampleAt(r.br,pos+d);const c=Math.abs(TS.c);if(c<1e-4)continue;
-    const ch=(.8+.2*r.spec.handling)*1.05,den=c-.00588*ch,vc=den>0?Math.sqrt(44.1*ch/den):999;v=Math.min(v,Math.sqrt(vc*vc+2*30*d));}
+    const gr=gripAt(r.br,pos+d),ch=(.8+.2*r.spec.handling)*1.05*gr,den=c-.00588*ch,vc=den>0?Math.sqrt(44.1*ch/den):999;v=Math.min(v,Math.sqrt(vc*vc+2*30*gr*d));}
   return v;}
 function updateRivals(dt){
   const racing=G.mode==='race'||G.mode==='finish';
@@ -3328,23 +3386,39 @@ function updateRivals(dt){
       advance(r,r.speed*dt);continue;
     }
     if(!racing)continue;
-    let target=r.skill;
-    if(r.nitroT>0){r.nitroT-=dt;target+=14*(.8+.2*r.spec.nitro);}else if(rnd()<dt*.06)r.nitroT=2+rnd()*1.8;
+    const D=DIFF[G.rules.diff]||DIFF.normal,cs=cornerSpeed(r)*D.corner;
+    let target=r.skill+D.pace;
+    // nitro: a tank that fills over time and faster in a slide or in the air. A smart rival saves it for a long run
+    // ahead or a fight with a car close by; otherwise it fires whenever the tank is half full
+    r.tank=Math.min(1,(r.tank||0)+(.045+(Math.abs(r.slide||0)>.3?.1:0)+(r.air?.1:0))*dt);
+    r.thinkT=(r.thinkT||0)-dt;const think=r.thinkT<=0;if(think)r.thinkT=.5;
+    if(r.nitroT>0){r.nitroT-=dt;target+=14*(.8+.2*r.spec.nitro);}
+    else if(think&&r.tank>=.45){const gp=Math.abs(dAlong(r.br,posOf(player),posOf(r)));
+      if(r.tactic===undefined)r.tactic=rnd()<D.nitro;
+      if(r.tactic?(cs>r.speed+22||gp<18&&cs>r.speed+8):rnd()<.25){r.nitroT=1.2+r.tank*2.6;r.tank=0;r.tactic=undefined;}}
     if(r.padT>0){r.padT-=dt;target+=14;}
+    // racecraft: a leader with a faster car closing behind moves over to cover it (once, on a straight, not near a fork);
+    // and now and then a rival runs wide in a bend and loses a little speed
+    r.blockCD=(r.blockCD||0)-dt;
+    if(think&&D.block&&r.blockCD<=0&&player.br===r.br&&!player.out&&cs>r.speed+5){const d=dAlong(r.br,posOf(r),posOf(player));
+      if(d>4&&d<30&&player.speed>r.speed+2&&Math.abs(player.x-r.x)>1.6&&!BR.some(b=>{const k=wrapD(b.s0,r.s);return k>-b.span&&k<200;})){
+        r.blockCD=5;if(rnd()<D.block){r.lane=[0,1,2,3].reduce((a,i)=>Math.abs(laneX(r,i)-player.x)<Math.abs(laneX(r,a)-player.x)?i:a,r.lane);r.laneCD=2.5;}}}
+    if(r.mistake>0){r.mistake-=dt;target*=.86;}
+    else if(think&&!r.air){sampleAt(r.br,posOf(r)+25);const c=TS.c;if(Math.abs(c)>1/160&&rnd()<D.slip*.5){r.mistake=1.1;r.bump=Math.sign(c)*(3+rnd()*2);}}
     if(G.rules.slip)for(const o of [player,...rivals]){if(o===r||o.out||o.elim||o.br!==r.br)continue;const d=dAlong(r.br,posOf(o),posOf(r));if(d>3.5&&d<22&&Math.abs(o.x-r.x)<2.3){target+=3;break;}}
-    const gap=r.dist-player.dist;target*=1+clamp(-gap/380,-.14,.17);
+    const gap=r.dist-player.dist;target*=1+clamp(-gap/380,D.band[0],D.band[1]);
     if(r.finished)target=55;
-    target=Math.min(target,cornerSpeed(r)*(r.lane%2?1:.97));
+    target=Math.min(target,cs*(r.lane%2?1:.97)*(r.mistake>0?.9:1));
     r.speed+=(target-r.speed)*(target>r.speed?.5:1.4)*dt;
     r.laneCD-=dt;
     // forks: each rival picks a route per lap and moves over in good time
     const lapK=Math.floor(Math.max(0,r.dist)/L);if(r.forkLap!==lapK){r.forkLap=lapK;r.forks={};}
     let forced=false;
-    if(r.br<0)for(const b of BR){const d=wrapD(b.s0,r.s);if(d>-b.span*.3&&d<170){if(r.forks[b.i]===undefined)r.forks[b.i]=rnd()<.5;
+    if(r.br<0)for(const b of BR){const d=wrapD(b.s0,r.s);if(d>-b.span*.3&&d<170){if(r.forks[b.i]===undefined){const shorter=b.len<b.span;r.forks[b.i]=rnd()<D.fork?shorter:!shorter;} // (smarter rivals take the shorter way)
       const want=r.forks[b.i]?b.side:-b.side,ok=want>0?[2,3]:[0,1];if(!ok.includes(r.lane))r.lane=ok[r.lane<2?(want>0?0:1):(want>0?0:1)];forced=true;}}
-    const blk=lookAhead(r.br,posOf(r),r.x,60);
+    const blk=lookAhead(r.br,posOf(r),r.x,60,r);
     if(blk&&r.laneCD<=0&&!forced){
-      let best=r.lane,bd=-1;for(let i=0;i<4;i++){const la=lookAhead(r.br,posOf(r),laneX(r,i),80);const d=(la?la.d:120)-Math.abs(i-r.lane)*6;if(d>bd){bd=d;best=i;}}
+      let best=r.lane,bd=-1;for(let i=0;i<4;i++){const la=lookAhead(r.br,posOf(r),laneX(r,i),80,r);const d=(la?la.d:120)-Math.abs(i-r.lane)*6;if(d>bd){bd=d;best=i;}}
       r.lane=best;r.laneCD=.7+rnd()*.5;
     }
     // on the main road at a fork they want: aim at the branch's lanes as it peels away
@@ -3352,9 +3426,11 @@ function updateRivals(dt){
     // thrown aside by a shockwave: it slides out across the road (no steering back until the push has spent itself),
     // easing off, until a wall or the edge stops it
     if(r.shove){r.vx=r.shove;r.x+=r.shove*dt;r.shove*=Math.exp(-2.5*dt);if(Math.abs(r.shove)<1)r.shove=0;const [lo,hi]=limits(r);if(r.x<lo||r.x>hi){r.x=clamp(r.x,lo,hi);r.shove=0;}}
-    else{r.vx=clamp((tx-r.x)*2.4,-12,12);r.x+=r.vx*dt;}
+    else{r.vx=clamp((tx-r.x)*2.4,-12,12)*(r.bump?.25:1)+(r.bump||0);r.x+=r.vx*dt; // (a bump from another car: thrown off line, then back)
+      if(r.bump){r.bump*=Math.exp(-3.5*dt);if(Math.abs(r.bump)<.4)r.bump=0;const [lo,hi]=limits(r);if(r.x<lo||r.x>hi){r.x=clamp(r.x,lo,hi);r.bump=0;r.speed*=.97;}}}
     sampleE(r);const rc=TS.c;r.slide=lerp(r.slide||0,clamp((Math.abs(rc)*r.speed*r.speed-55)/110,0,.85)*Math.sign(rc),Math.min(1,dt*4));
     advance(r,r.speed*dt/clamp(1+rc*r.x,.6,1.6));forkCheck(r);
+    surfaceFx(r);
     const ev=rampStep(r,dt);
     if(ev&&ev.launch){r.stunt=ev.r.T.roll?{t:'roll',dir:ev.r.flip}:edgeRoll(ev.r,r.x-ev.r.x);
       if(r.airMax>.8&&rnd()<.45)r.spin={dir:rnd()<.5?-1:1,t:0,dur:.55};}
@@ -3429,11 +3505,25 @@ function collisions(){
     }
     if(p.nitroLevel===3){const sg=Math.sign(c.dx)||Math.sign(o.x-p.x)||1;shove(o,sg);if(G.rules.knock)knockdown(o,'shock');continue;} // a shockwave clears whatever it touches
     if(G.rules.knock&&(landing||p.nitroLevel>0&&(ram||swipe))){knockdown(o,landing?'air':'slam');continue;}
-    // bump a rival
-    if(side){const ov=c.wd-Math.abs(c.dx),sg=Math.sign(c.dx)||1;const pw=clamp(.6/p.spec.mass,.3,.75);p.x-=sg*ov*pw;if(!o.remote)o.x+=sg*ov*(1-pw)+(slam?sg*.6:0);else mpBump(o,{lat:sg*3*(slam?1.5:1)});pushLat(p,-sg*3);o.laneCD=.3;G.shake=Math.max(G.shake,.25);}
-    else if(c.ds>0){const v0=p.speed;p.speed=Math.max(Math.min(p.speed,o.speed-1),p.speed*.94);o.speed=Math.max(o.speed,v0*.92);mpBump(o,{fwd:+(v0*.92).toFixed(1)});nudge(p,-(c.ln-c.ds));G.shake=Math.max(G.shake,.25);}
-    else{o.speed=Math.min(o.speed,p.speed-1);nudge(o,-(c.ln+c.ds));}
+    // bump a rival: momentum by weight. The lighter car gives way more, and how hard you came across (or up behind)
+    // sets how hard both are thrown. A rival is knocked off its line and steers back once the push has spent itself.
+    const mp=p.spec.mass,mo=o.spec?o.spec.mass:mp,pw=mo/(mp+mo);
+    if(side){const ov=c.wd-Math.abs(c.dx),sg=Math.sign(c.dx)||1,rel=Math.max(0,(p.vx-(o.vx||0))*sg),kick=2.4+rel*.9+(slam?3:0);
+      p.x-=sg*ov*pw;pushLat(p,-sg*kick*pw);
+      if(!o.remote){o.x+=sg*ov*(1-pw);o.bump=sg*kick*(1-pw)*1.6;o.laneCD=.6;}else mpBump(o,{lat:+(sg*kick*(1-pw)*1.6).toFixed(1)});
+      p.speed*=1-.012*pw;G.shake=Math.max(G.shake,clamp(rel/20,.25,.6));if(rel>4)sfx('knock');}
+    else if(c.ds>0){const v0=p.speed,rel=Math.max(0,v0-o.speed);p.speed=Math.max(v0-rel*pw*1.15-.5,v0*.85);o.speed=Math.max(o.speed,o.speed+rel*(1-pw)*.9);
+      mpBump(o,{fwd:+o.speed.toFixed(1)});nudge(p,-(c.ln-c.ds));G.shake=Math.max(G.shake,clamp(rel/25,.25,.6));if(rel>5)sfx('knock');}
+    else{const rel=Math.max(0,o.speed-p.speed);o.speed-=rel*(1-pw)*1.15+.5;p.speed+=rel*pw*.8;nudge(o,-(c.ln+c.ds));if(rel>5){G.shake=Math.max(G.shake,.35);sfx('knock');}}
   }
+  // rivals touch each other too: side by side they lean on each other by weight, and one that runs up behind another
+  // is held up (and looks for a way past)
+  for(let i=0;i<rivals.length;i++){const a=rivals[i];if(a.out||a.remote||a.wreck>0||a.y>1.2||a.finished)continue;
+    for(let j=i+1;j<rivals.length;j++){const b=rivals[j];if(b.out||b.remote||b.wreck>0||b.y>1.2||b.finished)continue;
+      const c=overlap(a,b);if(!c)continue;const ma=a.spec.mass,mb=b.spec.mass,wa=mb/(ma+mb);
+      if(Math.abs(c.dx)>c.wd-.85&&Math.abs(c.ds)<c.ln-.9){const ov=c.wd-Math.abs(c.dx),sg=Math.sign(c.dx)||1;a.x-=sg*ov*wa;b.x+=sg*ov*(1-wa);
+        a.bump=-sg*3*wa;b.bump=sg*3*(1-wa);a.laneCD=b.laneCD=.5;}
+      else{const [bk,fr]=c.ds>0?[a,b]:[b,a];bk.speed=Math.min(bk.speed,fr.speed-.5);nudge(bk,-(c.ln-Math.abs(c.ds)));bk.laneCD=Math.min(bk.laneCD,.1);}}}
   // rivals plough parked traffic out of the way too
   for(const r of rivals){if(r.out||r.wreck>0||r.y>1.2)continue;
     for(const t of traffic){if(t.down||t.flying>0)continue;const c=overlap(r,t);if(!c||c.ds<=0)continue;
@@ -3448,12 +3538,15 @@ function poseRacer(e,dt){
   b.position.y=e.y;
   let yaw=-Math.atan2(e.vx,Math.max(e.speed,8))*1.4,roll=0,pitch=e.air?clamp(-e.vy*.02,-.25,.25):(e.ramp?-.15:0);
   if(!e.isPlayer&&e.slide)yaw+=e.slide;
+  if(!e.isPlayer&&!e.remote&&!e.air){sampleE(e);const aL=TS.c*e.speed*e.speed;e.rollV=lerp(e.rollV||0,clamp(aL*.003,-.09,.09),Math.min(1,dt*6));roll=e.rollV;
+    const dv=(e.speed-(e.lastV||e.speed))/Math.max(dt,1e-3);e.lastV=e.speed;e.pitchV=lerp(e.pitchV||0,clamp(-dv*.0017,-.05,.05),Math.min(1,dt*5));pitch+=e.pitchV;}
   if(e.isPlayer)b.position.y=e.y+clamp(e.sy||0,-.35,.25);
   if(e.isPlayer){
     // nose leads the turn: yaw shows where the car is pointed plus a bit of where the wheel is asking it to go
     yaw=e.visYaw||0;e.driftAng=0;
-    roll=clamp(-(e.lat||0)*.0022,-.075,.075);
-    if(!e.air&&!e.ramp)pitch=clamp(-(e.lng||0)*.0012,-.035,.05);
+    // the body leans out of a bend and dips under braking (a heavier car a little more), and drops on landing
+    const sm=.85+.15*e.spec.mass;roll=clamp(-(e.lat||0)*.003*sm,-.1,.1);
+    if(!e.air&&!e.ramp)pitch=clamp(-(e.lng||0)*.0017*sm,-.05,.07);
     c.wheels.forEach(w=>{if(w.userData.front)w.rotation.y=-(e.delta||0)*1.4;});
   }
   if(e.stunt&&e.air&&e.stunt.t!=='jump'){
@@ -3551,7 +3644,9 @@ function cameraFollow(dt){
   }
   camera.position.copy(camPos);
   // shake is a smooth wobble (a fresh random jolt every frame reads as the screen glitching)
-  const sh=Math.min(G.shake,1)*.16+NT[p.nitroLevel].push/1500,wt=G.t*31;
+  // plus a fine buzz that grows with speed, and more on a rough surface (cobbles, dirt), so speed is felt as well as seen
+  const buzz=G.mode==='race'&&!p.air&&!C.fp?clamp((p.speed-50)/40,0,1)*.022+(p.surf?(p.surf===1?.035:.022)*clamp(p.speed/40,0,1):0):0;
+  const sh=Math.min(G.shake,1)*.16+NT[p.nitroLevel].push/1500+buzz,wt=G.t*31;
   if(sh>0){camera.position.addScaledVector(r,(Math.sin(wt*1.07)+Math.sin(wt*.61+1.3))*sh*.5).addScaledVector(u,(Math.sin(wt*.93+.4)+Math.sin(wt*.53+2.1))*sh*.4);}
   G.shake=Math.max(0,G.shake-dt*2.2);
   camera.lookAt(camLook);
@@ -3738,17 +3833,18 @@ Object.entries(MODES).forEach(([id,md])=>{const b=document.createElement('button
 const OPTS=[
   {key:'slip',name:'Slipstream',desc:'Tuck in behind a car to charge nitro and gain a little speed.',vals:[['On',true],['Off',false]]},
   {key:'knock',name:'Knockdowns',desc:'Slam cars off the road, and wreck if you rear-end one at speed.',vals:[['On',true],['Off',false]]},
-  {key:'contact',name:'Contact',desc:'Ghost lets you drive straight through other cars. Roadworks still count.',vals:[['On',true],['Ghost',false]]}];
+  {key:'contact',name:'Contact',desc:'Ghost lets you drive straight through other cars. Roadworks still count.',vals:[['On',true],['Ghost',false]]},
+  {key:'diff',name:'Rivals',desc:'How hard the rivals race: their pace, how they use nitro, defend and pick routes, and how often they slip up.',vals:[['Easy','easy'],['Normal','normal'],['Hard','hard']]}];
 function renderOpts(){
   const r=rulesFor(G.modeSel),box=$('opts');box.textContent='';
   OPTS.forEach(o=>{
-    const locked=G.modeSel==='rush'&&o.key!=='slip'||o.key==='knock'&&!r.contact,cur=r[o.key];
+    const locked=G.modeSel==='rush'&&o.key!=='slip'&&o.key!=='diff'||o.key==='knock'&&!r.contact,cur=r[o.key];
     const d=document.createElement('div');d.className='opt'+(locked?' locked':'');
     const b=document.createElement('b');b.textContent=o.name;const sm=document.createElement('small');
     sm.textContent=locked?(G.modeSel==='rush'?'Always on in Knockdown Rush.':'Off while Contact is set to Ghost.'):o.desc;
     const seg=document.createElement('div');seg.className='row seg';seg.setAttribute('role','group');seg.setAttribute('aria-label',o.name);
     o.vals.forEach(([t,v])=>{const bt=document.createElement('button');bt.textContent=t;bt.setAttribute('aria-pressed',String(cur===v));bt.disabled=locked;
-      bt.onclick=()=>{SET[o.key]=v;store.set('rn-'+o.key,v?'1':'0');renderOpts();};seg.appendChild(bt);});
+      bt.onclick=()=>{SET[o.key]=v;store.set('rn-'+o.key,typeof v==='string'?v:v?'1':'0');G.rules=rulesFor(G.modeSel);renderOpts();};seg.appendChild(bt);});
     d.append(b,seg,sm);box.appendChild(d);});
 }
 function refreshModeUI(){

@@ -6,7 +6,8 @@ T.issues=[];T.note=(m)=>{if(T.issues.length<400)T.issues.push(m);};
 T.drive=function(opt,st){const p=player;const u=p.speed,pos=posOf(p),hand=p.spec.handling,ch=(.8+.2*hand)*1.05*9.8;
   let vs=999,worst=0,wd=0;const len=p.br<0?1e9:BR[p.br].len;
   for(let d=4;d<=260;d+=4){if(pos+d>len)break;sampleAt(p.br,pos+d);const c=Math.abs(TS.c);if(c>Math.abs(worst)){worst=TS.c;wd=d;}
-    const den=c-.0006*ch;const vc=den>0?Math.sqrt(4.5*ch/den):999;vs=Math.min(vs,Math.sqrt(vc*vc+2*(opt.dec||18)*Math.max(0,d-25)));}
+    const gr=typeof gripAt==='function'?gripAt(p.br,pos+d):1,cg=ch*gr; // (grip: weather and surface)
+    const den=c-.0006*cg;const vc=den>0?Math.sqrt(4.5*cg/den):999;vs=Math.min(vs,Math.sqrt(vc*vc+2*(opt.dec||18)*gr*Math.max(0,d-25)));}
   const look=12+u*.42,hw=hwAt(p.br,pos);
   let tx=opt.lane!==undefined?opt.lane:clamp(-Math.sign(worst)*Math.min(hw*.45,Math.abs(worst)*300),-hw*.5,hw*.5);
   if(opt.route&&p.br<0)for(const b of BR){const d=wrapD(b.s0,p.s),d2=wrapD(p.s,b.s0);
@@ -111,7 +112,7 @@ T.probes=function(){const p=player,out=[];G.modeSel='classic';G.lapsSel=5;startR
   {PICK.forEach(q=>{q.off=0;q.g.visible=true;}); // (an earlier probe may have taken it: they come back only after 12 s)
    const k=PICK.find(k=>k.br<0&&k.y===0);if(k){T.setAt(-1,k.s-60,k.x,40);p.nitro=0;T.run(60*3,{lane:k.x,noBrake:true},()=>p.nitro>.09);if(!(p.nitro>=.09))T.note(MAP_ID+' nitro canister not collected');}}
   // boost pad
-  {const pd=PADS.find(q=>q.br<0);if(pd){T.setAt(-1,pd.s-50,pd.x,40);let got=false;T.run(60*3,{lane:pd.x},()=>{if(p.padT>0)got=true;return got;});if(!got)T.note(MAP_ID+' boost pad not triggered');}}
+  {const pd=PADS.find(q=>q.br<0);if(pd){T.setAt(-1,pd.s-25,pd.x,40);let got=false; /* (close enough that the bot holds the line even on a bend) */T.run(60*3,{lane:pd.x},()=>{if(p.padT>0)got=true;return got;});if(!got)T.note(MAP_ID+' boost pad not triggered');}}
   // roadworks: block wrecks without nitro, smashes with it; barrels slow
   {const blk=OBST.filter(o=>o.kind==='block'&&o.br<0);if(blk.length){const o=blk[0];OBST.forEach(q=>{q.dead=0;q.mesh.visible=true;placeObst(q);});
     T.setAt(-1,o.s-80,o.x,45);const w0=p.stats.wrecks;T.run(60*4,{lane:o.x,noBrake:true},()=>p.stats.wrecks>w0);if(p.stats.wrecks===w0)T.note(MAP_ID+' drove through a roadblock without nitro');

@@ -111,6 +111,27 @@ The game script is one IIFE. Main pieces, by name (use grep; line numbers drift)
 - **Walls:** a car bounces off a wall, losing speed by how hard it hit. Run-off barriers are solid; only landing more than 3 m beyond one is out of bounds (`goOOB` / `respawn`).
 - **Ramps:** `rampStep` handles launches. Running into the side of a tall ramp bounces you off it.
 
+- **Grip** (`gripAt(br,s)` = `WX_GRIP` × `SURF_GRIP[surfAt]`): weather on the whole map (wet maps 0.86, Aurora Ice Field 0.8, Glacier Pass 0.9) times the surface under the car (asphalt 1, dirt 0.82, cobbles 0.93, from the layout's `surf` sections in `SURF[]`). `p.surfG` eases toward it. It scales the tyre limit `mu`, braking, the engine's traction cap, and how much a slide scrubs. Dirt also takes 3% off the top speed. The AI's `cornerSpeed` and the test bot's speed planner use it too. Toasts announce the weather at the start and each change of surface; `surfaceFx` throws dust off dirt and spray off wet roads (rivals too).
+
+### Contact and rivals
+- **Contact by weight:** the lighter car gives way more (`pw = mo/(mp+mo)`), and the closing speed sets how hard both are thrown. Rivals get `r.bump`, a sideways velocity that decays (they steer back at a quarter rate meanwhile). Rear-ending trades speed by mass, and a rival hitting you from behind pushes you forward. Rivals also touch each other: they lean on each other side by side, and one that runs up behind another is held up. `lookAhead(..., self)` counts slower racers, so rivals plan a way past them.
+- **Difficulty** (`SET.diff`, `rn-diff`, Race settings → Rivals; table `DIFF`): pace offset, cornering factor, rubber band (`band`), tactical nitro share, blocking, shortcut choice, mistakes per second in bends.
+  - Nitro: rivals have a tank (`r.tank`) that fills over time, faster in a slide or the air. A tactical rival saves it for a long run (`cornerSpeed > speed + 22`) or a fight; otherwise it fires at random.
+  - Blocking: a leader with a faster player 4–30 m behind moves to the player's lane once, on a straight away from forks, then waits 5 s.
+  - Mistakes: `r.mistake` runs it wide (a bump toward the outside) at 86% pace for about a second.
+  - Forks: rivals take the shorter route (`b.len < b.span`) with probability `fork`.
+  - Measured with the test bot driving well (drift and Perfect nitro): Easy, it wins by a distance; Normal, it finishes 1st–5th within about 2 s; Hard, mostly 3rd–5th.
+
+### Feel
+- **Body:** the player's roll goes up to 0.1 rad and pitch to 0.07, scaled by mass. Rivals roll from `TS.c·v²` and pitch from their acceleration.
+- **Camera:** a fine buzz grows with speed above 180 km/h, stronger on cobbles and dirt (not in the on-board views).
+- **Engine sound by drivetrain** (`ENGINE_NOTE`, `DRIVE`): gears are spaced over each car's own top speed (`GEARS` are fractions).
+  - Non-turbo: revs higher and sounds brighter.
+  - Turbo: a whistle (`AU.o3`) and a blow-off (`sfx('bov')`) on each upshift and on braking.
+  - Hybrid: a motor whine at low speed.
+  - Electric: no gears, a triangle/sine whine and a quiet hum.
+- **Tyres:** squeal near the grip limit (`p.betaAbs`); gravel noise (`AU.gg`) on dirt.
+
 ### Nitro
 - **Table:** `NT[]` holds the four types: 1 yellow, 2 Perfect, 3 Shockwave, 4 pulse.
 - **Controls:** `pressNitro`, `nitroOff`.
@@ -222,6 +243,8 @@ Gotcha: Rimac material names match the wheel rule (`^rim`), so rename them first
 Mac builds need `identity: '-'` and `hardenedRuntime: false` (already set). Delete removed builds with `rm "${SH:?}"/…` (a safety check blocks a bare `$SH`).
 
 ## Recent history (newest first)
+
+- **Gameplay and physics pass (2026-10-09):** surface and weather grip, contact by weight (including rival-to-rival), rival difficulty (Easy/Normal/Hard) with tactical nitro, blocking, mistakes and route choice, stronger body roll and pitch, a speed and surface buzz on the camera, engine sounds by drivetrain, tyre squeal and gravel noise. Class balance re-run for all 68 cars. See "Grip", "Contact and rivals" and "Feel" under Game architecture.
 
 - **Reversed cars fixed (2026-10-09):** the Valhalla, AMG ONE and Daytona SP3 models were built back to front (wrong nose from `nose='auto'`), so they drove tail first. They were turned round with `tools/blender/turnaround.py`. All 68 cars were checked from the front. `MODEL_VER` 12.
 
