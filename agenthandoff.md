@@ -166,7 +166,7 @@ f.contentWindow.__ev('T.probes()');            // feature probes on this map; pr
 f.contentWindow.__ev(`T.race(5,'classic',{drift:true,nitro:'perfect',avoid:true})`);  // a full race driven through the controls
 f.contentWindow.__ev('T.issues.join("\\n")');
 ```
-- **Maps:** `city`, `canyon`, `alpine`, `coast`, `tokyo`, `jungle`, `volcano`, `arctic`, `industrial`, `eifel`, `sakura`, `desert`, `autumn`.
+- **Maps:** `city`, `canyon`, `alpine`, `coast`, `tokyo`, `jungle`, `volcano`, `arctic`, `industrial`, `eifel`, `sakura`, `desert`, `autumn`, `moon`, `tropic`, `savanna`.
 - **`T.probes()` covers:** every ramp, air and ground 360s, gaps, both fork routes, divider crashes, canisters, pads, roadworks, traffic, nitro rams, Shockwave, all nitro types, drift, out of bounds, the cameras and ghost mode.
 - **`T.race(carIdx, mode, opt)`:** checks every frame for NaN values, cars escaping walls, stuck cars and whether the results screen appears.
 
@@ -209,6 +209,17 @@ Gotcha: Rimac material names match the wheel rule (`^rim`), so rename them first
 Mac builds need `identity: '-'` and `hardenedRuntime: false` (already set). Delete removed builds with `rm "${SH:?}"/…` (a safety check blocks a bare `$SH`).
 
 ## Recent history (newest first)
+
+- **Three more maps (2026-10-09):**
+  - **Lunar Base** (`moon`, 5.8 km): a black sky with stars, grey regolith terrain, craters (flattened torus rims over dark floors), white domes with glowing bands, masts with red lights, and a lit Earth with a blue halo overhead. Base lamps along the track. The crater rim has kerbs on its inside: a twist ramp there rolled cars off a 5 m cliff run-off.
+  - **Paradise Isle** (`tropic`, 5.5 km, noon): a turquoise sea ground (like the coast's), a white sand strip either side of the road (left off under the cliff-edged causeway), palms, huts on stilts out in the lagoon, green islands far off. The shortcut is a hairpin cut-back across the bottom bend.
+  - **Savanna Sunset** (`savanna`, 5.1 km): golden grass, flat-topped acacias, baobabs, red termite mounds, rocky kopjes, a red-earth dirt section (sand texture tinted red, because the dirt texture reads green). The shortcut bows north round the notch: a straight chord clipped the hairpin to 6 m.
+  - `palms(spots)` is now a shared helper (the desert and the island).
+  - Suite fixes:
+    - `T.clear` also avoids roadworks (the drift probe was starting in the barrels on Moon) and prefers a straight.
+    - The ram probe puts the rival 6 m ahead, on the ground (from 9 m away it sidesteps, and a rival left mid-air is flown over).
+    - The canister probe resets canisters first (an earlier probe may have taken them, and they respawn only after 12 s).
+  - `VER` 1.9.
 
 - **Three new maps, bolder bend signs, proper finish (2026-10-09):**
   - **Sakura Pass** (`sakura`, 4.4 km, spring day): cherry blossom (jacaranda tinted pink), firs, a switchback pocket over a drop, a stone shrine road under red torii gates (built like gantries, posts via `DRV.out`), pagodas, a snow-capped peak and falling petals (`wx:'petals'`). Its corner list starts at the straight after the switchbacks, so the start is clear of both forks.

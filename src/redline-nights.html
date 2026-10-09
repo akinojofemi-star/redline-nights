@@ -388,7 +388,19 @@ const MAPS={
   autumn:{name:'Maple Valley',blurb:'Autumn in farm country: twisting lanes through red and gold maples, a dirt road past the barns and a jump over the river.',
     sky:[0x3a6aa8,0xa8c0d8,0xffd8a8],sun:[.5,.16,-1],stars:false,fog:[0xe0c8a8,220,1500],exposure:1.02,
     hemi:[0xfff0d8,0x6a5030,.95],dir:[0xffd8a8,1.45],fill:[0x9ab8ff,.3],asphalt:'#2c2a2c',wall:['#d0c8b8','#c0b8a8'],rails:[0xff7a2a,0xffe0a0],
-    scenery:'autumn',lamps:false,wx:'leaves',tunnel:{wall:0x4a3a2c,rings:[0xff7a2a,0xffe0a0],label:'VALLEY TUNNEL'}}
+    scenery:'autumn',lamps:false,wx:'leaves',tunnel:{wall:0x4a3a2c,rings:[0xff7a2a,0xffe0a0],label:'VALLEY TUNNEL'}},
+  moon:{name:'Lunar Base',blurb:'A race across the Moon: grey craters under a black sky, the Earth hanging overhead, the domes of the base and a jump over a crater rille.',
+    sky:[0x000000,0x020206,0x0c0c16],sun:[.5,.35,-1],stars:true,fog:[0x05050a,500,3000],exposure:.95,
+    hemi:[0x8890a8,0x202024,.4],dir:[0xffffff,1.3],fill:[0x6080ff,.25],asphalt:'#1c1c22',wall:['#c8ccd4','#b8bcc4'],rails:[0x40e0ff,0xffffff],
+    scenery:'moon',lamps:true,tunnel:{wall:0x2a2c34,rings:[0x40e0ff,0xffffff],label:'CRATER TUNNEL'}},
+  tropic:{name:'Paradise Isle',blurb:'Noon on a tropical island: white sand and palms beside a turquoise lagoon, a village street, a causeway over the water and a jump across the channel.',
+    sky:[0x1a6ad8,0x6ab8f0,0xe0f4fa],sun:[-.4,.35,-1],stars:false,fog:[0xbfe4f0,260,1900],exposure:1.0,
+    hemi:[0xf0f8ff,0x6aa0a0,1.0],dir:[0xfff4e0,1.6],fill:[0x9ad8ff,.35],asphalt:'#2a2a2e',wall:['#f0ece4','#e0dcd4'],rails:[0x20d8c0,0xffffff],
+    scenery:'tropic',lamps:false,tunnel:{wall:0x3a4a4a,rings:[0x20d8c0,0xffffff],label:'CORAL TUNNEL'}},
+  savanna:{name:'Savanna Sunset',blurb:'Sunset on the African plains: a long back straight through golden grass, red-earth tracks between acacias and baobabs, and a jump over the river.',
+    sky:[0x2a2a6a,0xe87a4a,0xffc070],sun:[.5,.08,-1],stars:false,fog:[0xe8a070,240,1700],exposure:1.08,
+    hemi:[0xffd8b0,0x6a3a20,.9],dir:[0xffb070,1.4],fill:[0x9a9aff,.3],asphalt:'#2a2626',wall:['#b07a50','#a06a40'],rails:[0xffa020,0xffe0a0],
+    scenery:'savanna',lamps:false,tunnel:{wall:0x5a3a24,rings:[0xffa020,0xffe0a0],label:'BAOBAB TUNNEL'}}
 };
 const MAP_ID=(()=>{const h=(location.hash||'').slice(1);if(MAPS[h])return h;const v=store.get('rn-map');return MAPS[v]?v:'city';})();
 const MAP=MAPS[MAP_ID];
@@ -598,7 +610,25 @@ const LAYOUTS={
     [1100,1000,100,6],[650,850,50,5],[350,1000,50,4],[0,750,90,3],[-250,350,80,3]],
     sec:[[0,1,{w:14,l:'kerb',r:'kerb'}],[1,4,{l:'kerb',r:'kerb'}],[6,9,{surf:'dirt',l:'kerb',r:'kerb'}],[9,11,{l:'kerb',r:'kerb'}]],
     gaps:[[0,.5,45]],
-    br:[{kind:'short',ease:[0,0],p:[[796.9,321.8,100],[1155,555,100]]},{kind:'long',p:[[-236,250,50],[-480,240,50],[-470,40,50],[-207,50,50]]}]}
+    br:[{kind:'short',ease:[0,0],p:[[796.9,321.8,100],[1155,555,100]]},{kind:'long',p:[[-236,250,50],[-480,240,50],[-470,40,50],[-207,50,50]]}]},
+  // Lunar Base: a hooked loop round the base, a crater rim, and a fast curve back
+  moon:{start:.4,surf:'asphalt',c:[[-300,0,100,4],[700,0,60,6],[800,250,60,8],[500,350,90,10],[350,650,120,12],[700,950,80,10],[1200,850,150,8],[1400,400,100,6],
+    [1250,-200,90,4],[600,-450,150,3],[-300,-350,100,3]],
+    sec:[[0,1,{w:15,l:'kerb',r:'kerb'}],[1,4,{w:12.5}],[4,6,{l:'kerb',r:'cliff'}],[6,8,{w:16,l:'kerb',r:'kerb'}],[8,0,{l:'kerb',r:'kerb'}]],
+    gaps:[[4,.5,45]],
+    br:[{kind:'short',ease:[0,0],p:[[1300,625,150],[1000,-296,150]]},{kind:'long',ease:[0,0],p:[[450,-433.3,120],[380,-650,80],[20,-650,80],[-80,-374.4,120]]}]},
+  // Paradise Isle: round the island, a village street at the notch, a causeway over the lagoon and a chicane
+  tropic:{start:.3,surf:'asphalt',c:[[-400,0,120,2],[500,-100,200,3],[1100,100,80,4],[1000,450,50,6],[700,450,50,6],[600,750,120,4],[1000,1000,90,3],[600,1250,150,2],
+    [-200,1100,120,2],[-500,700,90,3],[-200,400,70,4],[-550,250,90,2]],
+    sec:[[0,1,{w:15,l:'kerb',r:'kerb'}],[1,3,{l:'kerb',r:'kerb'}],[3,5,{w:12.5,surf:'stone'}],[5,7,{l:'kerb',r:'kerb'}],[7,9,{l:'cliff',r:'cliff'}],[9,0,{l:'kerb',r:'kerb'}]],
+    gaps:[[7,.75,45]],
+    br:[{kind:'short',ease:[0,0],p:[[800,875,60],[200,1175,150]]},{kind:'long',ease:[0,0],p:[[700,-33.3,100],[760,-230,70],[900,-220,70],[900,33.3,120]]}]},
+  // Savanna Sunset: a long back straight, a fast sweeper, a red-earth notch and a twisty return
+  savanna:{start:.35,surf:'asphalt',c:[[-600,0,150,3],[900,0,90,5],[1250,350,160,6],[1050,750,70,7],[700,620,70,6],[450,950,120,5],[-150,1000,220,4],[-450,600,90,3],
+    [-150,380,80,4],[-680,230,120,3]],
+    sec:[[0,1,{w:16,l:'kerb',r:'kerb'}],[1,3,{l:'kerb',r:'kerb'}],[3,5,{surf:'dirt',l:'kerb',r:'kerb'}],[5,6,{l:'kerb',r:'kerb'}],[6,7,{l:'cliff',r:'cliff'}],[7,0,{l:'kerb',r:'kerb'}]],
+    gaps:[[6,.5,50]],
+    br:[{kind:'short',ease:[0,0],p:[[1130,590,150],[700,430,200],[150,975,200]]},{kind:'long',ease:[0,0],p:[[300,0,120],[380,-220,70],[640,-220,70],[700,0,120]]}]}
 };
 // dense points (about every 4 m) round the loop, starting at the start line: [{x,z,h}], plus any corner that doesn't fit
 function layoutPoints(spec,step=4){
@@ -1002,7 +1032,10 @@ const LOOK=Object.assign({
   forest:{road:.36,verge:['grass',3,0x9ccc78],ground:['grass',7,0x6e9a52],wall:['concrete',3,0xe8e8ec]},
   sakura:{road:.36,verge:['grass',3,0xa8d088],ground:['grass',7,0x86a868],wall:['stonewall',3,0xd8d0c0]},
   desert:{road:.3,verge:['sand',4,0xf0c890],ground:['sand',9,0xe0b07a],wall:['rockLayer',6,0xe8a870],dirt:'sand',dirtTint:0x8a5a3a},
-  autumn:{road:.34,verge:['grass',3,0xc8b878],ground:['grass',7,0xa89a5a],wall:['stonewall',3,0xd0c8b8],dirt:'dirt',dirtTint:0x5e3c28}
+  autumn:{road:.34,verge:['grass',3,0xc8b878],ground:['grass',7,0xa89a5a],wall:['stonewall',3,0xd0c8b8],dirt:'dirt',dirtTint:0x5e3c28},
+  moon:{road:.22,verge:['concrete',4,0x86868e],ground:['concrete',8,0x6e6e76],wall:['concrete',3,0xd8dce4]},
+  tropic:{road:.3,verge:['sand',4,0xfff4dc],wall:['concrete',3,0xf4f0e8]},
+  savanna:{road:.32,verge:['grass',3,0xe0c070],ground:['grass',7,0xc8a050],wall:['rockLayer',6,0xd08850],dirt:'sand',dirtTint:0x9a4a28}
 }[MAP.scenery],MAP_ID==='industrial'?{wall:['metal',3,0xc8b8a8],ground:['concrete',7,0x6a6460]}:{});
 const roadTexOf=(skip,plain)=>canvasTex(512,512,(g,w,h)=>{
   g.clearRect(0,0,w,h);
@@ -1061,7 +1094,7 @@ const railMats=[new THREE.MeshBasicMaterial({color:MAP.rails[0],side:THREE.Doubl
 // open edges: a red and white kerb, then a verge, then the drop
 const kerbTex=canvasTex(32,128,(g,w,h)=>{for(let y=0;y<4;y++){g.fillStyle=y%2?'#f4f0e8':'#d8202c';g.fillRect(0,y*32,w,32);}});kerbTex.wrapS=kerbTex.wrapT=THREE.RepeatWrapping;
 const kerbMat=new THREE.MeshStandardMaterial({map:kerbTex,roughness:.7});
-const VERGE_COL={city:'#2a2430',canyon:'#a8714a',alpine:'#e8eef8',coast:'#d8c08c',tokyo:'#2c2c34',jungle:'#3f6a2c',volcano:'#2a1612',arctic:'#e4eef8',forest:'#4a7a34',sakura:'#5a8a44',desert:'#c89a64',autumn:'#8a7a3a'}[MAP.scenery];
+const VERGE_COL={city:'#2a2430',canyon:'#a8714a',alpine:'#e8eef8',coast:'#d8c08c',tokyo:'#2c2c34',jungle:'#3f6a2c',volcano:'#2a1612',arctic:'#e4eef8',forest:'#4a7a34',sakura:'#5a8a44',desert:'#c89a64',autumn:'#8a7a3a',moon:'#7a7a82',tropic:'#e8d8b0',savanna:'#a88a40'}[MAP.scenery];
 const vergeTex=canvasTex(128,128,(g,w,h)=>{g.fillStyle=VERGE_COL;g.fillRect(0,0,w,h);const r=mulberry32(14);for(let i=0;i<1500;i++){g.fillStyle=`rgba(${r()>.5?'255,255,255':'0,0,0'},${r()*.12})`;g.fillRect(r()*w,r()*h,3,3);}});
 vergeTex.wrapS=vergeTex.wrapT=THREE.RepeatWrapping;const vergeMat=rnTex(new THREE.MeshStandardMaterial({map:vergeTex,roughness:1}),{tex:LOOK.verge[0],scale:LOOK.verge[1],tint:LOOK.verge[2]});
 const outer=(k,side)=>HW[k]+(side>0?ROR:ROL)[k];
@@ -1111,7 +1144,7 @@ if(MAP.scenery==='forest'){
 }
 // gaps: the road simply stops; water (or lava, or the city far below) shows through, with a cliff face at each end
 if(GAPS.length){
-  const gapCol={city:0x0a0812,canyon:0x2a6a8a,alpine:0x6a8ab0,coast:0x1d5f8c,tokyo:0x101018,jungle:0x2a7a8a,volcano:0xff5a10,arctic:0x8ab8d8,forest:0x2a6a7a,sakura:0x3a7a9a,desert:0x6a4a2a,autumn:0x3a6a8a}[MAP.scenery];
+  const gapCol={city:0x0a0812,canyon:0x2a6a8a,alpine:0x6a8ab0,coast:0x1d5f8c,tokyo:0x101018,jungle:0x2a7a8a,volcano:0xff5a10,arctic:0x8ab8d8,forest:0x2a6a7a,sakura:0x3a7a9a,desert:0x6a4a2a,autumn:0x3a6a8a,moon:0x020204,tropic:0x1aa0b8,savanna:0x3a5a6a}[MAP.scenery];
   const gm=new THREE.MeshStandardMaterial({color:gapCol,roughness:.2,metalness:.3,emissive:MAP.scenery==='volcano'?0xff4000:0,emissiveIntensity:.8});
   for(const g of GAPS){const ks=[];for(let k=0;k<NS;k++)if(GAPK[k]&&Math.abs(wrapD(k/NS*L,g.s0))<g.len+5)ks.push(k);
     ks.sort((a,b)=>wrapD(a/NS*L,g.s0)-wrapD(b/NS*L,g.s0));const run=padRun(ks);
@@ -1171,7 +1204,10 @@ const GROUND_LOOK={
   forest:{base:'#3a5a2c',dot:'10,30,5',a:.3,grid:null,rough:1},
   sakura:{base:'#4a6a3a',dot:'10,30,5',a:.3,grid:null,rough:1},
   desert:{base:'#d4a46a',dot:'120,70,30',a:.15,grid:null,rough:1},
-  autumn:{base:'#6a6a30',dot:'60,40,10',a:.3,grid:null,rough:1}}[MAP.scenery];
+  autumn:{base:'#6a6a30',dot:'60,40,10',a:.3,grid:null,rough:1},
+  moon:{base:'#5a5a62',dot:'20,20,24',a:.3,grid:null,rough:1},
+  tropic:{base:'#1aa0b0',dot:'200,255,250',a:.35,grid:null,rough:.25},
+  savanna:{base:'#8a7030',dot:'60,30,10',a:.3,grid:null,rough:1}}[MAP.scenery];
 const groundTex=canvasTex(256,256,(g,w,h)=>{g.fillStyle=GROUND_LOOK.base;g.fillRect(0,0,w,h);if(GROUND_LOOK.grid){g.strokeStyle=GROUND_LOOK.grid;g.lineWidth=2;g.strokeRect(0,0,w,h);}
   const r=mulberry32(5);for(let i=0;i<700;i++){g.fillStyle=`rgba(${GROUND_LOOK.dot},${r()*GROUND_LOOK.a})`;g.fillRect(r()*w,r()*h,MAP.scenery==='coast'?6:3,MAP.scenery==='coast'?1.5:3);}
   if(GROUND_LOOK.cracks){g.strokeStyle=GROUND_LOOK.cracks;g.lineCap='round'; // lava seams / ice fractures, drawn wrapping so the tile repeats cleanly
@@ -1179,7 +1215,7 @@ const groundTex=canvasTex(256,256,(g,w,h)=>{g.fillStyle=GROUND_LOOK.base;g.fillR
       for(let s=0;s<9;s++){a+=(r()-.5)*1.4;x+=Math.cos(a)*16;y+=Math.sin(a)*16;pts.push([x,y]);}
       for(const dx of [-w,0,w])for(const dy of [-h,0,h]){g.beginPath();pts.forEach(([px,py],i)=>i?g.lineTo(px+dx,py+dy):g.moveTo(px+dx,py+dy));g.stroke();}}}});
 groundTex.wrapS=groundTex.wrapT=THREE.RepeatWrapping;groundTex.repeat.set(160,160);
-const ground=new THREE.Mesh(new THREE.PlaneGeometry(9000,9000).rotateX(-Math.PI/2),new THREE.MeshStandardMaterial({map:groundTex,roughness:GROUND_LOOK.rough,metalness:MAP.scenery==='coast'||MAP.scenery==='arctic'?.15:0,
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(9000,9000).rotateX(-Math.PI/2),new THREE.MeshStandardMaterial({map:groundTex,roughness:GROUND_LOOK.rough,metalness:MAP.scenery==='coast'||MAP.scenery==='arctic'||MAP.scenery==='tropic'?.15:0,
   ...(MAP.scenery==='volcano'?{emissive:0xffffff,emissiveMap:groundTex,emissiveIntensity:.9}:{})}));
 if(LOOK.ground){ground.material.metalness=0;ground.material.roughness=1;rnTex(ground.material,{tex:LOOK.ground[0],scale:LOOK.ground[1],tint:LOOK.ground[2]});}
 ground.position.y=GROUND_Y;scene.add(ground);
@@ -1194,7 +1230,9 @@ const TERRAIN={alpine:{clear:150,ramp:420,h:700,rock:'rockLayer',top:'snow',tint
   forest:{clear:130,ramp:420,h:170,rock:'dirt',top:'grass',tint:0x7a9a5a,tint2:0x8ab070,slope:[.55,.8],sc:12},
   sakura:{clear:160,ramp:420,h:300,rock:'rockLayer',top:'grass',tint:0x8a9478,tint2:0x9ac080,slope:[.78,.93],sc:16},
   desert:{clear:140,ramp:500,h:110,rock:'sand',top:'sand',tint:0xf0c080,tint2:0xe8b878,slope:[.9,.98],sc:22},
-  autumn:{clear:120,ramp:420,h:160,rock:'dirt',top:'grass',tint:0x9a8a5a,tint2:0xb0a060,slope:[.55,.8],sc:12}}[MAP.scenery];
+  autumn:{clear:120,ramp:420,h:160,rock:'dirt',top:'grass',tint:0x9a8a5a,tint2:0xb0a060,slope:[.55,.8],sc:12},
+  moon:{clear:150,ramp:450,h:240,rock:'rockDark',top:'concrete',tint:0x80808a,tint2:0x74747c,slope:[.7,.9],sc:16},
+  savanna:{clear:150,ramp:500,h:120,rock:'rockLayer',top:'grass',tint:0xc08050,tint2:0xc8a858,slope:[.6,.85],sc:14}}[MAP.scenery];
 if(TERRAIN){
   const T=TERRAIN,pts=[];for(let k=0;k<NS;k+=2)pts.push(P[k*3],P[k*3+2]);for(const b of BR)for(let i=0;i<b.n;i+=2)pts.push(b.P[i*3],b.P[i*3+2]);
   let x0=1e9,x1=-1e9,z0=1e9,z1=-1e9;for(let i=0;i<pts.length;i+=2){x0=Math.min(x0,pts[i]);x1=Math.max(x1,pts[i]);z0=Math.min(z0,pts[i+1]);z1=Math.max(z1,pts[i+1]);}
@@ -1553,6 +1591,12 @@ function clouds(count,op,col){
     for(let k=0;k<n;k++){const sp=new THREE.Sprite(cloudMat);sp.scale.set(w*(.7+SR()*.6),w*(.32+SR()*.18),1);
       sp.position.set(Math.cos(a)*r+(SR()-.5)*w*1.4,y+(SR()-.3)*w*.18,Math.sin(a)*r+(SR()-.5)*w*1.4);scene.add(sp);}}}
 const unitBox=new THREE.BoxGeometry(1,1,1).translate(0,.5,0);
+// palms at [x, z] spots: a leaning trunk and a crown of fronds each
+function palms(spots){const trunks=[],crowns=[],v=new V3();
+  for(const [x,z] of spots){const h=8+SR()*6,yaw=SR()*6,tilt=.06+SR()*.16;trunks.push([x,GROUND_Y,z,1,h,1,yaw,undefined,tilt]);v.set(0,h,0).applyEuler(_eu.set(tilt,yaw,0));crowns.push([x+v.x,GROUND_Y+v.y,z+v.z,1.2,1.2,1.2,SR()*6]);}
+  const blades=[];for(let i=0;i<8;i++){const b=new THREE.BoxGeometry(.55,.07,3.6).translate(0,0,1.8);b.rotateX(.42);b.rotateY(i/8*Math.PI*2);blades.push(b.toNonIndexed());}
+  instanced(new THREE.CylinderGeometry(.22,.38,1,6).translate(0,.5,0),rnTex(new THREE.MeshStandardMaterial({roughness:.9}),{tex:'dirt',scale:1.2,tint:0xa88a6a}),trunks);
+  instanced(mergeNI(blades),rnTex(new THREE.MeshStandardMaterial({roughness:.8,side:THREE.DoubleSide,flatShading:true}),{tex:'grass',scale:2,tint:new THREE.Color(1.2,1.7,1.0)}),crowns);}
 if(MAP.scenery==='forest'){
   // spruce forest right up to the run-off, grandstands opposite the pits on the main straight and round the arena
   const firs=[],firs2=[];
@@ -1618,13 +1662,10 @@ if(MAP.scenery==='sakura'){
 }
 if(MAP.scenery==='desert'){
   // palm oases, scattered rocks, dunes and pyramids far off in the haze
-  const trunks=[],crowns=[],rocks=[],v=new V3(),wrapK=i=>((Math.round(i)%NS)+NS)%NS;
+  const oasis=[],rocks=[],wrapK=i=>((Math.round(i)%NS)+NS)%NS;
   for(let o=0;o<9;o++){const i=Math.floor((o+SR()*.6)/9*NS),side=SR()<.5?-1:1,base=40+SR()*60;
-    for(let k=0;k<12;k++){const [x0,z0]=spot(wrapK(i+(SR()-.5)*30),side*(base+SR()*60)),x=x0+(SR()-.5)*30,z=z0+(SR()-.5)*30;if(trackDist(x,z)<24)continue;
-      const h=8+SR()*6,yaw=SR()*6,tilt=.06+SR()*.16;trunks.push([x,GROUND_Y,z,1,h,1,yaw,undefined,tilt]);v.set(0,h,0).applyEuler(_eu.set(tilt,yaw,0));crowns.push([x+v.x,GROUND_Y+v.y,z+v.z,1.2,1.2,1.2,SR()*6]);}}
-  const blades=[];for(let i=0;i<8;i++){const b=new THREE.BoxGeometry(.55,.07,3.6).translate(0,0,1.8);b.rotateX(.42);b.rotateY(i/8*Math.PI*2);blades.push(b.toNonIndexed());}
-  instanced(new THREE.CylinderGeometry(.22,.38,1,6).translate(0,.5,0),rnTex(new THREE.MeshStandardMaterial({roughness:.9}),{tex:'dirt',scale:1.2,tint:0xa88a6a}),trunks);
-  instanced(mergeNI(blades),rnTex(new THREE.MeshStandardMaterial({roughness:.8,side:THREE.DoubleSide,flatShading:true}),{tex:'grass',scale:2,tint:new THREE.Color(1.2,1.7,1.0)}),crowns);
+    for(let k=0;k<12;k++){const [x0,z0]=spot(wrapK(i+(SR()-.5)*30),side*(base+SR()*60)),x=x0+(SR()-.5)*30,z=z0+(SR()-.5)*30;if(trackDist(x,z)>=24)oasis.push([x,z]);}}
+  palms(oasis);
   for(let i=0;i<NS;i+=9)for(const side of [-1,1]){if(SR()<.3){const sc=2+SR()*4,[x,z]=spot(i,side*(22+SR()*50));if(trackDist(x,z)>18)rocks.push([x,GROUND_Y+sc*.35,z,sc,sc*.7,sc*1.2,SR()*6]);}}
   const rockMat=rnTex(new THREE.MeshStandardMaterial({roughness:.95,flatShading:true}),{tex:'rockLayer',scale:8,tint:0xe0a070});
   boulders(rocks,instanced(new THREE.DodecahedronGeometry(1,0),rockMat,rocks),0xe8b080);
@@ -1658,6 +1699,70 @@ if(MAP.scenery==='autumn'){
   const hills=[];for(let i=0;i<30;i++){const a=i/30*Math.PI*2+SR()*.15,r=2800+SR()*700,w=500+SR()*500;hills.push([Math.cos(a)*r,GROUND_Y-10,Math.sin(a)*r,w,200+SR()*300,w,SR()*6]);}
   instanced(new THREE.SphereGeometry(1,10,6,0,Math.PI*2,0,Math.PI/2),new THREE.MeshBasicMaterial({color:0x8a7a5a,fog:false}),hills);
   clouds(18,.7,0xfff4e8);
+}
+if(MAP.scenery==='moon'){
+  // craters, the domes and masts of the base, and the Earth overhead
+  const rims=[],floors=[],domes=[],bands=[],masts=[],tips=[];
+  for(let k=0;k<70;k++){const i=(SR()*NS)|0,side=SR()<.5?-1:1,r=15+Math.pow(SR(),2)*90,[x,z]=spot(i,side*(r+40+SR()*300));if(trackDist(x,z)<r+30)continue;
+    rims.push([x,GROUND_Y-.5,z,r,r*.18+2,r,SR()*6]);floors.push([x,GROUND_Y+.06,z,r*.9,1,r*.9,0]);}
+  instanced(new THREE.TorusGeometry(1,.16,6,28).rotateX(Math.PI/2),rnTex(new THREE.MeshStandardMaterial({roughness:1}),{tex:'concrete',scale:6,tint:0x8c8c94}),rims);
+  instanced(new THREE.CircleGeometry(1,28).rotateX(-Math.PI/2),new THREE.MeshStandardMaterial({color:0x3a3a42,roughness:1}),floors);
+  for(let c=0;c<7;c++){const i=Math.floor((c+.2+SR()*.6)/7*NS)%NS,side=SR()<.5?-1:1,[cx,cz]=spot(i,side*(90+SR()*80));
+    for(let k=0;k<4;k++){const x=cx+(SR()-.5)*70,z=cz+(SR()-.5)*70,r=8+SR()*12;if(trackDist(x,z)<r+30)continue;domes.push([x,GROUND_Y,z,r,r*.75,r,0]);bands.push([x,GROUND_Y+r*.12,z,r*1.01,r*.06,r*1.01,0]);}
+    {const x=cx+(SR()-.5)*40,z=cz+(SR()-.5)*40,h=26+SR()*16;if(trackDist(x,z)>30){masts.push([x,GROUND_Y,z,.5,h,.5,0]);tips.push([x,GROUND_Y+h,z,1.2,1.2,1.2,0]);}}}
+  instanced(new THREE.SphereGeometry(1,20,10,0,Math.PI*2,0,Math.PI/2),new THREE.MeshStandardMaterial({color:0xe8ecf4,roughness:.35,metalness:.25}),domes);
+  instanced(new THREE.CylinderGeometry(1,1,1,24,1,true),new THREE.MeshBasicMaterial({color:0x40e0ff,side:THREE.DoubleSide}),bands);
+  instanced(new THREE.CylinderGeometry(1,1,1,6).translate(0,.5,0),new THREE.MeshStandardMaterial({color:0xb8bcc4,metalness:.6,roughness:.4}),masts);
+  instanced(new THREE.SphereGeometry(1,8,6),new THREE.MeshBasicMaterial({color:0xff3040}),tips);
+  const earthTex=canvasTex(256,128,(g,w,h)=>{g.fillStyle='#1c4c9c';g.fillRect(0,0,w,h);const r=mulberry32(3);g.fillStyle='#3a8a4a';
+    for(let i=0;i<14;i++){g.beginPath();g.ellipse(r()*w,r()*h,10+r()*30,6+r()*16,r()*3,0,7);g.fill();}
+    g.fillStyle='rgba(255,255,255,.75)';for(let i=0;i<40;i++){g.beginPath();g.ellipse(r()*w,r()*h,8+r()*28,2+r()*5,r()*.6,0,7);g.fill();}});
+  const ea=Math.atan2(SUN_DIR.z,SUN_DIR.x)+2.2,earth=new THREE.Mesh(new THREE.SphereGeometry(240,32,16),new THREE.MeshLambertMaterial({map:earthTex,fog:false}));
+  earth.position.set(Math.cos(ea)*2700,GROUND_Y+1500,Math.sin(ea)*2700);earth.rotation.z=.4;scene.add(earth);
+  const halo=new THREE.Sprite(new THREE.SpriteMaterial({map:softTex,color:0x5a9aff,fog:false,transparent:true,opacity:.55,blending:THREE.AdditiveBlending,depthWrite:false}));
+  halo.scale.set(720,720,1);halo.position.copy(earth.position);scene.add(halo);
+}
+if(MAP.scenery==='tropic'){
+  // a white sand strip along the road over the turquoise lagoon (not under the causeway), palms, huts on stilts out in the
+  // water and green islands far off
+  const sand=rnTex(new THREE.MeshStandardMaterial({roughness:1}),{tex:'sand',scale:5,tint:0xfff0d8});
+  for(const side of [-1,1])for(const run of runs(NS,k=>(side>0?ER:EL)[k]!==2&&!GAPK[k],true))
+    scene.add(new THREE.Mesh(ribbonRun(padRun(run),(k,s,o)=>atY(k,side<0?(s?0:-95):(s?95:0),GROUND_Y+.08,o),40,L/NS),sand));
+  const spotsP=[];for(let i=0;i<NS;i+=5)for(const side of [-1,1]){if(SR()>.5||(side>0?ER:EL)[i]===2)continue;const [x,z]=spot(i,side*(20+SR()*50));if(trackDist(x,z)>=18)spotsP.push([x,z]);}
+  palms(spotsP);
+  const posts=[],decks=[],huts=[],roofs=[];
+  for(let k=0;k<16;k++){const i=Math.floor((k+SR()*.7)/16*NS)%NS,side=SR()<.5?-1:1,[x,z]=spot(i,side*(125+SR()*80));if(trackDist(x,z)<110)continue;const yaw=SR()*6;
+    for(const [dx,dz] of [[-3,-3],[3,-3],[-3,3],[3,3]])posts.push([x+dx,GROUND_Y-1,z+dz,.25,4.4,.25,0]);
+    decks.push([x,GROUND_Y+3,z,9,.5,9,yaw]);huts.push([x,GROUND_Y+3.5,z,6,3,6,yaw]);roofs.push([x,GROUND_Y+6.5,z,6,3.6,6,yaw+Math.PI/4]);}
+  const wood=new THREE.MeshStandardMaterial({color:0x8a6a48,roughness:.9});
+  instanced(new THREE.CylinderGeometry(1,1,1,6).translate(0,.5,0),wood,posts);instanced(unitBox,wood,decks);
+  instanced(unitBox,new THREE.MeshStandardMaterial({color:0xd8c8a8,roughness:.9}),huts);
+  instanced(new THREE.ConeGeometry(1,1,4).translate(0,.5,0),rnTex(new THREE.MeshStandardMaterial({roughness:1}),{tex:'sand',scale:1.5,tint:0xc89a50}),roofs);
+  const isl=[];for(let i=0;i<14;i++){const a=i/14*Math.PI*2+SR()*.3,r=2900+SR()*600,w=280+SR()*380;isl.push([Math.cos(a)*r,GROUND_Y-10,Math.sin(a)*r,w,110+SR()*220,w*.8,SR()*6]);}
+  instanced(new THREE.SphereGeometry(1,10,6,0,Math.PI*2,0,Math.PI/2),new THREE.MeshBasicMaterial({color:0x3a7a52,fog:false}),isl);
+  clouds(16,.85,0xffffff);
+}
+if(MAP.scenery==='savanna'){
+  // flat-topped acacias, fat baobabs, red termite mounds and rocky kopjes on the golden grass
+  const col=new THREE.Color(),trunks=[],crowns=[],baoT=[],baoC=[],mounds=[],rocks=[];
+  for(let i=0;i<NS;i+=4)for(const side of [-1,1]){if(SR()>.6)continue;const [x,z]=spot(i,side*(26+Math.pow(SR(),1.3)*280));if(trackDist(x,z)<24)continue;
+    if(SR()<.12){const r=1.4+SR()*1.2,h=9+SR()*5;baoT.push([x,GROUND_Y,z,r,h,r,SR()*6]);
+      for(let k=0;k<4;k++){const a=SR()*6.3;baoC.push([x+Math.cos(a)*r*1.4,GROUND_Y+h+SR()*1.5,z+Math.sin(a)*r*1.4,2.4,1.3,2.4,SR()*6,col.setHSL(.22,.4,.25).convertSRGBToLinear().getHex()]);}continue;}
+    const h=9+SR()*4,w=9+SR()*6;trunks.push([x,GROUND_Y,z,.45,h,.45,SR()*6]);
+    crowns.push([x,GROUND_Y+h,z,w,w*.3,w*(.8+SR()*.3),SR()*6,col.setHSL(.2+SR()*.06,.5,.26+SR()*.08).convertSRGBToLinear().getHex()]);}
+  for(let i=0;i<NS;i+=11)for(const side of [-1,1]){if(SR()<.35){const r=1+SR()*1.4,[x,z]=spot(i,side*(24+SR()*80));if(trackDist(x,z)>20)mounds.push([x,GROUND_Y,z,r,2+SR()*3.5,r,SR()*6]);}
+    if(SR()<.12){const [cx,cz]=spot(i,side*(50+SR()*150));if(trackDist(cx,cz)>45)for(let k=0;k<5;k++){const sc=3+SR()*6;rocks.push([cx+(SR()-.5)*20,GROUND_Y+sc*.35,cz+(SR()-.5)*20,sc,sc*.75,sc*1.2,SR()*6]);}}}
+  const bark=new THREE.MeshStandardMaterial({color:0x5a4434,roughness:.95});
+  instanced(new THREE.CylinderGeometry(.7,1,1,6).translate(0,.5,0),bark,trunks);
+  instanced(new THREE.IcosahedronGeometry(1,1),new THREE.MeshStandardMaterial({color:0xffffff,roughness:.9,flatShading:true}),crowns);
+  instanced(new THREE.CylinderGeometry(.75,1,1,10).translate(0,.5,0),new THREE.MeshStandardMaterial({color:0x8a7060,roughness:.95}),baoT);
+  instanced(new THREE.IcosahedronGeometry(1,0),new THREE.MeshStandardMaterial({color:0xffffff,roughness:.9,flatShading:true}),baoC);
+  instanced(new THREE.ConeGeometry(1,1,7).translate(0,.5,0),rnTex(new THREE.MeshStandardMaterial({roughness:1}),{tex:'sand',scale:2,tint:0xb05a30}),mounds);
+  const rockMat=rnTex(new THREE.MeshStandardMaterial({roughness:.95,flatShading:true}),{tex:'rockLayer',scale:8,tint:0xc89070});
+  boulders(rocks,instanced(new THREE.DodecahedronGeometry(1,0),rockMat,rocks),0xd0a080);
+  const hills=[];for(let i=0;i<28;i++){const a=i/28*Math.PI*2+SR()*.15,r=2800+SR()*700,w=500+SR()*600;hills.push([Math.cos(a)*r,GROUND_Y-10,Math.sin(a)*r,w,120+SR()*220,w*.7,SR()*6]);}
+  instanced(new THREE.SphereGeometry(1,10,6,0,Math.PI*2,0,Math.PI/2),new THREE.MeshBasicMaterial({color:0x6a4a58,fog:false}),hills);
+  clouds(10,.6,0xffd8b0);
 }
 // street lamps + light pools
 if(MAP.lamps){

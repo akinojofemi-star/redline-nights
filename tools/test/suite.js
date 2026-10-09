@@ -69,7 +69,10 @@ T.race=function(carIdx,mode,opt){opt=opt||{};const tag=MAP_ID+'/'+CARS[carIdx].s
   if(res.oob)T.note(tag+' went out of bounds '+res.oob+'x');
   return res;};
 // ------------------------------------------------------------------ feature probes on this map
-T.clear=s=>{for(let k=0;k<200;k++){const t=mod(s+k*15);if(!GAPS.some(g=>{const d=wrapD(t,g.s0);return d>-200&&d<g.len+150;})&&!BR.some(b=>{const d=wrapD(t,b.s0);return d>-150&&d<b.span+100;})&&!RAMPS.some(r=>r.br<0&&Math.abs(wrapD(t,r.s))<120)&&Math.abs(wrapD(t,TUNNEL.s0+(TUNNEL.s1-TUNNEL.s0)/2))>(TUNNEL.s1-TUNNEL.s0)/2+60)return t;}return s;};
+// a spot for a probe: clear of gaps, forks, ramps, roadworks and the tunnel, on a straight if there is one
+T.clear=s=>{const ok=(t,str)=>!GAPS.some(g=>{const d=wrapD(t,g.s0);return d>-200&&d<g.len+150;})&&!BR.some(b=>{const d=wrapD(t,b.s0);return d>-150&&d<b.span+100;})&&!RAMPS.some(r=>r.br<0&&Math.abs(wrapD(t,r.s))<120)&&!OBST.some(o=>o.br<0&&Math.abs(wrapD(t,o.s))<150)&&Math.abs(wrapD(t,TUNNEL.s0+(TUNNEL.s1-TUNNEL.s0)/2))>(TUNNEL.s1-TUNNEL.s0)/2+60
+    &&(!str||[0,30,60,90,120,150].every(d=>{sample(t+d);return Math.abs(TS.c)<1/350;}));
+  for(const str of [true,false])for(let k=0;k<200;k++){const t=mod(s+k*15);if(ok(t,str))return t;}return s;};
 T.setAt=function(br,s,x,spd){const p=player;G.mode='race';G.paused=false;p.oob=null;p.wreck=0;p.stunt=null;p.settle=null;p.tricks=[];p.ghost=0;p.air=false;p.y=0;p.vy=0;p.ramp=null;p.spin=null;p.drift=false;p.nitroLevel=0;
   p.br=br;if(br<0){p.dist=s;p.s=mod(s);}else{p.bs=s;p.dist=mainS(br,s);p.s=mod(p.dist);}p.x=x;alignToTrack(p,spd);p.speed=spd;p.lastLap=p.lastLap||0;};
 T.run=function(frames,opt,until){const st={cd:0,drifts:0,nitros:0,perfectAt:0};for(let i=0;i<frames;i++){T.drive(opt||{},st);update(1/60);if(!T.check(st,MAP_ID+' probe'))return false;if(until&&until())return true;}return null;};
@@ -105,7 +108,8 @@ T.probes=function(){const p=player,out=[];G.modeSel='classic';G.lapsSel=5;startR
     for(let i=0;i<90&&p.stats.wrecks===w0;i++){p.botSteer=0;p.botBrake=false;update(1/60);}p.botSteer=undefined;p.botBrake=undefined;
     if(p.stats.wrecks===w0)T.note(MAP_ID+' driving straight into the '+b.kind+' divider did not crash');p.wreck=0;}
   // canisters add nitro
-  {const k=PICK.find(k=>k.br<0&&k.y===0);if(k){T.setAt(-1,k.s-60,k.x,40);p.nitro=0;T.run(60*3,{lane:k.x,noBrake:true},()=>p.nitro>.09);if(!(p.nitro>=.09))T.note(MAP_ID+' nitro canister not collected');}}
+  {PICK.forEach(q=>{q.off=0;q.g.visible=true;}); // (an earlier probe may have taken it: they come back only after 12 s)
+   const k=PICK.find(k=>k.br<0&&k.y===0);if(k){T.setAt(-1,k.s-60,k.x,40);p.nitro=0;T.run(60*3,{lane:k.x,noBrake:true},()=>p.nitro>.09);if(!(p.nitro>=.09))T.note(MAP_ID+' nitro canister not collected');}}
   // boost pad
   {const pd=PADS.find(q=>q.br<0);if(pd){T.setAt(-1,pd.s-50,pd.x,40);let got=false;T.run(60*3,{lane:pd.x},()=>{if(p.padT>0)got=true;return got;});if(!got)T.note(MAP_ID+' boost pad not triggered');}}
   // roadworks: block wrecks without nitro, smashes with it; barrels slow
@@ -117,7 +121,7 @@ T.probes=function(){const p=player,out=[];G.modeSel='classic';G.lapsSel=5;startR
   {const bend=s=>{let m=0;for(let d=0;d<=90;d+=6){sample(s+d);m=Math.max(m,Math.abs(TS.c));}return m;}; // (the straightest run-up there is)
    const t=traffic.filter(t=>t.br<0&&!t.down&&T.clear(t.s-70)===mod(t.s-70)).sort((a,b)=>bend(a.s-70)-bend(b.s-70))[0];if(t){T.setAt(-1,t.s-25,t.x,45);T.run(60*3,{lane:t.x,noBrake:true},()=>t.flying>0||t.down);if(!(t.flying>0||t.down))T.note(MAP_ID+' drove through parked traffic');}}
   // takedown: nitro ram into a rival
-  {const r=rivals[0];if(r&&G.rules.knock){T.setAt(-1,T.clear(L*.3),laneX(p,1),60);r.br=-1;r.dist=p.dist+9;r.s=mod(r.dist);r.x=p.x;r.lane=1;r.laneCD=5;traffic.forEach(t=>{if(t.br<0&&Math.abs(wrapD(t.s,p.s))<300)t.down=true;});r.speed=40;r.wreck=0;r.out=false;const k0=p.stats.knock;p.nitro=1;pressNitro();
+  {const r=rivals[0];if(r&&G.rules.knock){T.setAt(-1,T.clear(L*.3),laneX(p,1),60);r.br=-1;r.dist=p.dist+6;r.s=mod(r.dist);r.x=p.x;r.lane=1;r.laneCD=5;traffic.forEach(t=>{if(t.br<0&&Math.abs(wrapD(t.s,p.s))<300)t.down=true;});r.speed=40;r.wreck=0;r.out=false;r.air=false;r.y=0;r.vy=0;r.ramp=null;const k0=p.stats.knock;p.nitro=1;pressNitro(); // (on the ground: a rival left mid-air by an earlier probe is flown over)
     let minD=99;const o={lane:p.x};T.run(60*4,o,()=>{o.lane=r.x;if(r.br===p.br)minD=Math.min(minD,Math.hypot(dAlong(-1,posOf(r),posOf(p)),r.x-p.x));return p.stats.knock>k0;});
     if(p.stats.knock===k0)T.note(MAP_ID+' nitro ram on a rival did not take it down (closest '+minD.toFixed(1)+' m, rival x '+r.x.toFixed(1)+' me '+p.x.toFixed(1)+')');}}
   // shockwave knocks nearby cars
