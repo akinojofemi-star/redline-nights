@@ -71,7 +71,7 @@ Racing Heritage (renamed from Redline Nights; the repo, URL, file names and `rn-
 - `package.json` is 1.6.4.
 - The latest GitHub release is **v1.6.3** (desktop).
 - Multiplayer protocol is `VER = '1.7'` in `app/shell.html`. Bump it when the network messages change, because only matching versions can play together.
-- `MODEL_VER = 11` in the game. Bump it when car models are re-exported.
+- `MODEL_VER = 12` in the game. Bump it when car models are re-exported.
 
 ## Game architecture (`src/redline-nights.html`)
 
@@ -198,12 +198,13 @@ The models are real cars from Sketchfab (mostly CC BY-NC-SA, so the game must st
    - `smooth`, then export a GLB to `/tmp/rh_glb`.
 4. Run `python3 ../tools/blender/glb2json.py <dir>` from `app/` to produce `app/models/<id>.json`. Copy only the new GLBs into a fresh directory first.
    - Then run `python3 ../tools/blender/darktrim.py models/<id>.json`. Forza-sourced textures often bake light grey into parts that are black on the real car, and the game shows the trim's baked colour, so they come out white. The script scales the trim's mean colour down to 3.5% when it is above 15%. Most cars sit at 0.5–5%.
-5. Bump `MODEL_VER` (now 11).
+5. Bump `MODEL_VER` (now 12).
 
 Rule gotchas:
 - Interiors often share materials with the outside. Delete interior objects by name first (`SM_Interior`, `SteeringWheel`, `INTERIOR`, `BONNETCAM`, `polySurface*`), or tell them apart by phong number.
 - A `windowinside` → delete rule took the Alpine's whole body with it.
 - `carlib` has a gloss `black` material for texsplit.
+- **Check the nose.** `prepare_car`'s `nose='auto'` picks the wrong end on some long-tailed mid-engined cars. The Valhalla, AMG ONE and Daytona SP3 drove tail first until fixed. Because it labels the lamps and front wheels by the end it chose, a headlight-position check passes anyway. Look at each new car from its +z side in the game. Fix a finished model with `python3 ../tools/blender/turnaround.py models/<id>.json`: it rotates the geometry, swaps the wheel names and the head/tail lamps, and needs a `MODEL_VER` bump. For a rebuild, pass `nose='-y'` or `'+y'`.
 - On Forza-sourced models (`…RewardRecycled…`), `Coloured_Material` is the black secondary zone: grilles, sills, mirrors, diffuser and window surrounds. It defaults to paint, so add `(r'coloured_material','black')` unless it really is the body colour (on the A110 the body paint is `WindowInside`).
 
 **Provenance:** many Sketchfab car models (ddiaz-design and others) are ripped from games. Material names show it: "RewardRecycled" is Forza, "nfsm" is NFS Mobile, and one name says "from_CSR2". The game must stay non-commercial. Rejected for unclear origin or broken geometry: VTX_car's AMG ONE, LSxSEPTIC's AMG GT Black Series, several GR Corollas.
@@ -221,6 +222,8 @@ Gotcha: Rimac material names match the wheel rule (`^rim`), so rename them first
 Mac builds need `identity: '-'` and `hardenedRuntime: false` (already set). Delete removed builds with `rm "${SH:?}"/…` (a safety check blocks a bare `$SH`).
 
 ## Recent history (newest first)
+
+- **Reversed cars fixed (2026-10-09):** the Valhalla, AMG ONE and Daytona SP3 models were built back to front (wrong nose from `nose='auto'`), so they drove tail first. They were turned round with `tools/blender/turnaround.py`. All 68 cars were checked from the front. `MODEL_VER` 12.
 
 - **25 new cars (2026-10-09), 68 in all:** five per class, all from ddiaz-design on Sketchfab.
 

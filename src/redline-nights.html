@@ -2112,7 +2112,7 @@ function makeCar(color,{shape=SEDAN,flames=false}={}){
   return car;
 }
 // Blender-modelled bodies (models/<id>.glb). Materials are matched by name so paint colour and lighting stay consistent.
-const MODEL_CACHE={},MODEL_VER=11; // bump when the Blender models are re-exported
+const MODEL_CACHE={},MODEL_VER=12; // bump when the Blender models are re-exported
 function loadModel(id){
   if(!THREE.GLTFLoader)return Promise.reject(new Error('no loader'));
   return MODEL_CACHE[id]||(MODEL_CACHE[id]=new Promise((res,rej)=>new THREE.GLTFLoader().load('models/'+id+'.json?v='+MODEL_VER,g=>res(g.scene),undefined,rej)));
