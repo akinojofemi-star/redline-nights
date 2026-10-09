@@ -94,6 +94,7 @@ The game script is one IIFE. Main pieces, by name (use grep; line numbers drift)
   - `forkCheck` puts a car on whichever road's centre it is nearer. `toBranch` and `toMain` keep the exact world position via `projectTo`. The player gets a 0.12 s lock so it can't flicker between roads.
   - `b.split` and `b.merge` mark where the roads fully part and rejoin (`apartAt`). The split has a solid divider block (`b.nose`, which `goreCheck` uses to wreck a car straddling it); the merge marker is flat paint.
 - **Placement rules:**
+  - `tun` (optional, default .4) is where along the lap the tunnel search starts.
   - `GAPS` sit clear of forks.
   - `TUNNEL` is placed away from every other road.
   - Ramps (`RAMPS`, `RAMP_TYPES`) are placed by `flatS` and `flatB` with run-out room.
@@ -165,7 +166,7 @@ f.contentWindow.__ev('T.probes()');            // feature probes on this map; pr
 f.contentWindow.__ev(`T.race(5,'classic',{drift:true,nitro:'perfect',avoid:true})`);  // a full race driven through the controls
 f.contentWindow.__ev('T.issues.join("\\n")');
 ```
-- **Maps:** `city`, `canyon`, `alpine`, `coast`, `tokyo`, `jungle`, `volcano`, `arctic`, `industrial`.
+- **Maps:** `city`, `canyon`, `alpine`, `coast`, `tokyo`, `jungle`, `volcano`, `arctic`, `industrial`, `eifel`.
 - **`T.probes()` covers:** every ramp, air and ground 360s, gaps, both fork routes, divider crashes, canisters, pads, roadworks, traffic, nitro rams, Shockwave, all nitro types, drift, out of bounds, the cameras and ghost mode.
 - **`T.race(carIdx, mode, opt)`:** checks every frame for NaN values, cars escaping walls, stuck cars and whether the results screen appears.
 
@@ -208,6 +209,12 @@ Gotcha: Rimac material names match the wheel rule (`^rim`), so rename them first
 Mac builds need `identity: '-'` and `hardenedRuntime: false` (already set). Delete removed builds with `rm "${SH:?}"/…` (a safety check blocks a bare `$SH`).
 
 ## Recent history (newest first)
+
+- **New map, Eifel Grand Prix (`eifel`, 2026-10-09):**
+  - Traced from the user's map of the Nürburgring GP circuit at 5.5 m per pixel (5.95 km lap). Corner names are left out of the game.
+  - To trace a map: load the image into a canvas, overlay `layoutPoints(spec)` from a `?test=1` game frame, adjust the corners until it matches, and check that non-adjacent stretches are at least about 70 m apart centre to centre. The Haug-Haken and Dunlop hairpins are opened out a little so their legs don't touch at the game's road width.
+  - It has no forks, to stay true to the layout. The jump is on the Bit to Hatzenbach straight; `tun:.53` puts the tunnel on the Audi S climb (the default put it over the Dunlop braking zone).
+  - New `forest` scenery: daylight, grass, photo firs, rolling hills, red, white and blue grandstands opposite the pits on the main straight and round the arena, and a pit building.
 
 - **2K textures, better car paint (2026-10-08):**
   - Desktop loads 2K colour maps (`<name>_c2.jpg`, listed in `TEX2K`) for asphalt, concrete, dirt, grass, ice, paving, dark rock, layered rock, sand and snow. They are the original ambientCG CC0 sources (Asphalt031, Concrete034, Ground037, Grass004, Ice002, PavingStones070, Rock035, Rock051, Ground054, Snow006), saved at quality 70. Normal and roughness maps stay 1K. Phones stay 1K. The metal and stone-wall originals couldn't be identified, so those stay 1K, and facades are unchanged because their window glow maps line up with the current images. To download from ambientCG, use curl with a browser user agent on `https://ambientcg.com/get?file=<ID>_2K-JPG.zip`.

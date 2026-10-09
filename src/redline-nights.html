@@ -372,7 +372,11 @@ const MAPS={
   industrial:{name:'Industrial Surge',blurb:'Night shift at the foundry: a hairpin under the cranes, an elevated freight road with a jump across a missing span, and a long way round past the yards.',
     sky:[0x120e16,0x3a2622,0xe0743a],sun:[.4,.05,-1],stars:false,fog:[0x5a3a2c,140,1150],exposure:1.12,
     hemi:[0xffc890,0x2a2026,.75],dir:[0xffa860,1.1],fill:[0x90b0ff,.4],asphalt:'#262426',wall:['#5a5652','#6a6460'],rails:[0xffa020,0x40c8ff],
-    scenery:'city',lamps:true,tunnel:{wall:0x2c2826,rings:[0xffa020,0xff5020],label:'FOUNDRY TUNNEL'}}
+    scenery:'city',lamps:true,tunnel:{wall:0x2c2826,rings:[0xffa020,0xff5020],label:'FOUNDRY TUNNEL'}},
+  eifel:{name:'Eifel Grand Prix',blurb:'A grand prix circuit in the Eifel forest: the long pit straight, the twisting arena, the plunge down to the hairpin and the climb back through the esses.',
+    sky:[0x2c68b4,0x7eb0e2,0xd6e4ee],sun:[-.45,.3,-1],stars:false,fog:[0xb6c8d8,240,1700],exposure:1.0,
+    hemi:[0xe8f2ff,0x4a6038,.95],dir:[0xfff2dc,1.5],fill:[0xa8c4ff,.35],asphalt:'#2a2a2e',wall:['#e4e4e8','#c8c8cc'],rails:[0xe8202a,0xffffff],
+    scenery:'forest',lamps:false,tunnel:{wall:0x3c3c42,rings:[0xe8202a,0xffffff],label:'FOREST TUNNEL'}}
 };
 const MAP_ID=(()=>{const h=(location.hash||'').slice(1);if(MAPS[h])return h;const v=store.get('rn-map');return MAPS[v]?v:'city';})();
 const MAP=MAPS[MAP_ID];
@@ -547,7 +551,16 @@ const LAYOUTS={
     [-442,-544,150,5],[-493,-891,45,6],[-170,-809,200,12],[170,-714,200,14],[544,-476,90,14],[571,-204,150,18]],
     sec:[[7,8,{w:11}],[11,1,{l:'cliff',r:'cliff'}],[2,4,{w:12,surf:'stone'}],[4,6,{l:'kerb',r:'kerb',surf:'stone'}]],
     gaps:[[0,.45,45]],
-    br:[{kind:'short',p:[[17,-756.75,150],[330,-420,150],[525.85,-37.4,150]]},{kind:'long',p:[[-93.5,306,90],[-330,280,90],[-650,-420,100],[-464.95,-700.15,100]]}]}
+    br:[{kind:'short',p:[[17,-756.75,150],[330,-420,150],[525.85,-37.4,150]]},{kind:'long',p:[[-93.5,306,90],[-330,280,90],[-650,-420,100],[-464.95,-700.15,100]]}]},
+  // Eifel Grand Prix, traced from the user's circuit map (5.5 m per pixel): the pit straight down to the Haug-Haken
+  // hairpin, the arena loop, down past Valvoline and Ford to the Dunlop hairpin, back up through the Audi S, Michelin,
+  // Bit and Hatzenbach, then the NGK chicane and Coca-Cola onto the straight. The hairpins are opened out a little
+  // (Haug-Haken, Dunlop) so the two legs of each stay clear of each other at the game's road width. No forks.
+  eifel:{start:.22,surf:'asphalt',c:[[644,-786,35,10],[-38,-22,30,9],[-115,-55,30,9],[-5,-302,30,8],[-280,-319,35,8],[-280,-203,35,8],
+    [-170,-198,30,8],[-181,-27,150,7],[-275,374,60,4],[-93,418,35,3],[-577,924,35,2],[-671,836,35,2],[-352,506,50,3],[-396,407,50,4],
+    [-264,-55,40,6],[-473,-176,40,7],[-148,-605,100,9],[319,-715,30,10],[314,-781,30,10],[627,-863,35,10]],
+    sec:[[0,1,{l:'kerb',r:'kerb'}],[7,10,{l:'kerb',r:'kerb'}],[10,12,{w:14,l:'kerb',r:'kerb'}],[12,15,{l:'kerb',r:'kerb'}],[15,16,{l:'cliff',r:'cliff'}],[16,19,{w:14,l:'kerb',r:'kerb'}]],
+    gaps:[[15,.4,45]],tun:.53}
 };
 // dense points (about every 4 m) round the loop, starting at the start line: [{x,z,h}], plus any corner that doesn't fit
 function layoutPoints(spec,step=4){
@@ -848,7 +861,8 @@ const GAPS=(LAYOUTS[MAP_ID].gaps||[]).map(([e,f,len])=>{const [a,b]=MARKS.edge[e
   return {s0,s1:mod(s0+len),len};});
 // the tunnel: up to a tenth of the lap, as near the middle of the lap as it can be, on a stretch where no other road
 // (a fork, or the lap passing back over itself) comes anywhere near its walls, and clear of the start and the gaps
-const TUNNEL=(()=>{const TW=14.4*RW,R2=(ROAD_HALF+TW+16)**2,blk=new Uint8Array(NS);
+const TUNNEL=(()=>{const t0=LAYOUTS[MAP_ID].tun??.4,TW=14.4*RW, // (tun: where along the lap to start looking, default .4)
+  R2=(ROAD_HALF+TW+16)**2,blk=new Uint8Array(NS);
   for(let k=0;k<NS;k++){const x=P[k*3],z=P[k*3+2],s=k/NS*L;
     for(let j=0;j<NS&&!blk[k];j+=2)if(Math.abs(wrapD(j/NS*L,s))>320&&(P[j*3]-x)**2+(P[j*3+2]-z)**2<R2)blk[k]=1;
     for(const b of BR){if(blk[k])break;for(let i=0;i<b.n;i+=2)if((b.P[i*3]-x)**2+(b.P[i*3+2]-z)**2<R2){blk[k]=1;break;}}}
@@ -856,8 +870,8 @@ const TUNNEL=(()=>{const TW=14.4*RW,R2=(ROAD_HALF+TW+16)**2,blk=new Uint8Array(N
     if(!GAPS.every(g=>{const d=wrapD(a-120,g.s0);return d+len+240<0||d>g.len;}))return false;
     for(let s=a-60;s<=a+len+60;s+=L/NS)if(blk[Math.round(mod(s)/L*NS)%NS])return false;return true;};
   for(const f of [.1,.085,.07,.055,.04]){const len=f*L;
-    for(let k=0;k<L/20;k++)for(const sg of [1,-1]){const a=.4*L+sg*k*10;if(clear(a,len))return {s0:a,s1:a+len,h:10.5,w:TW};}}
-  return {s0:.4*L,s1:.44*L,h:10.5,w:TW};})();
+    for(let k=0;k<L/20;k++)for(const sg of [1,-1]){const a=t0*L+sg*k*10;if(clear(a,len))return {s0:a,s1:a+len,h:10.5,w:TW};}}
+  return {s0:t0*L,s1:(t0+.04)*L,h:10.5,w:TW};})();
 
 function ribbon(pt,vLen){
   const n=NS+1,pos=new Float32Array(n*6),uv=new Float32Array(n*4),idx=new Uint16Array(NS*6),a=[0,0,0];
@@ -942,7 +956,8 @@ const LOOK=Object.assign({
   coast:{road:.45,verge:['sand',4,0xf4dcb0],wall:['concrete',3,0xeae2d6]},
   jungle:{road:.42,verge:['grass',3,0xa8d080],ground:['grass',7,0x7a9a5a],wall:['stonewall',3,0xd0d0b4],dirt:'dirt',dirtTint:0x8a6448},
   volcano:{road:.24,verge:['rockDark',4,0xd8784a],wall:['rockDark',4,0xd0a090]},
-  arctic:{road:.42,verge:['snow',4,0xffffff],wall:['concrete',3,0xccd6e4]}
+  arctic:{road:.42,verge:['snow',4,0xffffff],wall:['concrete',3,0xccd6e4]},
+  forest:{road:.36,verge:['grass',3,0x9ccc78],ground:['grass',7,0x6e9a52],wall:['concrete',3,0xe8e8ec]}
 }[MAP.scenery],MAP_ID==='industrial'?{wall:['metal',3,0xc8b8a8],ground:['concrete',7,0x6a6460]}:{});
 const roadTexOf=(skip,plain)=>canvasTex(512,512,(g,w,h)=>{
   g.clearRect(0,0,w,h);
@@ -1001,7 +1016,7 @@ const railMats=[new THREE.MeshBasicMaterial({color:MAP.rails[0],side:THREE.Doubl
 // open edges: a red and white kerb, then a verge, then the drop
 const kerbTex=canvasTex(32,128,(g,w,h)=>{for(let y=0;y<4;y++){g.fillStyle=y%2?'#f4f0e8':'#d8202c';g.fillRect(0,y*32,w,32);}});kerbTex.wrapS=kerbTex.wrapT=THREE.RepeatWrapping;
 const kerbMat=new THREE.MeshStandardMaterial({map:kerbTex,roughness:.7});
-const VERGE_COL={city:'#2a2430',canyon:'#a8714a',alpine:'#e8eef8',coast:'#d8c08c',tokyo:'#2c2c34',jungle:'#3f6a2c',volcano:'#2a1612',arctic:'#e4eef8'}[MAP.scenery];
+const VERGE_COL={city:'#2a2430',canyon:'#a8714a',alpine:'#e8eef8',coast:'#d8c08c',tokyo:'#2c2c34',jungle:'#3f6a2c',volcano:'#2a1612',arctic:'#e4eef8',forest:'#4a7a34'}[MAP.scenery];
 const vergeTex=canvasTex(128,128,(g,w,h)=>{g.fillStyle=VERGE_COL;g.fillRect(0,0,w,h);const r=mulberry32(14);for(let i=0;i<1500;i++){g.fillStyle=`rgba(${r()>.5?'255,255,255':'0,0,0'},${r()*.12})`;g.fillRect(r()*w,r()*h,3,3);}});
 vergeTex.wrapS=vergeTex.wrapT=THREE.RepeatWrapping;const vergeMat=rnTex(new THREE.MeshStandardMaterial({map:vergeTex,roughness:1}),{tex:LOOK.verge[0],scale:LOOK.verge[1],tint:LOOK.verge[2]});
 const outer=(k,side)=>HW[k]+(side>0?ROR:ROL)[k];
@@ -1044,7 +1059,7 @@ for(const side of [-1,1]){
 }
 // gaps: the road simply stops; water (or lava, or the city far below) shows through, with a cliff face at each end
 if(GAPS.length){
-  const gapCol={city:0x0a0812,canyon:0x2a6a8a,alpine:0x6a8ab0,coast:0x1d5f8c,tokyo:0x101018,jungle:0x2a7a8a,volcano:0xff5a10,arctic:0x8ab8d8}[MAP.scenery];
+  const gapCol={city:0x0a0812,canyon:0x2a6a8a,alpine:0x6a8ab0,coast:0x1d5f8c,tokyo:0x101018,jungle:0x2a7a8a,volcano:0xff5a10,arctic:0x8ab8d8,forest:0x2a6a7a}[MAP.scenery];
   const gm=new THREE.MeshStandardMaterial({color:gapCol,roughness:.2,metalness:.3,emissive:MAP.scenery==='volcano'?0xff4000:0,emissiveIntensity:.8});
   for(const g of GAPS){const ks=[];for(let k=0;k<NS;k++)if(GAPK[k]&&Math.abs(wrapD(k/NS*L,g.s0))<g.len+5)ks.push(k);
     ks.sort((a,b)=>wrapD(a/NS*L,g.s0)-wrapD(b/NS*L,g.s0));const run=padRun(ks);
@@ -1100,7 +1115,8 @@ const GROUND_LOOK={
   tokyo:{base:'#0d0c14',dot:'255,255,255',a:.05,grid:'rgba(90,200,255,.12)',rough:.5},
   jungle:{base:'#2c4424',dot:'10,30,5',a:.3,grid:null,rough:1},
   volcano:{base:'#140a08',dot:'255,90,20',a:.25,grid:null,rough:.9,cracks:'#ff6a10'},
-  arctic:{base:'#b8d2ea',dot:'255,255,255',a:.6,grid:null,rough:.15,cracks:'rgba(255,255,255,.7)'}}[MAP.scenery];
+  arctic:{base:'#b8d2ea',dot:'255,255,255',a:.6,grid:null,rough:.15,cracks:'rgba(255,255,255,.7)'},
+  forest:{base:'#3a5a2c',dot:'10,30,5',a:.3,grid:null,rough:1}}[MAP.scenery];
 const groundTex=canvasTex(256,256,(g,w,h)=>{g.fillStyle=GROUND_LOOK.base;g.fillRect(0,0,w,h);if(GROUND_LOOK.grid){g.strokeStyle=GROUND_LOOK.grid;g.lineWidth=2;g.strokeRect(0,0,w,h);}
   const r=mulberry32(5);for(let i=0;i<700;i++){g.fillStyle=`rgba(${GROUND_LOOK.dot},${r()*GROUND_LOOK.a})`;g.fillRect(r()*w,r()*h,MAP.scenery==='coast'?6:3,MAP.scenery==='coast'?1.5:3);}
   if(GROUND_LOOK.cracks){g.strokeStyle=GROUND_LOOK.cracks;g.lineCap='round'; // lava seams / ice fractures, drawn wrapping so the tile repeats cleanly
@@ -1119,7 +1135,8 @@ const TERRAIN={alpine:{clear:150,ramp:420,h:700,rock:'rockLayer',top:'snow',tint
   canyon:{clear:170,ramp:300,h:150,terrace:28,rock:'rockLayer',top:'sand',tint:0xf0a070,tint2:0xd09060,slope:[.8,.92],sc:18},
   jungle:{clear:110,ramp:380,h:110,rock:'dirt',top:'grass',tint:0x8a9a6a,tint2:0x9ac080,slope:[.55,.8],sc:10},
   volcano:{clear:150,ramp:400,h:420,rock:'rockDark',top:'rockDark',tint:0x6a4a44,tint2:0x4a3434,slope:[.7,.9],sc:20},
-  arctic:{clear:200,ramp:520,h:90,rock:'ice',top:'snow',tint:0xa8c8e8,tint2:0xf4f8ff,slope:[.6,.85],sc:16}}[MAP.scenery];
+  arctic:{clear:200,ramp:520,h:90,rock:'ice',top:'snow',tint:0xa8c8e8,tint2:0xf4f8ff,slope:[.6,.85],sc:16},
+  forest:{clear:130,ramp:420,h:170,rock:'dirt',top:'grass',tint:0x7a9a5a,tint2:0x8ab070,slope:[.55,.8],sc:12}}[MAP.scenery];
 if(TERRAIN){
   const T=TERRAIN,pts=[];for(let k=0;k<NS;k+=2)pts.push(P[k*3],P[k*3+2]);for(const b of BR)for(let i=0;i<b.n;i+=2)pts.push(b.P[i*3],b.P[i*3+2]);
   let x0=1e9,x1=-1e9,z0=1e9,z1=-1e9;for(let i=0;i<pts.length;i+=2){x0=Math.min(x0,pts[i]);x1=Math.max(x1,pts[i]);z0=Math.min(z0,pts[i+1]);z1=Math.max(z1,pts[i+1]);}
@@ -1454,6 +1471,31 @@ if(MAP.scenery==='arctic'){
   instanced(new THREE.SphereGeometry(1,8,5,0,Math.PI*2,0,Math.PI/2),snow,drifts);
   const bergs=[];for(let i=0;i<26;i++){const a=i/26*Math.PI*2+SR()*.15,r=2800+SR()*800,w=200+SR()*400;bergs.push([Math.cos(a)*r,GROUND_Y-10,Math.sin(a)*r,w,120+SR()*280,w*.6,SR()*6]);}
   instanced(new THREE.CylinderGeometry(.75,1,1,6).translate(0,.5,0),new THREE.MeshBasicMaterial({color:0x3a5a86,fog:false}),bergs);
+}
+if(MAP.scenery==='forest'){
+  // spruce forest right up to the run-off, grandstands opposite the pits on the main straight and round the arena
+  const firs=[],firs2=[];
+  for(let i=0;i<NS;i+=3)for(const side of [-1,1]){
+    if(SR()>.82)continue;const [x,z]=spot(i,side*(26+Math.pow(SR(),1.5)*300));if(trackDist(x,z)<24)continue;
+    (SR()<.55?firs:firs2).push([x,GROUND_Y-.2,z,13+SR()*13,SR()*6]);
+  }
+  impTrees('fir_a',firs,0xe4ecd8);impTrees('fir_b',firs2,0xe4ecd8);
+  const seats=[],backs=[],pits=[],SEAT=[0xd02030,0x2050c0,0xf0f0f0];
+  // seat rows rise from the road's own level (the road runs on a low embankment), red, blue and white
+  const stand=(i,side,len)=>{const yaw=Math.atan2(F[i*3],F[i*3+2]),off=HW[i]+(side>0?ROR:ROL)[i]+10,base=P[i*3+1]-GROUND_Y,rows=[];
+    for(let t=0;t<6;t++){const [x,z]=spot(i,side*(off+t*2.6));if(trackDist(x,z)<off-4)return;rows.push([x,GROUND_Y,z,2.6,base+.6+t*1.5,len,yaw,SEAT[t%3]]);}
+    const [bx,bz]=spot(i,side*(off+6*2.6+.6));if(trackDist(bx,bz)<off-4)return;seats.push(...rows);backs.push([bx,GROUND_Y,bz,1.2,base+10,len,yaw]);}; // (boxes run along the road: local z follows yaw)
+  const at=s=>Math.round(mod(s)/L*NS)%NS;
+  for(let s=-120;s<520;s+=48)stand(at(s),-1,44);
+  for(let s=-60;s<460;s+=60){const i=at(s),yaw=Math.atan2(F[i*3],F[i*3+2]),off=HW[i]+ROR[i]+16,[x,z]=spot(i,off);
+    if(trackDist(x,z)>off-4)pits.push([x,GROUND_Y,z,14,P[i*3+1]-GROUND_Y+8,56,yaw]);}
+  // the arena: stands on the outside of its bends
+  {const a=MARKS.apex[3]*L,b=MARKS.apex[6]*L;for(let s=a;s<b;s+=46){const i=at(s);if(Math.abs(C[i])>1/220)stand(i,Math.sign(C[i]),38);}}
+  instanced(new THREE.BoxGeometry(1,1,1).translate(0,.5,0),new THREE.MeshStandardMaterial({roughness:.8}),seats);
+  instanced(new THREE.BoxGeometry(1,1,1).translate(0,.5,0),rnTex(new THREE.MeshStandardMaterial({roughness:.8}),{tex:'concrete',scale:3,tint:0x8a8a92}),backs);
+  instanced(new THREE.BoxGeometry(1,1,1).translate(0,.5,0),rnTex(new THREE.MeshStandardMaterial({roughness:.75,metalness:.1,color:0xf2f2f4}),{tex:'facadeOffice',scale:22,roof:.06}),pits);
+  const hills=[];for(let i=0;i<30;i++){const a=i/30*Math.PI*2+SR()*.15,r=2800+SR()*700,w=500+SR()*500;hills.push([Math.cos(a)*r,GROUND_Y-10,Math.sin(a)*r,w,200+SR()*300,w,SR()*6]);}
+  instanced(new THREE.SphereGeometry(1,10,6,0,Math.PI*2,0,Math.PI/2),new THREE.MeshBasicMaterial({color:0x5a7a68,fog:false}),hills);
 }
 // street lamps + light pools
 if(MAP.lamps){
