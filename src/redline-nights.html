@@ -563,7 +563,10 @@ const LAYOUTS={
     gaps:[[15,.4,45]],tun:.53,
     // the pit lane: leaves the straight before Coca-Cola (drawn tangent to it, so not eased), hooks round inside the
     // hairpin, runs beside the start straight past the line and merges halfway to Haug-Haken
-    br:[{kind:'short',name:'PIT LANE',ease:[0,0],p:[[470,-822.4,0],[607,-858,30],[331,-550,300],[201.6,-290.2,300]]}]}
+    br:[{kind:'short',name:'PIT LANE',ease:[0,0],p:[[470,-822.4,0],[607,-858,30],[331,-550,300],[201.6,-290.2,300]]},
+    // the nitro route: leaves the Valvoline descent, loops out east round the outside of Ford and merges into the run down to
+    // Dunlop (drawn by hand there, so the merge is done well before the hairpin)
+      {kind:'long',ease:[1,0],p:[[-205,80,60],[-30,130,60],[40,520,60],[-142.5,578,300],[-355.6,692.7,300]]}]}
 };
 // dense points (about every 4 m) round the loop, starting at the start line: [{x,z,h}], plus any corner that doesn't fit
 function layoutPoints(spec,step=4){

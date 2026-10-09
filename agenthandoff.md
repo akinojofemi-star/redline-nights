@@ -81,7 +81,7 @@ The game script is one IIFE. Main pieces, by name (use grep; line numbers drift)
 - **Layouts:** `LAYOUTS[map]` lists corners `[x, z, radius, height]` that are filleted into a closed Catmull-Rom curve. It also defines:
   - `sec`: road sections with width, edges (wall, kerb or cliff) and surface;
   - `gaps`: jumps across missing road;
-  - `br`: the forks, usually one `short` (shortcut) and one `long` (nitro route); Eifel has only its pit lane. Optional `name` and `ease` (see history).
+  - `br`: the forks, usually one `short` (shortcut) and one `long` (nitro route); Eifel's are its pit lane (short) and a nitro route. Optional `name` and `ease` (see history).
 - **Sampling:** `NS = 2400` samples per lap, in arrays `P`, `F`, `R`, `C`.
 - **Coordinates:** `s` is distance along the lap and `x` is lateral position. `+x` is to the right of the driving direction. `sample(s)` fills `TS`.
 - **Width and edges:** `HW[k]` is the half-width, and `EL`/`ER` are the edge types (0 wall, 1 kerb with a 12 m run-off, 2 cliff with 5 m).
@@ -210,6 +210,8 @@ Mac builds need `identity: '-'` and `hardenedRuntime: false` (already set). Dele
 
 ## Recent history (newest first)
 
+- **Eifel nitro route (2026-10-09):** a `long` fork that leaves the Valvoline descent (eased) and loops east round the outside of Ford. It merges by hand (`ease:[1,0]`) into the run down to Dunlop at about 2,670 m, well before the hairpin; the automatic merge eased right into the Dunlop braking zone. It's 1,195 m against 1,056 m of main road and stays at least 72 m from every other stretch, with 32 canisters, 5 pads and a ramp. The main-road ramps re-placed themselves round it. One bot run in four went over the cliff edge after the jump near the new hops on the Bit straight; it didn't repeat.
+
 - **Eifel pit lane (2026-10-09):**
   - The pit lane is a `short` fork named `PIT LANE`. It leaves the NGK straight about 200 m after the chicane, hooks round inside Coca-Cola (radius 30), runs 76 m to the right of the start straight past the line, and merges about 470 m after it. It's 762 m against 925 m of main road.
   - New branch options: `name` (the label on signs, gantries and hints) and `ease:[start,end]`. Set an end to 0 to keep it exactly as drawn; the automatic ease only suits gradual peel-offs. Both pit-lane ends are drawn by hand and tangent to the main road.
@@ -221,7 +223,7 @@ Mac builds need `identity: '-'` and `hardenedRuntime: false` (already set). Dele
 - **New map, Eifel Grand Prix (`eifel`, 2026-10-09):**
   - Traced from the user's map of the Nürburgring GP circuit at 5.5 m per pixel (5.95 km lap). Corner names are left out of the game.
   - To trace a map: load the image into a canvas, overlay `layoutPoints(spec)` from a `?test=1` game frame, adjust the corners until it matches, and check that non-adjacent stretches are at least about 70 m apart centre to centre. The Haug-Haken and Dunlop hairpins are opened out a little so their legs don't touch at the game's road width.
-  - Its one fork is the pit lane from the drawing (see the next entry). The jump is on the Bit to Hatzenbach straight; `tun:.53` puts the tunnel on the Audi S climb (the default put it over the Dunlop braking zone).
+  - Its forks are the pit lane from the drawing and a nitro route (see the newer entries). The jump is on the Bit to Hatzenbach straight; `tun:.53` puts the tunnel on the Audi S climb (the default put it over the Dunlop braking zone).
   - New `forest` scenery: daylight, grass, photo firs, rolling hills, red, white and blue grandstands opposite the pits on the main straight and round the arena, and a pit building.
 
 - **2K textures, better car paint (2026-10-08):**
