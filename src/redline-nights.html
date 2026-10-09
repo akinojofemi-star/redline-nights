@@ -555,12 +555,15 @@ const LAYOUTS={
   // Eifel Grand Prix, traced from the user's circuit map (5.5 m per pixel): the pit straight down to the Haug-Haken
   // hairpin, the arena loop, down past Valvoline and Ford to the Dunlop hairpin, back up through the Audi S, Michelin,
   // Bit and Hatzenbach, then the NGK chicane and Coca-Cola onto the straight. The hairpins are opened out a little
-  // (Haug-Haken, Dunlop) so the two legs of each stay clear of each other at the game's road width. No forks.
+  // (Haug-Haken, Dunlop) so the two legs of each stay clear of each other at the game's road width.
   eifel:{start:.22,surf:'asphalt',c:[[644,-786,35,10],[-38,-22,30,9],[-115,-55,30,9],[-5,-302,30,8],[-280,-319,35,8],[-280,-203,35,8],
     [-170,-198,30,8],[-181,-27,150,7],[-275,374,60,4],[-93,418,35,3],[-577,924,35,2],[-671,836,35,2],[-352,506,50,3],[-396,407,50,4],
     [-264,-55,40,6],[-473,-176,40,7],[-148,-605,100,9],[319,-715,30,10],[314,-781,30,10],[627,-863,35,10]],
     sec:[[0,1,{l:'kerb',r:'kerb'}],[7,10,{l:'kerb',r:'kerb'}],[10,12,{w:14,l:'kerb',r:'kerb'}],[12,15,{l:'kerb',r:'kerb'}],[15,16,{l:'cliff',r:'cliff'}],[16,19,{w:14,l:'kerb',r:'kerb'}]],
-    gaps:[[15,.4,45]],tun:.53}
+    gaps:[[15,.4,45]],tun:.53,
+    // the pit lane: leaves the straight before Coca-Cola (drawn tangent to it, so not eased), hooks round inside the
+    // hairpin, runs beside the start straight past the line and merges halfway to Haug-Haken
+    br:[{kind:'short',name:'PIT LANE',ease:[0,0],p:[[470,-822.4,0],[607,-858,30],[331,-550,300],[201.6,-290.2,300]]}]}
 };
 // dense points (about every 4 m) round the loop, starting at the start line: [{x,z,h}], plus any corner that doesn't fit
 function layoutPoints(spec,step=4){
@@ -626,7 +629,7 @@ function layoutBranches(spec,step=4){
     push(px,pz);
     let tot=0;const acc=[0];for(let i=1;i<out.length;i++){tot+=Math.hypot(out[i][0]-out[i-1][0],out[i][1]-out[i-1][1]);acc.push(tot);}
     const hill=B.kind==='long'?6:0;
-    return {kind:B.kind,pts:out.map((p,i)=>{const u=acc[i]/tot,k=u*u*(3-2*u),sn=Math.sin(Math.PI*u)**2;return [p[0]-cx,h0+(h1-h0)*k+hill*sn,p[1]-cz];})};
+    return {kind:B.kind,ease:B.ease||[1,1],name:B.name,pts:out.map((p,i)=>{const u=acc[i]/tot,k=u*u*(3-2*u),sn=Math.sin(Math.PI*u)**2;return [p[0]-cx,h0+(h1-h0)*k+hill*sn,p[1]-cz];})};
   });
 }
 // control points for the game's closed Catmull-Rom curve, centred on the origin
@@ -724,9 +727,9 @@ function easeStart(pts,dir){   // dir 1: the route leaves the main road heading 
       if(!best||score>best.score)best={score,pts:cur.concat(pts.slice(f))};}}
   return best?best.pts:pts;
 }
-const easeJunctions=pts=>easeStart(easeStart(pts,1).reverse(),-1).reverse();
-function buildBranchPts(pts,kind){
-  pts=easeJunctions(pts);
+// ease: [start, end], 0 to keep that end exactly as drawn (drawn leaving tangent to the main road, as the pit lane is)
+function buildBranchPts(pts,kind,ease=[1,1]){
+  if(ease[0])pts=easeStart(pts,1);if(ease[1])pts=easeStart(pts.slice().reverse(),-1).reverse();
   const e=pts[pts.length-1],s0=nearS(pts[0][0],pts[0][2]),s1=nearS(e[0],e[2]),span=mod(s1-s0);
   // level the branch with the main road wherever the two touch, easing into its own heights as they part, so the two
   // surfaces meet flush and a car crossing from one to the other never steps up or down
@@ -825,14 +828,18 @@ function forkCheck(e){
 function pickRoad(e){
   const score=()=>{const [lo,hi]=limits(e,true),m=Math.min(e.x-lo,hi-e.x);return m>=0?1e3-Math.abs(e.x):m;};
   const save=()=>({br:e.br,bs:e.bs,s:e.s,dist:e.dist,x:e.x}),here=save();let best=here,bm=score()+.5; // (a little in favour of where it is)
+  const wx=()=>{sampleE(e);return TS.p.x+TS.r.x*e.x;},wz=()=>TS.p.z+TS.r.z*e.x,x0=wx(),z0=wz();
   for(const b of BR){
     // (only once the two centres have parted: right at a junction they're the same line and the count would flicker)
     if(here.br<0){const d=wrapD(here.s,b.s0);if(d<0||d>b.span||Math.abs(offM(b,d))<1)continue;toBranch(e,b,bsM(b,d));}
     else if(here.br===b.i){if(Math.abs(offB(b,here.bs))<1)continue;toMain(e,b);}else continue;
+    // the other road only counts if the car's spot on it is where the car really is: where a road bends back on itself
+    // (a pit lane hooking round inside a hairpin) the nearest point can be far along it, with a small sideways offset
+    const x1=wx(),z1=wz();if((x1-x0)**2+(z1-z0)**2>4){Object.assign(e,here);continue;}
     const m=score();if(m>bm){bm=m;best=save();}Object.assign(e,here);}
   Object.assign(e,best);}
 // this map's alternative routes, laid out by hand in LAYOUTS
-for(const q of layoutBranches(LAYOUTS[MAP_ID])){const b=buildBranchPts(q.pts,q.kind);b.i=BR.length;BR.push(b);}
+for(const q of layoutBranches(LAYOUTS[MAP_ID])){const b=buildBranchPts(q.pts,q.kind,q.ease);b.name=q.name;b.i=BR.length;BR.push(b);}
 // section and gap positions from the layout's corners (fractions of the lap)
 const MARKS=layoutPoints(LAYOUTS[MAP_ID]);
 // a gap slides along the lap (up to 480 m either way, never onto the start) until there's room after the far side to land flat out and see the
@@ -1181,8 +1188,8 @@ const ARROW_L='\u25c0',ARROW_R='\u25b6';
 // where a branch is fully apart from the main road (end 0: the split) and where it starts to rejoin it (end 1)
 const apartAt=(b,end)=>{for(let q=0;q<=b.len;q+=1){const s=end?b.len-q:q;if(sepB(b,s)>=GAP)return s;}return end?b.len:0;};
 for(const b of BR){
-  const what=b.kind==='short'?'SHORTCUT':'NITRO ROUTE',col=b.kind==='short'?'#ffb02e':'#3fc8ff';
-  b.label=b.kind==='short'?'shortcut':'nitro route';
+  const what=b.name||(b.kind==='short'?'SHORTCUT':'NITRO ROUTE'),col=b.kind==='short'?'#ffb02e':'#3fc8ff';
+  b.label=what.toLowerCase();
   gantry(Math.abs(wrapD(b.s0-140,0))<60?b.s0-70:b.s0-140,b.side<0?ARROW_L+'  '+what+'  \u00b7  KEEP LEFT':'KEEP RIGHT  \u00b7  '+what+'  '+ARROW_R,col);
   // striped gore marker where the two roads separate and where they merge again
   const goreTex=canvasTex(128,64,(g,w,h)=>{g.fillStyle='#16121e';g.fillRect(0,0,w,h);g.fillStyle=col;for(let x=-64;x<w;x+=32){g.beginPath();g.moveTo(x,h);g.lineTo(x+16,h);g.lineTo(x+48,0);g.lineTo(x+32,0);g.fill();}});
@@ -1207,7 +1214,7 @@ const roadWord=(text,col)=>new THREE.MeshBasicMaterial({map:canvasTex(512,128,(c
 // flat on the road, stretched along it like real road markings so it reads from a driver's low angle, left to right
 const wordGeo=new THREE.PlaneGeometry(9,11).rotateX(-Math.PI/2).rotateY(Math.PI);
 for(const b of BR){
-  const what=b.kind==='short'?'SHORTCUT':'NITRO ROUTE',col=b.kind==='short'?'#ffb02e':'#3fc8ff';
+  const what=b.name||(b.kind==='short'?'SHORTCUT':'NITRO ROUTE'),col=b.kind==='short'?'#ffb02e':'#3fc8ff';
   const nose=b.split;
   const label=b.side<0?ARROW_L+' '+what+'      MAIN ROAD '+ARROW_R:ARROW_L+' MAIN ROAD      '+what+' '+ARROW_R;
   const tex=canvasTex(1024,160,(c,w,h)=>{c.fillStyle='#120c1c';c.fillRect(0,0,w,h);c.font='italic 900 76px "Saira Condensed",Impact,sans-serif';c.textBaseline='middle';
@@ -1487,8 +1494,10 @@ if(MAP.scenery==='forest'){
     const [bx,bz]=spot(i,side*(off+6*2.6+.6));if(trackDist(bx,bz)<off-4)return;seats.push(...rows);backs.push([bx,GROUND_Y,bz,1.2,base+10,len,yaw]);}; // (boxes run along the road: local z follows yaw)
   const at=s=>Math.round(mod(s)/L*NS)%NS;
   for(let s=-120;s<520;s+=48)stand(at(s),-1,44);
-  for(let s=-60;s<460;s+=60){const i=at(s),yaw=Math.atan2(F[i*3],F[i*3+2]),off=HW[i]+ROR[i]+16,[x,z]=spot(i,off);
-    if(trackDist(x,z)>off-4)pits.push([x,GROUND_Y,z,14,P[i*3+1]-GROUND_Y+8,56,yaw]);}
+  // pit garages along the far side of the pit lane
+  const pl=BR.find(b=>b.name==='PIT LANE');
+  if(pl)for(let bs=0;bs<pl.len;bs+=60){if(sepB(pl,bs)<70||sepB(pl,bs+56)<70)continue;const i=Math.round((bs+28)/pl.len*(pl.n-1)),off=pl.side*(ROAD_HALF+16);
+    pits.push([pl.P[i*3]+pl.R[i*3]*off,GROUND_Y,pl.P[i*3+2]+pl.R[i*3+2]*off,14,pl.P[i*3+1]-GROUND_Y+8,56,Math.atan2(pl.F[i*3],pl.F[i*3+2])]);}
   // the arena: stands on the outside of its bends
   {const a=MARKS.apex[3]*L,b=MARKS.apex[6]*L;for(let s=a;s<b;s+=46){const i=at(s);if(Math.abs(C[i])>1/220)stand(i,Math.sign(C[i]),38);}}
   instanced(new THREE.BoxGeometry(1,1,1).translate(0,.5,0),new THREE.MeshStandardMaterial({roughness:.8}),seats);

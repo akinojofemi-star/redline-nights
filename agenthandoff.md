@@ -81,7 +81,7 @@ The game script is one IIFE. Main pieces, by name (use grep; line numbers drift)
 - **Layouts:** `LAYOUTS[map]` lists corners `[x, z, radius, height]` that are filleted into a closed Catmull-Rom curve. It also defines:
   - `sec`: road sections with width, edges (wall, kerb or cliff) and surface;
   - `gaps`: jumps across missing road;
-  - `br`: the two forks per map, one `short` (shortcut) and one `long` (nitro route).
+  - `br`: the forks, usually one `short` (shortcut) and one `long` (nitro route); Eifel has only its pit lane. Optional `name` and `ease` (see history).
 - **Sampling:** `NS = 2400` samples per lap, in arrays `P`, `F`, `R`, `C`.
 - **Coordinates:** `s` is distance along the lap and `x` is lateral position. `+x` is to the right of the driving direction. `sample(s)` fills `TS`.
 - **Width and edges:** `HW[k]` is the half-width, and `EL`/`ER` are the edge types (0 wall, 1 kerb with a 12 m run-off, 2 cliff with 5 m).
@@ -210,10 +210,18 @@ Mac builds need `identity: '-'` and `hardenedRuntime: false` (already set). Dele
 
 ## Recent history (newest first)
 
+- **Eifel pit lane (2026-10-09):**
+  - The pit lane is a `short` fork named `PIT LANE`. It leaves the NGK straight about 200 m after the chicane, hooks round inside Coca-Cola (radius 30), runs 76 m to the right of the start straight past the line, and merges about 470 m after it. It's 762 m against 925 m of main road.
+  - New branch options: `name` (the label on signs, gantries and hints) and `ease:[start,end]`. Set an end to 0 to keep it exactly as drawn; the automatic ease only suits gradual peel-offs. Both pit-lane ends are drawn by hand and tangent to the main road.
+  - The fork crosses the start line, which is fine: lap distance is continuous on a branch.
+  - Fix in `pickRoad`: a candidate road only counts if the car's mapped position matches its real world position. Where a branch bends back (the pit lane inside the hairpin), the nearest point can be far along it with a small sideways offset, and the car jumped 100 m onto the pit lane.
+  - Pit garages now stand on the far side of the pit lane.
+  - Suite: the flip probe uses a ramp on a straight, and the parked-traffic probe uses the straightest run-up. Both used to fall back to bends on Eifel.
+
 - **New map, Eifel Grand Prix (`eifel`, 2026-10-09):**
   - Traced from the user's map of the Nürburgring GP circuit at 5.5 m per pixel (5.95 km lap). Corner names are left out of the game.
   - To trace a map: load the image into a canvas, overlay `layoutPoints(spec)` from a `?test=1` game frame, adjust the corners until it matches, and check that non-adjacent stretches are at least about 70 m apart centre to centre. The Haug-Haken and Dunlop hairpins are opened out a little so their legs don't touch at the game's road width.
-  - It has no forks, to stay true to the layout. The jump is on the Bit to Hatzenbach straight; `tun:.53` puts the tunnel on the Audi S climb (the default put it over the Dunlop braking zone).
+  - Its one fork is the pit lane from the drawing (see the next entry). The jump is on the Bit to Hatzenbach straight; `tun:.53` puts the tunnel on the Audi S climb (the default put it over the Dunlop braking zone).
   - New `forest` scenery: daylight, grass, photo firs, rolling hills, red, white and blue grandstands opposite the pits on the main straight and round the arena, and a pit building.
 
 - **2K textures, better car paint (2026-10-08):**

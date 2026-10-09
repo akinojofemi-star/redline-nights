@@ -114,8 +114,8 @@ T.probes=function(){const p=player,out=[];G.modeSel='classic';G.lapsSel=5;startR
     p.wreck=0;OBST.forEach(q=>{q.dead=0;placeObst(q);});const o2=blk[1]||blk[0];T.setAt(-1,o2.s-80,o2.x,45);p.nitro=1;pressNitro();const w1=p.stats.wrecks;T.run(60*3,{lane:o2.x,noBrake:true},()=>o2.dead);
     if(!o2.dead)T.note(MAP_ID+' nitro did not smash the roadblock');if(p.stats.wrecks>w1)T.note(MAP_ID+' wrecked on a roadblock while on nitro');}}
   // traffic: hitting a parked car sends it flying
-  {const straight=s=>{for(let d=0;d<=90;d+=6){sample(s+d);if(Math.abs(TS.c)>1/400)return false;}return true;};
-   const t=traffic.find(t=>t.br<0&&!t.down&&T.clear(t.s-70)===mod(t.s-70)&&straight(t.s-70))||traffic.find(t=>t.br<0&&!t.down&&T.clear(t.s-70)===mod(t.s-70));if(t){T.setAt(-1,t.s-70,t.x,45);T.run(60*3,{lane:t.x,noBrake:true},()=>t.flying>0||t.down);if(!(t.flying>0||t.down))T.note(MAP_ID+' drove through parked traffic');}}
+  {const bend=s=>{let m=0;for(let d=0;d<=90;d+=6){sample(s+d);m=Math.max(m,Math.abs(TS.c));}return m;}; // (the straightest run-up there is)
+   const t=traffic.filter(t=>t.br<0&&!t.down&&T.clear(t.s-70)===mod(t.s-70)).sort((a,b)=>bend(a.s-70)-bend(b.s-70))[0];if(t){T.setAt(-1,t.s-70,t.x,45);T.run(60*3,{lane:t.x,noBrake:true},()=>t.flying>0||t.down);if(!(t.flying>0||t.down))T.note(MAP_ID+' drove through parked traffic');}}
   // takedown: nitro ram into a rival
   {const r=rivals[0];if(r&&G.rules.knock){T.setAt(-1,T.clear(L*.3),laneX(p,1),60);r.br=-1;r.dist=p.dist+9;r.s=mod(r.dist);r.x=p.x;r.lane=1;r.laneCD=5;traffic.forEach(t=>{if(t.br<0&&Math.abs(wrapD(t.s,p.s))<300)t.down=true;});r.speed=40;r.wreck=0;r.out=false;const k0=p.stats.knock;p.nitro=1;pressNitro();
     let minD=99;const o={lane:p.x};T.run(60*4,o,()=>{o.lane=r.x;if(r.br===p.br)minD=Math.min(minD,Math.hypot(dAlong(-1,posOf(r),posOf(p)),r.x-p.x));return p.stats.knock>k0;});
@@ -152,7 +152,8 @@ T.probes=function(){const p=player,out=[];G.modeSel='classic';G.lapsSel=5;startR
     for(let i=0;i<90&&p.wreck<=0;i++){p.botSteer=0;p.botBrake=false;update(1/60);cameraFollow(1/60);camera.getWorldDirection(v1);if(p.wallT<=0)worst=Math.max(worst,v1.angleTo(v0)*57.3);v0.copy(v1);}
     p.botSteer=undefined;p.botBrake=undefined;p.wreck=0;if(worst>8)T.note(MAP_ID+' '+b.kind+' fork: camera swung '+worst.toFixed(0)+'° in one frame');}
   // flips: a normal ramp taken on all four wheels never rolls the car, whatever the angle; one side's wheels on it does
-  {const r=RAMPS.find(r=>r.br<0&&!r.T.roll&&r.T!==RAMP_TYPES.gap&&r.T.w<10);if(r){const ob=OBST.map(o=>o.dead);OBST.forEach(o=>o.dead=1);
+  {const ok=r=>r.br<0&&!r.T.roll&&r.T!==RAMP_TYPES.gap&&r.T.w<10,r=RAMPS.find(r=>ok(r)&&Math.abs(C[kOf(r.s)])<1/1000)||RAMPS.find(ok); // (on a straight: the probe drives at it without steering)
+   if(r){const ob=OBST.map(o=>o.dead);OBST.forEach(o=>o.dead=1);
     const take=(x,a)=>{T.setAt(-1,r.s-12,x,55);p.psi+=a;p.wvx=Math.cos(p.psi)*55;p.wvz=Math.sin(p.psi)*55;let st=null;
       for(let i=0;i<50&&!st;i++){p.botSteer=0;p.botBrake=false;update(1/60);if(p.air&&p.stunt)st=p.stunt.t;}
       p.botSteer=undefined;p.botBrake=undefined;p.wreck=0;p.air=false;p.y=0;p.vy=0;p.stunt=null;p.tricks=[];return st;};
