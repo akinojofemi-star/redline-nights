@@ -166,7 +166,7 @@ f.contentWindow.__ev('T.probes()');            // feature probes on this map; pr
 f.contentWindow.__ev(`T.race(5,'classic',{drift:true,nitro:'perfect',avoid:true})`);  // a full race driven through the controls
 f.contentWindow.__ev('T.issues.join("\\n")');
 ```
-- **Maps:** `city`, `canyon`, `alpine`, `coast`, `tokyo`, `jungle`, `volcano`, `arctic`, `industrial`, `eifel`.
+- **Maps:** `city`, `canyon`, `alpine`, `coast`, `tokyo`, `jungle`, `volcano`, `arctic`, `industrial`, `eifel`, `sakura`, `desert`, `autumn`.
 - **`T.probes()` covers:** every ramp, air and ground 360s, gaps, both fork routes, divider crashes, canisters, pads, roadworks, traffic, nitro rams, Shockwave, all nitro types, drift, out of bounds, the cameras and ghost mode.
 - **`T.race(carIdx, mode, opt)`:** checks every frame for NaN values, cars escaping walls, stuck cars and whether the results screen appears.
 
@@ -209,6 +209,20 @@ Gotcha: Rimac material names match the wheel rule (`^rim`), so rename them first
 Mac builds need `identity: '-'` and `hardenedRuntime: false` (already set). Delete removed builds with `rm "${SH:?}"/…` (a safety check blocks a bare `$SH`).
 
 ## Recent history (newest first)
+
+- **Three new maps, bolder bend signs, proper finish (2026-10-09):**
+  - **Sakura Pass** (`sakura`, 4.4 km, spring day): cherry blossom (jacaranda tinted pink), firs, a switchback pocket over a drop, a stone shrine road under red torii gates (built like gantries, posts via `DRV.out`), pagodas, a snow-capped peak and falling petals (`wx:'petals'`). Its corner list starts at the straight after the switchbacks, so the start is clear of both forks.
+  - **Dune Sea** (`desert`, 5.6 km, golden hour): a fast highway out to a far hairpin, then a dirt S-bend back. Smooth dune terrain, palm oases, rocks, three pyramids far off.
+  - **Maple Valley** (`autumn`, 4.9 km): twisty lanes, low-poly maples in red, orange and gold (per-instance colour; tinting the photo trees went muddy), firs, red barns and hay bales on the dirt section, and falling leaves (`wx:'leaves'`).
+  - Designing a layout: preview with `layoutPoints` in any `?test=1` page and keep non-adjacent stretches at least about 200 m apart. Then load the map and check every `b.sep` profile: it must rise once and fall once. Forks must not overlap each other, and neither may the start.
+  - Fork lessons: the automatic ease can start inside the bend before a straight and wobble about 1 m to the wrong side, and a bot (or a player) holding the far side then counts as on the fork. Fixes:
+    - Draw the departure tangent by hand (`ease:[0,…]`), with its first point far enough along the straight that the fillet starts on the straight.
+    - Keep a fork's start well clear of a hairpin exit, because running wide there drops you onto the fork.
+  - Bend signs (`CHEV`, all maps): three severities (red under 48 m radius, amber under 85 m, pale under 150 m, every other spot). Boards are 30% bigger, unlit, ignore fog, and stand wholly outside drivable space.
+  - Finish (`finishAt`, all maps): a 6 m checkered band, a checkered arch with the map name, and tall checkered pylons. Any fork spanning the line (Eifel's pit lane) gets its own band and arch where its cars actually finish, at `s0 + bs*span/len`.
+  - `clouds()` and `unitBox` are shared helpers for the daytime maps.
+  - Suite: the parked-traffic probe starts 25 m before the car (from further back the bot cuts a bend and misses).
+  - `VER` 1.8 (new maps: older clients must not join a game on a map they lack).
 
 - **Eifel finishing touches (2026-10-09):**
   - The Bit to Hatzenbach straight has kerbs and 12 m of run-off instead of cliff edges (the jump keeps its own edges).
