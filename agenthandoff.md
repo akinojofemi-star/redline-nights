@@ -210,6 +210,14 @@ Mac builds need `identity: '-'` and `hardenedRuntime: false` (already set). Dele
 
 ## Recent history (newest first)
 
+- **Eifel finishing touches (2026-10-09):**
+  - The Bit to Hatzenbach straight has kerbs and 12 m of run-off instead of cliff edges (the jump keeps its own edges).
+  - Gravel traps (sand texture, grey-beige) on the outside run-off of every kerbed bend tighter than 180 m.
+  - Grandstands round the outside of Dunlop and Coca-Cola.
+  - An "EIFEL · GRAND PRIX" advertising bridge (a `gantry`) 170 m before the Dunlop apex.
+  - Fair-weather cloud sprites in the sky.
+  - All `forest`-only.
+
 - **Eifel nitro route (2026-10-09):** a `long` fork that leaves the Valvoline descent (eased) and loops east round the outside of Ford. It merges by hand (`ease:[1,0]`) into the run down to Dunlop at about 2,670 m, well before the hairpin; the automatic merge eased right into the Dunlop braking zone. It's 1,195 m against 1,056 m of main road and stays at least 72 m from every other stretch, with 32 canisters, 5 pads and a ramp. The main-road ramps re-placed themselves round it. One bot run in four went over the cliff edge after the jump near the new hops on the Bit straight; it didn't repeat.
 
 - **Eifel pit lane (2026-10-09):**

@@ -559,7 +559,7 @@ const LAYOUTS={
   eifel:{start:.22,surf:'asphalt',c:[[644,-786,35,10],[-38,-22,30,9],[-115,-55,30,9],[-5,-302,30,8],[-280,-319,35,8],[-280,-203,35,8],
     [-170,-198,30,8],[-181,-27,150,7],[-275,374,60,4],[-93,418,35,3],[-577,924,35,2],[-671,836,35,2],[-352,506,50,3],[-396,407,50,4],
     [-264,-55,40,6],[-473,-176,40,7],[-148,-605,100,9],[319,-715,30,10],[314,-781,30,10],[627,-863,35,10]],
-    sec:[[0,1,{l:'kerb',r:'kerb'}],[7,10,{l:'kerb',r:'kerb'}],[10,12,{w:14,l:'kerb',r:'kerb'}],[12,15,{l:'kerb',r:'kerb'}],[15,16,{l:'cliff',r:'cliff'}],[16,19,{w:14,l:'kerb',r:'kerb'}]],
+    sec:[[0,1,{l:'kerb',r:'kerb'}],[7,10,{l:'kerb',r:'kerb'}],[10,12,{w:14,l:'kerb',r:'kerb'}],[12,16,{l:'kerb',r:'kerb'}],[16,19,{w:14,l:'kerb',r:'kerb'}]],
     gaps:[[15,.4,45]],tun:.53,
     // the pit lane: leaves the straight before Coca-Cola (drawn tangent to it, so not eased), hooks round inside the
     // hairpin, runs beside the start straight past the line and merges halfway to Haug-Haken
@@ -1049,6 +1049,13 @@ for(const side of [-1,1]){
     else scene.add(new THREE.Mesh(ribbonRun(padRun(run),(k,s,o)=>s?at(k,side*outer(k,side),-0.02,o):atY(k,side*(outer(k,side)+.3),GROUND_Y,o),8,L/NS),wallMat));
   }
 }
+// gravel traps (Eifel): the run-off on the outside of the tight corners is gravel, as at a real circuit
+if(MAP.scenery==='forest'){
+  const gravel=rnTex(new THREE.MeshStandardMaterial({roughness:1}),{tex:'sand',scale:3,tint:0xc8bea8});
+  for(const side of [-1,1]){const E=side>0?ER:EL,lr=s=>side>0?s:1-s;
+    for(const run of runs(NS,k=>E[k]===1&&!GAPK[k]&&Math.sign(C[k])===side&&Math.abs(C[k])>1/180,true)){if(run.length<8)continue;
+      scene.add(new THREE.Mesh(ribbonRun(padRun(run),(k,s,o)=>at(k,side*(lr(s)?outer(k,side)-.6:HW[k]+3.2),.03,o),10,L/NS),gravel));}}
+}
 // the edge of the world made obvious: a glowing red line where the run-off of an open edge ends (or the kerb of a cliff)
 // with a solid red-and-white crash barrier on it that cars bounce off like a wall (only a car that flies over it and lands
 // beyond is out of bounds), and a glowing lip across both ends of every gap
@@ -1503,6 +1510,16 @@ if(MAP.scenery==='forest'){
     pits.push([pl.P[i*3]+pl.R[i*3]*off,GROUND_Y,pl.P[i*3+2]+pl.R[i*3+2]*off,14,pl.P[i*3+1]-GROUND_Y+8,56,Math.atan2(pl.F[i*3],pl.F[i*3+2])]);}
   // the arena: stands on the outside of its bends
   {const a=MARKS.apex[3]*L,b=MARKS.apex[6]*L;for(let s=a;s<b;s+=46){const i=at(s);if(Math.abs(C[i])>1/220)stand(i,Math.sign(C[i]),38);}}
+  // and round the outside of the two big hairpins, Dunlop and Coca-Cola
+  for(const [a,b] of [[10,11],[19,0]]){const s0=MARKS.apex[a]*L-90,len=wrapD(MARKS.apex[b]*L,MARKS.apex[a]*L)+180;
+    for(let d=0;d<len;d+=42){const i=at(s0+d);if(Math.abs(C[i])>1/250)stand(i,Math.sign(C[i]),36);}}
+  // an advertising bridge across the run down to Dunlop
+  gantry(MARKS.apex[10]*L-170,'EIFEL  \u00b7  GRAND PRIX','#e8202a');
+  // fair-weather clouds: a few soft puffs each, high up and far off
+  const cloudMat=new THREE.SpriteMaterial({map:softTex,color:0xffffff,fog:false,transparent:true,opacity:.8,depthWrite:false});
+  for(let c=0;c<26;c++){const a=SR()*Math.PI*2,r=1600+SR()*2200,y=GROUND_Y+520+SR()*500,n=3+(SR()*3|0),w=260+SR()*320;
+    for(let k=0;k<n;k++){const sp=new THREE.Sprite(cloudMat);sp.scale.set(w*(.7+SR()*.6),w*(.32+SR()*.18),1);
+      sp.position.set(Math.cos(a)*r+(SR()-.5)*w*1.4,y+(SR()-.3)*w*.18,Math.sin(a)*r+(SR()-.5)*w*1.4);scene.add(sp);}}
   instanced(new THREE.BoxGeometry(1,1,1).translate(0,.5,0),new THREE.MeshStandardMaterial({roughness:.8}),seats);
   instanced(new THREE.BoxGeometry(1,1,1).translate(0,.5,0),rnTex(new THREE.MeshStandardMaterial({roughness:.8}),{tex:'concrete',scale:3,tint:0x8a8a92}),backs);
   instanced(new THREE.BoxGeometry(1,1,1).translate(0,.5,0),rnTex(new THREE.MeshStandardMaterial({roughness:.75,metalness:.1,color:0xf2f2f4}),{tex:'facadeOffice',scale:22,roof:.06}),pits);
