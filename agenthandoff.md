@@ -66,10 +66,10 @@ Racing Heritage (renamed from Redline Nights; the repo, URL, file names and `rn-
 | `tools/test/` | test harness (see Testing) |
 | `tools/blender/` | car model pipeline scripts (see Car models) |
 | `tools/release-notes-1.6.4.md` | draft GitHub release notes (not published) |
-| `~/Documents/Racing Heritage/` (was "Redline Nights - Share") | desktop builds and `HOW TO PLAY.txt` for friends. Holds the 1.12.0 builds (Racing Heritage, 2026-10-15), current with the browser game as of the gameplay pass |
+| `~/Documents/Racing Heritage/` (was "Redline Nights - Share") | desktop builds and `HOW TO PLAY.txt` for friends. Holds the 1.12.1 builds (2026-10-16), current with the browser game as of the graphics settings |
 
 **Versions**
-- `package.json` is 1.12.1. Keep its major.minor equal to the multiplayer `VER` (1.12); the patch number is for app rebuilds that don't change online play. Keep the two in step so the version-mismatch message matches the app's version.
+- `package.json` is 1.12.2. Keep its major.minor equal to the multiplayer `VER` (1.12); the patch number is for app rebuilds that don't change online play. Keep the two in step so the version-mismatch message matches the app's version.
 - The latest GitHub release is **v1.6.3** (desktop).
 - Multiplayer protocol is `VER = '1.7'` in `app/shell.html`. Bump it when the network messages change, because only matching versions can play together.
 - `MODEL_VER = 12` in the game. Bump it when car models are re-exported.
@@ -150,6 +150,7 @@ The game script is one IIFE. Main pieces, by name (use grep; line numbers drift)
   - `rnTex()` applies world-mapped PBR textures through `onBeforeCompile`. **Cloning an rnTex material drops the shader**, so build a new one.
   - `TERRAIN` builds the heightfield.
   - `impTrees`, `boulders` and `chunked` handle the photo props.
+- **LAN for browsers:** while a desktop app hosts LAN, `lan.js` also serves the game folder over plain HTTP on the relay's port (47800, read-only GET, confined to `app/`). A browser on the network opens `http://<host>:47800/`, where the lobby sees `LAN_PAGE` (http, port 47800) and offers JOIN THEIR LAN GAME, which runs `joinRoom('lan', location.host)`. On the website, the LAN panel's address box navigates there, because an https page may not open `ws://` to a LAN address (mixed content). Browsers can't host or hear the beacon. The host's lobby shows the browser address. Browser players run the host's copy of the game, so versions always match.
 - **Multiplayer:**
   - `MP` and `mpStart`/`mpState`/`mpApply`.
   - The host's lobby runs the AI.
@@ -221,6 +222,7 @@ f.contentWindow.__ev('T.issues.join("\\n")');
 - **Screenshots:** iframes render black with `toDataURL`. Navigate the pane itself to `game.html?test=1&n=<unique>#map` instead (a hash-only change doesn't reload). Render, then POST `renderer.domElement.toDataURL()` to `tools/test/recv.py` (port 8791). `tools/test/sheet.swift` makes contact sheets.
 - **Phones:** use the browser pane's mobile preset (375×812) and a custom 812×375 for landscape. Reset to desktop afterwards.
 - **Online smoothness:** wrap each lobby's `WebSocket` in the duo page to delay sends and receives by 30–70 ms each, with occasional 150–350 ms stalls, from a seeded random sequence so builds can be compared. Step both games by the real elapsed time (stepping 1/60 per tick runs slower than real time and biases the result). Compare B's remote car `car.g.position` with A's real one: distance, and the second difference for roughness. Single runs are very noisy, so always compare several seeds in the same frame setup.
+- **LAN with a browser:** run the real relay with Node: `lan.setGameDir(<repo>/app); lan.startRelay({...})`. Open a copy of `shell.html` with a stub `window.rn` (`hostStart` resolving `{port:47800, ips:[...]}`) from localhost as the host, and click HOST LAN. Then open `http://<this Mac's LAN IP>:47800/` in another tab and click JOIN THEIR LAN GAME.
 - **Online:** run `npx wrangler dev --port 8787` in `server/`, open `app/duo.html?server=ws://localhost:8787` (two lobbies side by side) and drive them by clicking buttons (`hostOnline`, `code` + `joinCode`, `ready`, `start`). A hidden pane doesn't run `requestAnimationFrame`, so step the games with `iframe.contentWindow.__rn.step(dt)`.
 
 ## Car models
@@ -261,6 +263,8 @@ Gotcha: Rimac material names match the wheel rule (`^rim`), so rename them first
 Mac builds need `identity: '-'` and `hardenedRuntime: false` (already set). Delete removed builds with `rm "${SH:?}"/…` (a safety check blocks a bare `$SH`).
 
 ## Recent history (newest first)
+
+- **Browser LAN play (2026-10-16):** browsers join a desktop app's LAN game from the host's own copy of the game (see "LAN for browsers"). App 1.12.2.
 
 - **Graphics and frame rate settings (2026-10-16):** see "Performance".
 
@@ -411,5 +415,5 @@ Mac builds need `identity: '-'` and `hardenedRuntime: false` (already set). Dele
 - **Gap placement:** Tokyo's gap only fits with the 200 m run-out tier, and it still ends about 185 m before the long fork. That's the best spot the map allows.
 - **Sunset Coast palms** are code-built, not photo-real (Poly Haven has no palm).
 - **New maps:** the user once asked for maps modelled on an Asphalt video that can no longer be viewed. Ask for screenshots if new maps come up.
-- **Desktop builds** in the share folder are 1.12.0. Rebuild (`npm run dist:all`, then copy from `dist/`) whenever the browser game changes and the user wants the apps updated. The old 1.6.4 builds are in the Trash (`Redline Nights 1.6.4 builds`). No GitHub release of 1.12.0 has been made.
+- **Desktop builds** in the share folder are 1.12.1 (the 1.12.0 ones are in the Trash). Rebuild (`npm run dist:all`, then copy from `dist/`) whenever the browser game changes and the user wants the apps updated. The old 1.6.4 builds are in the Trash (`Redline Nights 1.6.4 builds`). No GitHub release of 1.12.0 has been made.
 - **No pause in multiplayer:** the pause menu is disabled online, but the HUD full-screen button still works.

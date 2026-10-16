@@ -1,13 +1,36 @@
 // LAN play: a WebSocket relay that friends connect to (port 47800), a UDP beacon so their lobbies find the game
 // (port 47801), and a listener for other hosts' beacons. The relay only passes messages between the players; the
-// host's lobby page runs the game logic. It speaks the same protocol as the online game server (server/worker.js):
+// host's lobby page runs the game logic.
+// While hosting, the same port also serves the game itself over plain HTTP, so a friend on the network can play in a
+// browser: they open http://<host address>:47800 and the lobby there joins this game. (A browser can't host, hear the
+// beacon or reach the relay from the https website, which may only open secure connections; a page served from here
+// can.) They get exactly the host's version of the game. It speaks the same protocol as the online game server (server/worker.js):
 //   member -> relay  {type:'hello', role:'host'|'client'}  {type:'send', to:'host'|'*'|id, except?, data}  {type:'ping', c}
 //   relay -> member  {type:'welcome', id}  {type:'msg', from, data}  {type:'pong', c, s}  {type:'join'|'leave', id}
 //                    {type:'closed', why}  {type:'error', msg}
-const dgram = require('dgram'), os = require('os');
+const dgram = require('dgram'), os = require('os'), http = require('http'), fs = require('fs'), path = require('path');
 const { WebSocketServer } = require('ws');
 const GAME_PORT = 47800, BEACON_PORT = 47801, MAX_MEMBERS = 8;
 let relay = null, members = new Map(), nextId = 1, beacon = null, beaconTimer = null, beaconInfo = null;
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.json': 'application/json', '.css': 'text/css',
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.map': 'application/json', '.webmanifest': 'application/manifest+json' };
+// a read-only file server for the game's folder (the app's own window and LAN browsers both use it)
+function serveDir(dir) {
+  return (req, res) => {
+    if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405); return res.end(); }
+    let p; try { p = decodeURIComponent(new URL(req.url, 'http://x').pathname); } catch { res.writeHead(400); return res.end(); }
+    if (p === '/') p = '/shell.html';
+    const file = path.join(dir, path.normalize(p));
+    if (!file.startsWith(dir + path.sep)) { res.writeHead(403); return res.end(); }
+    fs.readFile(file, (err, data) => {
+      if (err) { res.writeHead(404); return res.end(); }
+      res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
+      res.end(req.method === 'HEAD' ? undefined : data);
+    });
+  };
+}
+let gameDir = null;
+const setGameDir = dir => { gameDir = dir; };
 const send = (ws, m) => { if (ws && ws.readyState === 1) ws.send(typeof m === 'string' ? m : JSON.stringify(m)); };
 
 function localIPs() {
@@ -28,8 +51,10 @@ function broadcastAddrs() {
 function startRelay(info, hooks = {}) {
   beaconInfo = info;
   if (relay) return { port: GAME_PORT, ips: localIPs().map(a => a.address) };
-  relay = new WebSocketServer({ port: GAME_PORT });
-  relay.on('error', err => { if (hooks.onError) hooks.onError(String(err.code || err.message)); });
+  const web = http.createServer(gameDir ? serveDir(gameDir) : (q, r) => { r.writeHead(404); r.end(); });
+  web.on('error', err => { if (hooks.onError) hooks.onError(String(err.code || err.message)); });
+  web.listen(GAME_PORT);
+  relay = new WebSocketServer({ server: web });relay.web = web;
   relay.on('connection', (ws, req) => {
     let id = null;
     const refuse = msg => { send(ws, { type: 'error', msg }); ws.close(); };
@@ -80,7 +105,7 @@ function startRelay(info, hooks = {}) {
 function stopRelay() {
   clearInterval(beaconTimer); beaconTimer = null;
   if (beacon) { try { beacon.close(); } catch {} beacon = null; }
-  if (relay) { relay.clients.forEach(c => c.terminate()); relay.close(); relay = null; }
+  if (relay) { relay.clients.forEach(c => c.terminate()); relay.close(); if (relay.web) relay.web.close(); relay = null; }
   members.clear();
 }
 
@@ -96,4 +121,4 @@ function startListener(onHost) {
   sock.bind(BEACON_PORT);
 }
 
-module.exports = { startRelay, stopRelay, startListener, localIPs, GAME_PORT, BEACON_PORT };
+module.exports = { startRelay, stopRelay, startListener, localIPs, serveDir, setGameDir, GAME_PORT, BEACON_PORT };

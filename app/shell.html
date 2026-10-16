@@ -70,6 +70,9 @@ const VER = '1.12';                           // multiplayer protocol: only matc
 const $ = id => document.getElementById(id);
 const store = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
 const APP = !!window.rn;                     // inside the desktop app (LAN hosting available)
+// opened from a desktop host on the LAN (it serves the game on its LAN port while hosting, see lan.js): this browser
+// can join that host's LAN game, and plays the host's own version of the game
+const LAN_PAGE = !APP && location.protocol === 'http:' && location.port === '47800';
 const WEB_URL = 'https://akinojofemi-star.github.io/redline-nights/';   // the browser version, for invite links
 const DOWNLOAD_URL = 'https://github.com/akinojofemi-star/redline-nights/releases/latest';
 const inviteLink = code => (APP ? WEB_URL : location.origin + location.pathname.replace(/index\.html$/, '')) + '#join=' + code;
@@ -379,7 +382,11 @@ function homeHTML() {
   <div class="lbl">Or by address</div>
   <div class="row"><input id="addr" placeholder="192.168.1.20" style="width:220px"><button id="joinAddr">Join</button></div>
   <p class="hint">By address also works through a virtual LAN such as Tailscale or ZeroTier.</p>`
-  : `<p class="tag" style="margin-top:0">LAN games (same network, no internet needed) run in the <a href="${DOWNLOAD_URL}" target="_blank" rel="noopener" style="color:var(--perfect)">desktop app</a> for Windows, Mac and Linux. Browser players can join anyone online.</p>`}
+  : LAN_PAGE ? `<p class="tag" style="margin-top:0">You opened this from the Racing Heritage app at <b>${esc(location.hostname)}</b> on your network.</p>
+  <div class="row" style="margin-top:12px"><button class="go" id="joinHere" style="background:var(--shock)">JOIN THEIR LAN GAME</button></div>`
+  : `<p class="tag" style="margin-top:0">LAN games (same network, no internet needed) are hosted in the <a href="${DOWNLOAD_URL}" target="_blank" rel="noopener" style="color:var(--perfect)">desktop app</a> for Windows, Mac and Linux. To join one from this browser, type the address shown in the host’s lobby:</p>
+  <div class="row"><input id="addrWeb" placeholder="192.168.1.20" style="width:220px"><button id="goLan">Open</button></div>
+  <p class="hint">This opens the game from the host’s computer on your network (so you play their version), then you join with one click.</p>`}
   <div class="sep"></div>
   <div class="row"><button id="fs">Full screen</button>${APP ? '<span class="hint" style="margin:0">or press F11</span>' : ''}</div>`;
 }
@@ -407,7 +414,8 @@ function lobbyHTML() {
     <div class="row"><span class="bigcode">${ready ? esc(net.code) : '…'}</span>${ready ? '<button id="copy">Copy code</button><button id="copyLink">Copy invite link</button>' : ''}</div>
     <div class="row hint">${ready ? 'Friends type this code under Online, or open the invite link (it plays in the browser). ' + pingTag : 'Connecting to the game server…'}</div>`;
   else if (host) head = `<div class="lbl">LAN game</div>
-    <div class="tag">${ready ? 'Friends on the same Wi-Fi or network see this game in their LAN list, or join at <b>' + net.lanIPs.map(esc).join('</b> or <b>') + '</b>' : 'Starting…'}</div>`;
+    <div class="tag">${ready ? 'Friends on the same Wi-Fi or network see this game in their LAN list, or join at <b>' + net.lanIPs.map(esc).join('</b> or <b>') + '</b>.'
+      + '<br>Friends in a browser: open <b>' + net.lanIPs.map(ip => 'http://' + esc(ip) + ':47800').join('</b> or <b>') + '</b>' : 'Starting…'}</div>`;
   else head = `<div class="lbl">${net.kind === 'online' ? 'Online · room ' + esc(net.label) : 'LAN · ' + esc(net.label)}</div><div class="row hint">${pingTag}</div>`;
   const plist = players.map(p => `<div class="item"><span class="sw" style="background:${paintHex(p.paint)}"></span>
     <div class="grow"><b>${esc(p.name)}${p.id === net.myId ? ' (you)' : ''}</b><small>${esc(carName(p.car))}</small></div>
@@ -447,6 +455,13 @@ function wire() {
   on('joinCode', 'onclick', () => joinRoom('online', $('code').value));
   on('code', 'onkeydown', e => { if (e.key === 'Enter') joinRoom('online', e.target.value); });
   on('joinAddr', 'onclick', () => { const a = $('addr').value.trim(); if (a) joinRoom('lan', a, a); });
+  on('joinHere', 'onclick', () => joinRoom('lan', location.host, location.hostname));
+  // from the website: go to the host's copy of the game (an https page may not open a plain connection to the LAN)
+  const goLan = () => { const a = $('addrWeb').value.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    if (!/^[A-Za-z0-9.-]+(:\d+)?$/.test(a)) return fail('Type the host’s address, like 192.168.1.20.');
+    location.href = 'http://' + (a.includes(':') ? a : a + ':47800') + '/'; };
+  on('goLan', 'onclick', goLan);
+  on('addrWeb', 'onkeydown', e => { if (e.key === 'Enter') goLan(); });
   on('leave', 'onclick', leave);
   on('steer', 'oninput', e => { store.set('rn-steer', e.target.value / 100); $('steerVal').textContent = e.target.value + '%'; });
   on('steer', 'onchange', e => { e.target.blur(); if (S.later) { S.later = false; render(); } });

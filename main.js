@@ -1,34 +1,23 @@
 // Racing Heritage desktop app.
 // - Serves the game from a small local web server (the game loads its car models over HTTP).
 // - Hosting on the LAN: a WebSocket relay on port 47800 that friends connect to, plus a UDP beacon on port 47801 so
-//   their lobby lists your game automatically. The relay is dumb: it passes messages between the host's lobby and
+//   their lobby lists your game automatically. The same port serves the game to friends playing in a browser. The relay is dumb: it passes messages between the host's lobby and
 //   each client; all game logic lives in the host's lobby (app/shell.html).
 // - Listens for other hosts' beacons and passes them to the lobby.
 // Online play (room codes) runs entirely in the lobby page over WebRTC, so it needs nothing from here.
 const { app, BrowserWindow, ipcMain } = require('electron');
-const http = require('http'), fs = require('fs'), path = require('path');
+const http = require('http'), path = require('path');
 const lan = require('./lan');
 
 const APP_DIR = path.join(__dirname, 'app');
 const WEB_PORT = 47820;
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.json': 'application/json', '.css': 'text/css',
-  '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.map': 'application/json' };
 let win = null;
+lan.setGameDir(APP_DIR); // (LAN friends can play in a browser from the host's copy of the game)
 
 // ---------------------------------------------------------------- local web server for the game files
 function startStatic() {
   return new Promise(resolve => {
-    const srv = http.createServer((req, res) => {
-      let p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
-      if (p === '/') p = '/shell.html';
-      const file = path.join(APP_DIR, path.normalize(p));
-      if (!file.startsWith(APP_DIR)) { res.writeHead(403); return res.end(); }
-      fs.readFile(file, (err, data) => {
-        if (err) { res.writeHead(404); return res.end(); }
-        res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
-        res.end(data);
-      });
-    });
+    const srv = http.createServer(lan.serveDir(APP_DIR));
     // a fixed port keeps saved settings (they belong to the page's address); fall back to any free port
     srv.once('error', () => srv.listen(0, '127.0.0.1', () => resolve(srv.address().port)));
     srv.listen(WEB_PORT, '127.0.0.1', () => resolve(WEB_PORT));
