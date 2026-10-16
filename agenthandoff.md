@@ -27,6 +27,7 @@ Racing Heritage (renamed from Redline Nights; the repo, URL, file names and `rn-
 
 **Nitro**
 - Nitro ends only when the bar empties, on a drift, or on a 360. Extra taps never cancel it.
+- **Nitro and drift cancel each other** (user request): pressing nitro ends a drift, and starting a drift ends nitro. If nitro ends a drift while the brake is still held, `p.driftLock` stops that held brake from starting a new drift straight away (which threw the nitro away). A fresh brake press drifts as usual.
 - Nitro types:
   - Single tap: yellow.
   - Quick or late second tap: orange "pulse".
@@ -65,10 +66,10 @@ Racing Heritage (renamed from Redline Nights; the repo, URL, file names and `rn-
 | `tools/test/` | test harness (see Testing) |
 | `tools/blender/` | car model pipeline scripts (see Car models) |
 | `tools/release-notes-1.6.4.md` | draft GitHub release notes (not published) |
-| `~/Documents/Redline Nights - Share/` | desktop builds and `HOW TO PLAY.txt` for friends. It currently holds 1.6.4 builds made **before** the mobile UI and test-pass fixes, so they're stale and unreleased |
+| `~/Documents/Racing Heritage/` (was "Redline Nights - Share") | desktop builds and `HOW TO PLAY.txt` for friends. Holds the 1.12.0 builds (Racing Heritage, 2026-10-15), current with the browser game as of the gameplay pass |
 
 **Versions**
-- `package.json` is 1.6.4.
+- `package.json` is 1.12.0, matching the multiplayer `VER` (1.12). Keep the two in step so the version-mismatch message matches the app's version.
 - The latest GitHub release is **v1.6.3** (desktop).
 - Multiplayer protocol is `VER = '1.7'` in `app/shell.html`. Bump it when the network messages change, because only matching versions can play together.
 - `MODEL_VER = 12` in the game. Bump it when car models are re-exported.
@@ -163,6 +164,13 @@ The game script is one IIFE. Main pieces, by name (use grep; line numbers drift)
 - **Full screen:** `toggleFS()` posts `{t:'fs'}` to the shell (`toggleFullscreen()` there; the app uses `rn.toggleFullscreen`). iPhones have no Fullscreen API, so they get an "Add to Home Screen" tip instead.
 - **Test hook:** `game.html?test=1` exposes `window.__ev(src)`, which evaluates code inside the game's closure.
 
+## Performance
+- **Frame pacing** (`frame`, `frameGap`): up to 60 fps in a race (a 120 Hz screen was drawing 120), 30 in the menu and on results, 15 when paused.
+- **Resolution** (`paceRes`): the pixel ratio starts at `PR_MAX` (1.5 desktop, 1.3 phone; was 1.75). It steps down 0.25 when frames average over 21 ms across 2 s (floor `PR_MIN` 1.0, phone 0.8) and back up 0.125 after 8 s of frames under 17.4 ms.
+- **Particles** (`PFX`, `emit`, `updateParts`): two `THREE.Points` pools (160 normal, 96 additive) with a small shader (fog, tone mapping, sized like the old sprites through `uScale`). That's two draw calls, where each puff used to be a sprite with its own. `emit` copies its arguments, so callers pass the scratch vectors `_e1`/`_e2`/`_e3`, not new ones.
+- **HUD:** `setStyle` writes a style only when it changes. The standings are computed once per update, and the minimap redraws at 20 Hz.
+- Measured on Canyon against the previous build: game logic 25–40% less CPU, render submission 20–27% less, 27% fewer pixels, plus half the frames on a 120 Hz screen.
+
 ## Testing (do this after every gameplay or map change)
 
 **1. Start a local server**
@@ -243,6 +251,8 @@ Gotcha: Rimac material names match the wheel rule (`^rim`), so rename them first
 Mac builds need `identity: '-'` and `hardenedRuntime: false` (already set). Delete removed builds with `rm "${SH:?}"/…` (a safety check blocks a bare `$SH`).
 
 ## Recent history (newest first)
+
+- **Nitro/drift and performance (2026-10-16, not yet pushed):** see the nitro rules and "Performance". Removed dead code: `edgeAt`, `_w` and the empty `poseTraffic`.
 
 - **Gameplay and physics pass (2026-10-09):** surface and weather grip, contact by weight (including rival-to-rival), rival difficulty (Easy/Normal/Hard) with tactical nitro, blocking, mistakes and route choice, stronger body roll and pitch, a speed and surface buzz on the camera, engine sounds by drivetrain, tyre squeal and gravel noise. Class balance re-run for all 68 cars. See "Grip", "Contact and rivals" and "Feel" under Game architecture.
 
@@ -389,5 +399,5 @@ Mac builds need `identity: '-'` and `hardenedRuntime: false` (already set). Dele
 - **Gap placement:** Tokyo's gap only fits with the 200 m run-out tier, and it still ends about 185 m before the long fork. That's the best spot the map allows.
 - **Sunset Coast palms** are code-built, not photo-real (Poly Haven has no palm).
 - **New maps:** the user once asked for maps modelled on an Asphalt video that can no longer be viewed. Ask for screenshots if new maps come up.
-- **Stale desktop builds:** the share folder's 1.6.4 builds don't include the mobile UI and test-pass fixes. Rebuild before any desktop release.
+- **Desktop builds** in the share folder are 1.12.0. Rebuild (`npm run dist:all`, then copy from `dist/`) whenever the browser game changes and the user wants the apps updated. The old 1.6.4 builds are in the Trash (`Redline Nights 1.6.4 builds`). No GitHub release of 1.12.0 has been made.
 - **No pause in multiplayer:** the pause menu is disabled online, but the HUD full-screen button still works.
