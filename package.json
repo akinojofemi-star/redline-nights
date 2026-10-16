@@ -1,7 +1,7 @@
 {
   "name": "redline-nights",
   "productName": "Racing Heritage",
-  "version": "1.12.0",
+  "version": "1.12.1",
   "description": "Arcade street racer with LAN and online multiplayer",
   "main": "main.js",
   "author": "Racing Heritage",

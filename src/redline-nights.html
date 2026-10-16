@@ -270,6 +270,10 @@ td.t{text-align:right}
       <label class="steer" data-tab="set"><span class="lbl">Steering sensitivity</span><input type="range" class="steerSl" min="50" max="160" step="10" aria-label="Steering sensitivity"><b class="steerVal"></b></label>
       <div class="row prefs" data-tab="set"><button class="go alt sm fsBtn">FULL SCREEN</button><button class="go alt sm muteBtn">SOUND ON</button><button class="go alt sm tlayBtn touchOnly">TOUCH CONTROLS</button></div>
       <div class="garage" data-tab="set">
+        <div class="lbl">Graphics</div>
+        <div class="opts" id="gfxOpts"></div>
+      </div>
+      <div class="garage" data-tab="set">
         <div class="lbl">Race settings</div>
         <div class="opts" id="opts"></div>
       </div>
@@ -419,15 +423,27 @@ const MAP=MAPS[MAP_ID];
 
 // ---------------------------------------------------------------- renderer
 const canvas=$('gl');
-const renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});
 const SMALL=matchMedia('(pointer: coarse)').matches&&Math.min(screen.width,screen.height)<600; // a phone
-// resolution: up to 1.5x the CSS pixels (1.3 on a phone), lowered automatically while frames run slow (see paceRes)
-const PR_MAX=Math.min(window.devicePixelRatio||1,SMALL?1.3:1.5),PR_MIN=Math.min(PR_MAX,SMALL?.8:1);let PR=PR_MAX;
+// graphics level (Settings > Graphics). pr: highest resolution (x the screen's CSS pixels); aa: anti-aliasing;
+// tex2k: the 2048 px road and ground textures; aniso: texture filtering; detail: surface normal and roughness maps;
+// fx: share of smoke, dust and sparks drawn; wx: rain and snow density; view: how far scenery props are drawn (of the
+// fog distance). Anti-aliasing and textures are set as the game loads, so changing the level reloads the game.
+const GFX_LEVELS={low:{name:'Low',pr:1,aa:false,tex2k:false,aniso:2,detail:false,fx:.45,wx:.4,view:.7},
+  medium:{name:'Medium',pr:1.25,aa:true,tex2k:false,aniso:4,detail:true,fx:.75,wx:.7,view:.85},
+  high:{name:'High',pr:1.5,aa:true,tex2k:true,aniso:8,detail:true,fx:1,wx:1,view:1},
+  ultra:{name:'Ultra',pr:2,aa:true,tex2k:true,aniso:16,detail:true,fx:1,wx:1,view:1}};
+const GFX_ID=GFX_LEVELS[store.get('rn-gfx')]?store.get('rn-gfx'):SMALL?'medium':'high',GFX=GFX_LEVELS[GFX_ID];
+// frame rate cap (Settings > Graphics): 30, 60 or 120 frames a second, or 0 = as fast as the screen refreshes
+const FPS_OPTS=[30,60,120,0];let FPS=FPS_OPTS.includes(+store.get('rn-fps'))&&store.get('rn-fps')!==null?+store.get('rn-fps'):60;
+const renderer=new THREE.WebGLRenderer({canvas,antialias:GFX.aa,powerPreference:'high-performance'});
+// resolution: up to the level's ratio (1.3 at most on a phone below Ultra), lowered automatically while frames run slow
+// (see paceRes), never below PR_MIN
+const PR_MAX=Math.min(window.devicePixelRatio||1,SMALL&&GFX_ID!=='ultra'?Math.min(GFX.pr,1.3):GFX.pr),PR_MIN=Math.min(PR_MAX,GFX_ID==='low'?.75:SMALL?.8:1);let PR=PR_MAX;
 renderer.setPixelRatio(PR);
 renderer.outputEncoding=THREE.sRGBEncoding;
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure=MAP.exposure;
-const MAXANISO=renderer.capabilities.getMaxAnisotropy();
+const MAXANISO=Math.min(renderer.capabilities.getMaxAnisotropy(),GFX.aniso);
 const scene=new THREE.Scene();
 // the haze starts well out (the road 3-4 s ahead at top speed has to read clearly) and keeps the far distance
 scene.fog=new THREE.Fog(MAP.fog[0],Math.max(MAP.fog[1]*2.5,320),Math.max(MAP.fog[2]*1.25,1400));
@@ -442,8 +458,12 @@ scene.add(camera);
 // markings on a road, say).
 const TEXL=new THREE.TextureLoader(),PTEX={};
 // sharper 2K colour maps of the same scans for these (not on a phone, to spare its memory and data)
-const TEX2K=SMALL?new Set():new Set(['asphalt','concrete','dirt','grass','ice','paving','rockDark','rockLayer','sand','snow']);
-function ptex(name,kind){const k=name+kind;if(!PTEX[k]){const t=TEXL.load('tex/'+name+'_'+kind+(kind==='c'&&TEX2K.has(name)?'2':'')+'.jpg');t.wrapS=t.wrapT=THREE.RepeatWrapping;
+const TEX2K=SMALL||!GFX.tex2k?new Set():new Set(['asphalt','concrete','dirt','grass','ice','paving','rockDark','rockLayer','sand','snow']);
+// Low graphics: a flat 1 px normal map and a neutral roughness map stand in for the surface detail maps (nothing to
+// download or keep in memory, and the shader reads them the same way: flat normals, the material's own roughness)
+const FLAT_TEX=GFX.detail?null:{n:new THREE.DataTexture(new Uint8Array([128,128,255,255]),1,1),r:new THREE.DataTexture(new Uint8Array([204,204,204,255]),1,1)};
+if(FLAT_TEX)for(const k in FLAT_TEX){FLAT_TEX[k].wrapS=FLAT_TEX[k].wrapT=THREE.RepeatWrapping;FLAT_TEX[k].needsUpdate=true;}
+function ptex(name,kind){if(FLAT_TEX&&FLAT_TEX[kind])return FLAT_TEX[kind];const k=name+kind;if(!PTEX[k]){const t=TEXL.load('tex/'+name+'_'+kind+(kind==='c'&&TEX2K.has(name)?'2':'')+'.jpg');t.wrapS=t.wrapT=THREE.RepeatWrapping;
   t.anisotropy=MAXANISO;PTEX[k]=t;}return PTEX[k];}
 const TEX_HAS={facadeNight:'e',facadeBrick:'e'};
 function rnTex(mat,o){
@@ -1448,7 +1468,7 @@ function impTrees(name,items,tint){
   const mat=new THREE.MeshStandardMaterial({map:t,alphaTest:.45,side:THREE.DoubleSide,roughness:.9,color:tint===undefined?0xffffff:tint});
   chunked(impGeo(name),mat,items,420,{fir_a:.6,fir_b:.6,jacaranda:.12,quiver:.3}[name]);} // footprint at car height: the branches or just the trunk
 const _yAxis=new V3(0,1,0);
-function updatePropChunks(){const lim=(scene.fog.far+250)**2,c=camera.position;for(const im of PROP_CHUNKS){const d=im.userData.c;im.visible=(d.x-c.x)**2+(d.z-c.z)**2<lim;}}
+function updatePropChunks(){const lim=(scene.fog.far*GFX.view+250)**2,c=camera.position;for(const im of PROP_CHUNKS){const d=im.userData.c;im.visible=(d.x-c.x)**2+(d.z-c.z)**2<lim;}}
 // the boulder mesh replaces the stand-in rocks once it has loaded
 function boulders(list,standIn,tint){
   if(!THREE.GLTFLoader||!list.length)return;
@@ -2176,6 +2196,7 @@ const PFX=[[160,false],[96,true]].map(([n,add])=>{const geo=new THREE.BufferGeom
 const _pc=new THREE.Color();
 const _e1=new V3(),_e2=new V3(),_e3=new V3(); // scratch vectors for emit's arguments (it copies them, so nothing is allocated per puff)
 function emit(pos,vel,life,s0,s1,color,additive){
+  if(GFX.fx<1&&Math.random()>GFX.fx)return; // (lower graphics levels draw a share of the puffs)
   const P=PFX[additive?1:0],i=P.i=(P.i+1)%P.n,j=i*3;if(P.life[i]<=0)P.live++;
   P.pos[j]=pos.x;P.pos[j+1]=pos.y;P.pos[j+2]=pos.z;P.v[j]=vel.x;P.v[j+1]=vel.y;P.v[j+2]=vel.z;
   P.life[i]=P.max[i]=life;P.s0[i]=s0;P.s1[i]=s1;_pc.setHex(color);P.col[j]=_pc.r;P.col[j+1]=_pc.g;P.col[j+2]=_pc.b;
@@ -2200,7 +2221,7 @@ const ring=new THREE.Mesh(new THREE.RingGeometry(.85,1,64).rotateX(-Math.PI/2),n
 scene.add(ring);let ringT=0;
 // weather: rain streaks, snow or rising embers, kept in a box that wraps around the camera
 const WX=MAP.wx?(()=>{
-  const kind=MAP.wx,rain=kind==='rain',n=rain?1500:kind==='snow'?1600:kind==='petals'||kind==='leaves'?700:450,HX=60,HY=30,r=mulberry32(99),p=new Float32Array(n*3);
+  const kind=MAP.wx,rain=kind==='rain',n=Math.round((rain?1500:kind==='snow'?1600:kind==='petals'||kind==='leaves'?700:450)*GFX.wx),HX=60,HY=30,r=mulberry32(99),p=new Float32Array(n*3);
   for(let i=0;i<n;i++){p[i*3]=(r()*2-1)*HX;p[i*3+1]=(r()*2-1)*HY;p[i*3+2]=(r()*2-1)*HX;}
   const buf=new Float32Array(n*(rain?6:3)),geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(buf,3));
   const obj=rain?new THREE.LineSegments(geo,new THREE.LineBasicMaterial({color:0xa8c4ff,transparent:true,opacity:.38,depthWrite:false}))
@@ -3801,16 +3822,17 @@ function update(dt){
 function resize(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);camera.aspect=w/h;setViewShift(G.mode==='menu');camera.updateProjectionMatrix();}
 addEventListener('resize',resize);resize();
 let last=performance.now(),dtAvg=1/60,nextAt=0;
-// frame pacing: the game runs at up to 60 frames a second (a 120 Hz screen would otherwise draw everything twice as
-// often for no visible gain), the menu and results at 30 and the pause screen at 15
-const frameGap=()=>G.paused&&!MP.hold?1000/15:G.mode==='menu'||G.resShown?1000/30:1000/60;
+// frame pacing: a race runs at the chosen frame rate (60 by default: a 120 Hz screen would otherwise draw everything
+// twice as often), the menu and results at 30 at most and the pause screen at 15
+const frameGap=()=>G.paused&&!MP.hold?1000/15:G.mode==='menu'||G.resShown?Math.max(1000/30,FPS?1000/FPS:0):FPS?1000/FPS:0;
 // automatic resolution: when the frames can't keep up (an average gap over 21 ms, under about 48 fps, judged over 2 s)
 // the resolution steps down; after 8 s of comfortable frames it steps back up, never past PR_MAX
 const RES={t:0,n:0,sum:0,good:0};
 function paceRes(gap){if(G.mode!=='race'||G.paused||document.hidden)return;RES.t+=gap;RES.n++;RES.sum+=gap;
   if(RES.t<2000)return;const avg=RES.sum/RES.n;RES.t=RES.n=RES.sum=0;
-  if(avg>21&&PR>PR_MIN){PR=Math.max(PR_MIN,PR-.25);RES.good=0;renderer.setPixelRatio(PR);resize();}
-  else if(avg<17.4&&PR<PR_MAX){if(++RES.good>=4){RES.good=0;PR=Math.min(PR_MAX,PR+.125);renderer.setPixelRatio(PR);resize();}}else RES.good=0;}
+  const slow=FPS===30?42:21; // (judged against 60 fps, or 30 when that's the cap)
+  if(avg>slow&&PR>PR_MIN){PR=Math.max(PR_MIN,PR-.25);RES.good=0;renderer.setPixelRatio(PR);resize();}
+  else if(avg<slow*.83&&PR<PR_MAX){if(++RES.good>=4){RES.good=0;PR=Math.min(PR_MAX,PR+.125);renderer.setPixelRatio(PR);resize();}}else RES.good=0;}
 function frame(now){
   requestAnimationFrame(frame);
   const want=frameGap();if(now<nextAt-2)return;nextAt=Math.max(nextAt+want,now-want); // (skip this display frame)
@@ -3854,7 +3876,7 @@ STATS.forEach(([k])=>{const sp=document.createElement('span');sp.textContent=k;c
 function pickCar(i){
   setPlayerCar(i);const c=player.spec;
   // fetch this class's car models now (not on a phone), so rivals show as real cars from the first frame of the race
-  if(!SMALL)CARS.forEach(x=>{if(x.cls===c.cls)loadModel(x.shape.model).catch(()=>{});});
+  if(!SMALL&&GFX_ID!=='low')CARS.forEach(x=>{if(x.cls===c.cls)loadModel(x.shape.model).catch(()=>{});});
   $('carName').textContent=c.name;$('carCls').textContent=c.cls;$('carCls').style.setProperty('--cc',CLS_COL[c.cls]);
   const inCls=CARS.filter(x=>x.cls===c.cls);$('carIdx').textContent=(inCls.indexOf(c)+1)+'/'+inCls.length+' in '+c.cls;$('carBlurb').textContent=c.blurb;
   [...$('classSeg').children].forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.cls===c.cls)));
@@ -3898,6 +3920,24 @@ function renderOpts(){
       bt.onclick=()=>{SET[o.key]=v;store.set('rn-'+o.key,typeof v==='string'?v:v?'1':'0');G.rules=rulesFor(G.modeSel);renderOpts();};seg.appendChild(bt);});
     d.append(b,seg,sm);box.appendChild(d);});
 }
+// graphics settings: the quality level reloads the game (anti-aliasing and textures are set as it loads); the frame
+// rate applies at once
+const GFX_DESC={low:'Fastest: lower resolution, no anti-aliasing, plain surfaces and fewer effects. For older or hot-running computers.',
+  medium:'Balanced: a little lower resolution and texture detail, most of the effects.',
+  high:'Full detail. Resolution drops automatically if your computer can\u2019t keep up.',
+  ultra:'Sharpest: the screen\u2019s full resolution and the finest texture filtering. Needs a strong graphics card.'};
+function renderGfx(){
+  const box=$('gfxOpts');if(!box)return;box.textContent='';const want=store.get('rn-gfx')||GFX_ID;
+  const row=(name,desc,vals,cur,pick)=>{const d=document.createElement('div');d.className='opt';const b=document.createElement('b');b.textContent=name;
+    const sm=document.createElement('small');sm.textContent=desc;const seg=document.createElement('div');seg.className='row seg';seg.setAttribute('role','group');seg.setAttribute('aria-label',name);
+    vals.forEach(([t,v])=>{const bt=document.createElement('button');bt.textContent=t;bt.setAttribute('aria-pressed',String(cur===v));bt.onclick=()=>pick(v);seg.appendChild(bt);});
+    d.append(b,seg,sm);box.appendChild(d);};
+  row('Quality',want!==GFX_ID?'Applies when the game next loads.':GFX_DESC[GFX_ID],Object.entries(GFX_LEVELS).map(([k,L])=>[L.name,k]),want,v=>{
+    store.set('rn-gfx',v);if(v===GFX_ID||MP.cfg){renderGfx();return;}$('mapBlurb').textContent='Applying '+GFX_LEVELS[v].name+' graphics\u2026';location.reload();});
+  row('Frame rate',FPS?'Up to '+FPS+' frames a second. 60 is smooth and easy on the computer; 30 saves the most power.':'As fast as your screen refreshes (uses the most power).',
+    [['30',30],['60',60],['120',120],['Max',0]],FPS,v=>{FPS=v;store.set('rn-fps',String(v));nextAt=0;renderGfx();});
+}
+renderGfx();
 function refreshModeUI(){
   [...modeSeg.children].forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.id===G.modeSel)));
   $('modeBlurb').textContent=MODES[G.modeSel].blurb;$('lapsWrap').hidden=G.modeSel==='elim'||G.modeSel==='rush';renderOpts();updateBest();

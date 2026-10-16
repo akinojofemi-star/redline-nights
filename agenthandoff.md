@@ -69,7 +69,7 @@ Racing Heritage (renamed from Redline Nights; the repo, URL, file names and `rn-
 | `~/Documents/Racing Heritage/` (was "Redline Nights - Share") | desktop builds and `HOW TO PLAY.txt` for friends. Holds the 1.12.0 builds (Racing Heritage, 2026-10-15), current with the browser game as of the gameplay pass |
 
 **Versions**
-- `package.json` is 1.12.0, matching the multiplayer `VER` (1.12). Keep the two in step so the version-mismatch message matches the app's version.
+- `package.json` is 1.12.1. Keep its major.minor equal to the multiplayer `VER` (1.12); the patch number is for app rebuilds that don't change online play. Keep the two in step so the version-mismatch message matches the app's version.
 - The latest GitHub release is **v1.6.3** (desktop).
 - Multiplayer protocol is `VER = '1.7'` in `app/shell.html`. Bump it when the network messages change, because only matching versions can play together.
 - `MODEL_VER = 12` in the game. Bump it when car models are re-exported.
@@ -165,8 +165,18 @@ The game script is one IIFE. Main pieces, by name (use grep; line numbers drift)
 - **Test hook:** `game.html?test=1` exposes `window.__ev(src)`, which evaluates code inside the game's closure.
 
 ## Performance
-- **Frame pacing** (`frame`, `frameGap`): up to 60 fps in a race (a 120 Hz screen was drawing 120), 30 in the menu and on results, 15 when paused.
-- **Resolution** (`paceRes`): the pixel ratio starts at `PR_MAX` (1.5 desktop, 1.3 phone; was 1.75). It steps down 0.25 when frames average over 21 ms across 2 s (floor `PR_MIN` 1.0, phone 0.8) and back up 0.125 after 8 s of frames under 17.4 ms.
+- **Frame rate setting** (Settings > Graphics > Frame rate, `FPS`, `rn-fps`): 30, 60 (default), 120 or Max (no cap). Pacing is in `frame`/`frameGap`: a race runs at `FPS`, the menu and results at 30 at most, and the pause screen at 15. `paceRes` judges slow frames against 60 fps, or 30 when that's the cap.
+- **Graphics levels** (Settings > Graphics > Quality, `GFX_LEVELS`, `GFX_ID`, `rn-gfx`; default High on computers, Medium on phones). Changing the level reloads the game, like changing the track, because anti-aliasing and textures are fixed at load. In multiplayer it applies on the next load.
+
+  | Level | Pixel ratio | Anti-aliasing | Filtering | 2K textures | Normal/roughness maps | Particles | Weather |
+  |---|---|---|---|---|---|---|---|
+  | Low | 1.0 | off | 2× | no | 1 px flat stand-ins (`FLAT_TEX`) | 45% | 40% |
+  | Medium | 1.25 | on | 4× | no | yes | 75% | 70% |
+  | High | 1.5 | on | 8× | yes | yes | 100% | 100% |
+  | Ultra | 2.0 | on | 16× | yes | yes | 100% | 100% |
+
+  Low also draws scenery props to 70% of the fog distance and doesn't preload the class's car models.
+- **Resolution** (`paceRes`): the pixel ratio starts at `PR_MAX` (the level's ratio, at most 1.3 on a phone below Ultra). It steps down 0.25 when frames average over 21 ms across 2 s (floor `PR_MIN` 1.0, phone 0.8) and back up 0.125 after 8 s of frames under 17.4 ms.
 - **Particles** (`PFX`, `emit`, `updateParts`): two `THREE.Points` pools (160 normal, 96 additive) with a small shader (fog, tone mapping, sized like the old sprites through `uScale`). That's two draw calls, where each puff used to be a sprite with its own. `emit` copies its arguments, so callers pass the scratch vectors `_e1`/`_e2`/`_e3`, not new ones.
 - **HUD:** `setStyle` writes a style only when it changes. The standings are computed once per update, and the minimap redraws at 20 Hz.
 - Measured on Canyon against the previous build: game logic 25–40% less CPU, render submission 20–27% less, 27% fewer pixels, plus half the frames on a 120 Hz screen.
@@ -251,6 +261,8 @@ Gotcha: Rimac material names match the wheel rule (`^rim`), so rename them first
 Mac builds need `identity: '-'` and `hardenedRuntime: false` (already set). Delete removed builds with `rm "${SH:?}"/…` (a safety check blocks a bare `$SH`).
 
 ## Recent history (newest first)
+
+- **Graphics and frame rate settings (2026-10-16):** see "Performance".
 
 - **Nitro/drift and performance (2026-10-16, not yet pushed):** see the nitro rules and "Performance". Removed dead code: `edgeAt`, `_w` and the empty `poseTraffic`.
 
