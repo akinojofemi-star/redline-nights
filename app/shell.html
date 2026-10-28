@@ -58,6 +58,10 @@ button.on{background:var(--ok);color:var(--ink);border-color:var(--ok)}
 .stats .bar{height:8px;background:rgba(255,255,255,.1);transform:skewX(-18deg);position:relative;overflow:hidden}
 .stats .bar i{position:absolute;inset:0 auto 0 0;background:var(--hud)}
 .sep{height:1px;background:var(--line);margin:20px 0}
+.wifi{display:grid;grid-template-columns:120px 1fr;gap:10px 14px;align-items:center;margin-top:8px;padding:12px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.wifi svg{display:block;width:120px;height:120px;background:#fff}
+.wifi b{color:var(--hud);font-size:16px;letter-spacing:.04em;user-select:all}
+.steps{margin:8px 0 0;padding-left:20px;color:var(--dim);font-size:13px;line-height:1.6}
 </style></head>
 <body>
 <iframe id="game" title="Racing Heritage" allow="autoplay; fullscreen"></iframe>
@@ -85,6 +89,7 @@ const S = {
   net: null,                                  // the connection (host hub or client)
   lobby: null,                                // {players, settings, racing} as the host last sent it
   msg: '', err: false, curMap: null, mpLoaded: false, pendingStart: null,
+  wifi: { can: null, on: null, busy: false, err: '', help: false },   // a Wi-Fi network this computer makes (hotspot.js)
   invite: (/join=([A-Za-z0-9]{5})/.exec(location.hash) || [])[1] || null   // opened from an invite link
 };
 if (S.invite) { S.invite = S.invite.toUpperCase(); history.replaceState(null, '', location.pathname + location.search); }
@@ -174,7 +179,7 @@ function hostGame(kind) {
   const hub = { isHost: true, myId: 'H', kind, clients: new Set(), players: new Map(), racing: false, code: null, lanIPs: [], room: null };
   hub.sendTo = (id, d) => hub.room && hub.room.send(id, d);
   hub.broadcast = (d, except) => hub.room && hub.room.send('*', d, except);
-  hub.close = () => { if (hub.room) hub.room.close(); if (kind === 'lan' && APP) rn.hostStop(); };
+  hub.close = () => { if (hub.room) hub.room.close(); if (kind === 'lan' && APP) { rn.hostStop(); wifiOff(); S.wifi.err = ''; clearInterval(hub.ipTimer); } };
   hub.players.set('H', { id: 'H', name: S.name, car: S.car, paint: S.paint, ready: true, host: true });
   S.net = hub; S.lobby = null; go('lobby');
   const h = forNet(hub, {
@@ -193,11 +198,153 @@ function hostGame(kind) {
     else rn.hostStart(beaconInfo()).then(r => { if (S.net !== hub) return; hub.lanIPs = r.ips; hub.room = openRoom('ws://127.0.0.1:' + r.port, 'host', h); render(); });
   };
   connect(); render();
+  // this computer's addresses change when it joins another Wi-Fi or makes its own: keep the ones shown current
+  if (kind === 'lan') {
+    if (S.wifi.can === null) rn.netCan().then(c => { S.wifi.can = c; render(); });
+    hub.ipTimer = setInterval(() => rn.localIPs().then(ips => {
+      if (S.net !== hub || ips.join() === hub.lanIPs.join()) return;
+      hub.lanIPs = ips; if (S.screen === 'lobby') render();
+    }), 3000);
+  }
 }
 function beaconInfo() {
   const hub = S.net;
   return { v: VER, name: S.name + "'s game", players: hub ? hub.players.size : 1, map: settings.map };
 }
+// ---------------------------------------------------------------- "create a network": this computer becomes the Wi-Fi
+// The name and password stay the same from game to game, so friends' phones remember the network.
+function wifiCfg() {
+  let c = null; try { c = JSON.parse(store.get('rn-wifi') || 'null'); } catch (e) {}
+  if (!c || !c.ssid || !c.pass) {
+    const pick = (abc, n) => Array.from(crypto.getRandomValues(new Uint8Array(n)), b => abc[b % abc.length]).join('');
+    c = { ssid: 'RacingHeritage-' + pick('ABCDEFGHJKMNPQRSTUVWXYZ23456789', 4), pass: pick('abcdefghjkmnpqrstuvwxyz23456789', 8) };
+    store.set('rn-wifi', JSON.stringify(c));
+  }
+  return c;
+}
+function wifiOn() {
+  const w = S.wifi; if (w.on || w.busy) return;
+  w.busy = true; w.err = ''; render();
+  rn.netStart(wifiCfg()).then(r => {
+    w.busy = false;
+    if (r.ok) { w.on = r; if (S.net && S.net.kind === 'lan') S.net.lanIPs = [r.ip, ...S.net.lanIPs.filter(a => a !== r.ip)].filter(Boolean); }
+    else w.err = 'Couldn’t make the network' + (r.msg ? ' (' + r.msg + ')' : '') + '. This computer’s Wi-Fi may not support it.';
+    render();
+  });
+}
+function wifiOff() { if (S.wifi.on) { S.wifi.on = null; rn.netStop(); } }
+if (APP) rn.onNetDrop(() => { if (!S.wifi.on) return; S.wifi.on = null; S.wifi.err = 'The Wi-Fi network stopped.'; render(); });
+// the Wi-Fi part of the host's LAN lobby
+function wifiHTML(ready) {
+  const w = S.wifi, net = S.net;
+  if (!ready || !w.can || w.can === 'none') return '';
+  const phone = '<p class="hint">Or turn on a phone’s hotspot and have everyone, this computer too, join it.</p>';
+  if (w.on) {
+    const q = v => String(v).replace(/([\\;,:"])/g, '\\$1');
+    const url = 'http://' + (w.on.ip || net.lanIPs[0]) + ':47800';
+    return `<div class="lbl">This computer’s Wi-Fi network · on</div>
+    <div class="wifi">${qrSVG('WIFI:T:WPA;S:' + q(w.on.ssid) + ';P:' + q(w.on.pass) + ';;')}
+      <div>Wi-Fi <b>${esc(w.on.ssid)}</b><br>Password <b>${esc(w.on.pass)}</b>
+      <div class="hint">Friends join this Wi-Fi (a phone can scan the code), then this game appears in their LAN list.</div></div>
+      ${w.on.ip ? qrSVG(url) + `<div>Playing in a browser? Then open <b>${esc(url)}</b><div class="hint">or scan this code.</div></div>` : ''}</div>
+    <div class="row" style="margin-top:8px"><button id="wifiOff">Turn off the network</button></div>`;
+  }
+  if (w.can === 'mac') return `<div class="lbl">No Wi-Fi to share?</div>
+    ${w.help ? `<p class="tag" style="margin-top:0">A Mac can make a Wi-Fi network with Internet Sharing (apps aren’t allowed to turn it on themselves):</p>
+    <ol class="steps"><li>Open Sharing settings and click ⓘ next to <b>Internet Sharing</b>.</li>
+    <li>Share your connection from <b>Thunderbolt Bridge</b> or <b>Ethernet</b> (nothing needs plugging in) to devices using <b>Wi-Fi</b>. Under Wi-Fi Options, give the network a name and a password.</li>
+    <li>Switch Internet Sharing on (your Mac asks for its password), then press Done.</li></ol>
+    <p class="hint">Friends join that Wi-Fi and see this game in their LAN list. The address above updates by itself.</p>
+    <div class="row" style="margin-top:8px"><button id="wifiMac">Open Sharing settings</button></div>${phone}`
+    : '<div class="row"><button id="wifiHelp">Make a Wi-Fi network</button></div><p class="hint">This Mac becomes the Wi-Fi: no router or internet needed.</p>'}`;
+  return `<div class="lbl">No Wi-Fi to share?</div>
+    <div class="row"><button id="wifiOn" ${w.busy ? 'disabled' : ''}>${w.busy ? 'Starting the network…' : 'Make a Wi-Fi network'}</button></div>
+    ${w.err ? `<div class="msg err">${esc(w.err)}</div>${phone}` : '<p class="hint">This computer becomes the Wi-Fi: friends join it, no router or internet needed. Its own Wi-Fi connection may pause while the network is on.</p>'}`;
+}
+
+// ---------------------------------------------------------------- QR codes (byte mode, error correction level M,
+// versions 1-6: up to 106 characters), drawn as SVG. Following the QR standard (ISO 18004) and Nayuki's reference
+// encoder: data and Reed-Solomon codewords, finder/timing/alignment patterns, the lowest-penalty mask.
+const QR_M = [[10, 1, 16], [16, 1, 28], [26, 1, 44], [18, 2, 32], [24, 2, 43], [16, 4, 27]];  // per version: ec, blocks, data/block
+function qrSVG(text) {
+  const bytes = [...new TextEncoder().encode(text)];
+  const ver = QR_M.findIndex(([, n, d]) => 12 + bytes.length * 8 <= n * d * 8) + 1;
+  if (!ver) return '';
+  const [ecLen, nb, dLen] = QR_M[ver - 1], size = 17 + ver * 4;
+  // data bits: mode, length, bytes, terminator, then pad bytes
+  const bits = [];
+  const put = (v, n) => { for (let i = n - 1; i >= 0; i--) bits.push(v >>> i & 1); };
+  put(4, 4); put(bytes.length, 8); bytes.forEach(b => put(b, 8));
+  put(0, Math.min(4, nb * dLen * 8 - bits.length)); while (bits.length % 8) bits.push(0);
+  const data = []; for (let i = 0; i < bits.length; i += 8) data.push(parseInt(bits.slice(i, i + 8).join(''), 2));
+  for (let p = 0xEC; data.length < nb * dLen; p ^= 0xEC ^ 0x11) data.push(p);
+  // Reed-Solomon over GF(256)
+  const mul = (x, y) => { let z = 0; for (let i = 7; i >= 0; i--) { z = (z << 1) ^ ((z >>> 7) * 0x11D); z ^= (y >>> i & 1) * x; } return z; };
+  const div = new Array(ecLen).fill(0); div[ecLen - 1] = 1;
+  for (let i = 0, root = 1; i < ecLen; i++, root = mul(root, 2))
+    for (let j = 0; j < ecLen; j++) { div[j] = mul(div[j], root); if (j + 1 < ecLen) div[j] ^= div[j + 1]; }
+  const blocks = [], ecs = [];
+  for (let b = 0; b < nb; b++) {
+    const blk = data.slice(b * dLen, (b + 1) * dLen), rem = new Array(ecLen).fill(0);
+    for (const v of blk) { const f = v ^ rem.shift(); rem.push(0); div.forEach((c, i) => { rem[i] ^= mul(c, f); }); }
+    blocks.push(blk); ecs.push(rem);
+  }
+  const code = [];
+  for (let i = 0; i < dLen; i++) blocks.forEach(b => code.push(b[i]));
+  for (let i = 0; i < ecLen; i++) ecs.forEach(e => code.push(e[i]));
+  // the fixed patterns
+  const mod = [...Array(size)].map(() => new Array(size).fill(false)), fn = mod.map(r => r.slice());
+  const set = (x, y, v) => { mod[y][x] = !!v; fn[y][x] = true; };
+  for (let i = 0; i < size; i++) { set(6, i, i % 2 === 0); set(i, 6, i % 2 === 0); }
+  for (const [cx, cy] of [[3, 3], [size - 4, 3], [3, size - 4]])
+    for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
+      const x = cx + dx, y = cy + dy, d = Math.max(Math.abs(dx), Math.abs(dy));
+      if (x >= 0 && y >= 0 && x < size && y < size) set(x, y, d !== 2 && d !== 4);
+    }
+  if (ver > 1) { const a = size - 7;
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) set(a + dx, a + dy, Math.max(Math.abs(dx), Math.abs(dy)) !== 1); }
+  const format = mask => {                       // level M (00) and the mask, BCH-protected, both copies
+    const d = mask; let r = d; for (let i = 0; i < 10; i++) r = (r << 1) ^ ((r >>> 9) * 0x537);
+    const f = (d << 10 | r) ^ 0x5412, bit = i => f >>> i & 1;
+    for (let i = 0; i <= 5; i++) set(8, i, bit(i));
+    set(8, 7, bit(6)); set(8, 8, bit(7)); set(7, 8, bit(8));
+    for (let i = 9; i < 15; i++) set(14 - i, 8, bit(i));
+    for (let i = 0; i < 8; i++) set(size - 1 - i, 8, bit(i));
+    for (let i = 8; i < 15; i++) set(8, size - 15 + i, bit(i));
+    set(8, size - 8, 1);
+  };
+  format(0);
+  // the codewords, zigzagging up and down column pairs from the bottom right
+  let k = 0;
+  for (let right = size - 1; right >= 1; right -= 2) {
+    if (right === 6) right = 5;
+    for (let v = 0; v < size; v++) for (let j = 0; j < 2; j++) {
+      const x = right - j, y = (right + 1) & 2 ? v : size - 1 - v;
+      if (!fn[y][x] && k < code.length * 8) { mod[y][x] = !!(code[k >>> 3] >>> (7 - (k & 7)) & 1); k++; }
+    }
+  }
+  const MASKS = [(x, y) => (x + y) % 2 === 0, (x, y) => y % 2 === 0, x => x % 3 === 0, (x, y) => (x + y) % 3 === 0,
+    (x, y) => ((x / 3 | 0) + (y / 2 | 0)) % 2 === 0, (x, y) => x * y % 2 + x * y % 3 === 0,
+    (x, y) => (x * y % 2 + x * y % 3) % 2 === 0, (x, y) => ((x + y) % 2 + x * y % 3) % 2 === 0];
+  const flip = m => { for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) if (!fn[y][x] && MASKS[m](x, y)) mod[y][x] = !mod[y][x]; };
+  const penalty = () => {                        // runs of 5+, 2x2 blocks and dark/light balance
+    let p = 0, dark = 0;
+    for (let a = 0; a < size; a++) for (const line of [i => mod[a][i], i => mod[i][a]]) {
+      let run = 1; for (let i = 1; i <= size; i++) { if (i < size && line(i) === line(i - 1)) run++; else { if (run >= 5) p += run - 2; run = 1; } } }
+    for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+      if (mod[y][x]) dark++;
+      if (x && y && mod[y][x] === mod[y - 1][x] && mod[y][x] === mod[y][x - 1] && mod[y][x] === mod[y - 1][x - 1]) p += 3;
+    }
+    return p + 10 * Math.floor(Math.abs(dark * 20 - size * size * 10) / (size * size));
+  };
+  let best = 0, bestP = Infinity;
+  for (let m = 0; m < 8; m++) { flip(m); format(m); const p = penalty(); if (p < bestP) { bestP = p; best = m; } flip(m); }
+  flip(best); format(best);
+  let path = '';
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) if (mod[y][x]) path += `M${x + 4} ${y + 4}h1v1h-1z`;
+  return `<svg viewBox="0 0 ${size + 8} ${size + 8}" shape-rendering="crispEdges" role="img" aria-label="QR code"><path d="${path}" fill="#000"/></svg>`;
+}
+
 function lobbyFor(id) {
   const hub = S.net;
   return { t: 'lobby', you: id, players: [...hub.players.values()], settings, racing: hub.racing };
@@ -415,7 +562,8 @@ function lobbyHTML() {
     <div class="row hint">${ready ? 'Friends type this code under Online, or open the invite link (it plays in the browser). ' + pingTag : 'Connecting to the game server…'}</div>`;
   else if (host) head = `<div class="lbl">LAN game</div>
     <div class="tag">${ready ? 'Friends on the same Wi-Fi or network see this game in their LAN list, or join at <b>' + net.lanIPs.map(esc).join('</b> or <b>') + '</b>.'
-      + '<br>Friends in a browser: open <b>' + net.lanIPs.map(ip => 'http://' + esc(ip) + ':47800').join('</b> or <b>') + '</b>' : 'Starting…'}</div>`;
+      + '<br>Friends in a browser: open <b>' + net.lanIPs.map(ip => 'http://' + esc(ip) + ':47800').join('</b> or <b>') + '</b>' : 'Starting…'}</div>
+    ${APP ? wifiHTML(ready) : ''}`;
   else head = `<div class="lbl">${net.kind === 'online' ? 'Online · room ' + esc(net.label) : 'LAN · ' + esc(net.label)}</div><div class="row hint">${pingTag}</div>`;
   const plist = players.map(p => `<div class="item"><span class="sw" style="background:${paintHex(p.paint)}"></span>
     <div class="grow"><b>${esc(p.name)}${p.id === net.myId ? ' (you)' : ''}</b><small>${esc(carName(p.car))}</small></div>
@@ -489,6 +637,10 @@ function wire() {
   const paints = $('paints'); if (paints) paints.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { S.paint = +b.dataset.p; carChanged(); });
   on('ready', 'onclick', () => { S.ready = !S.ready; sendMe(); render(); });
   on('start', 'onclick', hostStart);
+  on('wifiOn', 'onclick', wifiOn);
+  on('wifiOff', 'onclick', () => { wifiOff(); render(); });
+  on('wifiHelp', 'onclick', () => { S.wifi.help = true; render(); });
+  on('wifiMac', 'onclick', () => rn.netSettings());
   if (S.screen === 'home') renderLan();
 }
 

@@ -1,7 +1,7 @@
 {
   "name": "redline-nights",
   "productName": "Racing Heritage",
-  "version": "1.12.2",
+  "version": "1.12.3",
   "description": "Arcade street racer with LAN and online multiplayer",
   "main": "main.js",
   "author": "Racing Heritage",
@@ -22,6 +22,7 @@
     "files": [
       "main.js",
       "lan.js",
+      "hotspot.js",
       "preload.js",
       "app/**/*",
       "!app/duo.html"
