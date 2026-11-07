@@ -137,6 +137,7 @@ The game script is one IIFE. Main pieces, by name (use grep; line numbers drift)
 - **Table:** `NT[]` holds the four types: 1 yellow, 2 Perfect, 3 Shockwave, 4 pulse.
 - **Controls:** `pressNitro`, `nitroOff`.
 - **Perfect window:** `PW0`–`PW1` = 0.55–0.85 s after the first tap (`PT = 1.1`). It's drawn on `#nbar`, which grows and lights the window (classes `.timing` and `.hot`).
+- **Nitro out of a drift:** `pressNitro` ends the drift and sets `p.straighten` (0.5 s). While it runs, `carPhysics` swings the nose to the direction of travel (rate 9/s) and keeps the car's line and speed (no grip scrub), so the car snaps straight and the nitro pushes it on, like the user's reference video (2026-11-07). The driver can still steer during it. It never aligns the car to the road. Before this the drift flag ended but the car kept sliding about 1 s, lost ~90 km/h and often hit the wall. The suite checks it: straight within 0.6 s of nitro, no speed lost unless a wall was hit.
 
 ### Rest of the game
 - **Contact:**

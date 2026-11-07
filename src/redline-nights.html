@@ -2953,7 +2953,7 @@ function resetRace(){
   assignRivals();
   rivals.forEach((r,i)=>{r.br=-1;r.bs=0;r.forks={};Object.assign(r,{tank:.2,mistake:0,blockCD:3,bump:0,tactic:undefined,thinkT:rnd()*.5});r.skill=(r.spec.top+player.spec.top)/2-1.2+i*.3;Object.assign(r,{dist:grid[i][0],x:grid[i][1],y:0,vy:0,vx:0,speed:0,air:false,ramp:null,wreck:0,nitroT:0,finished:false,finishTime:0,yaw:0,roll:0,stunt:null,spin:null,padT:0});r.lane=LANES.indexOf(r.x);r.s=mod(r.dist);r.car.body.rotation.set(0,0,0);r.car.body.position.y=0;
     r.out=m==='time';r.elim=false;r.car.g.visible=!r.out;});
-  Object.assign(player,{br:-1,bs:0,forkHint:{},purple:false,dist:-24,x:LANES[2],y:0,vy:0,vx:0,speed:0,air:false,ramp:null,wreck:0,ghost:0,nitro:.35,nitroLevel:0,drift:false,driftAng:0,slipA:0,wallT:0,slideV:0,driftArm:-9,steerS:0,hd:0,hdT:0,lat:0,lng:0,lastSpeed:0,yaw:0,roll:0,stunt:null,spin:null,padT:0,tricks:[],lastBrakeTap:-9,brakeT:0,startTap:null,finished:false,finishTime:0,lastLap:0,stats:newStats(),
+  Object.assign(player,{br:-1,bs:0,forkHint:{},purple:false,dist:-24,x:LANES[2],y:0,vy:0,vx:0,speed:0,air:false,ramp:null,wreck:0,ghost:0,nitro:.35,nitroLevel:0,drift:false,driftAng:0,slipA:0,wallT:0,slideV:0,driftArm:-9,steerS:0,hd:0,hdT:0,lat:0,lng:0,lastSpeed:0,yaw:0,roll:0,straighten:0,stunt:null,spin:null,padT:0,tricks:[],lastBrakeTap:-9,brakeT:0,startTap:null,finished:false,finishTime:0,lastLap:0,stats:newStats(),
     elim:false,lapStart:0,lapTimes:[],slipT:0,slip:0,slipOn:false});
   player.s=mod(player.dist);alignToTrack(player,0);player.lat=0;player.lng=0;playerCar.body.rotation.set(0,0,0);playerCar.body.position.y=0;playerCar.body.visible=true;
   resetTraffic();
@@ -3131,9 +3131,10 @@ function pressNitro(){
   const p=player;
   if(G.mode==='countdown'){if(p.startTap===null)p.startTap=G.countdown;return;}
   if(G.mode!=='race'||p.wreck>0)return;
-  // nitro ends a drift. If the brake is still held from that drift, a new one needs a fresh press of it (holding it
-  // would otherwise start another drift at once, which would throw the nitro away); a new press drifts as usual
-  if(p.drift){endDrift();p.driftLock=p.brakeT>0;p.driftArm=-9;}
+  // nitro ends a drift: the car snaps straight (see carPhysics) and the nitro pushes it on. If the brake is still held
+  // from that drift, a new one needs a fresh press of it (holding it would otherwise start another drift at once, which
+  // would throw the nitro away); a new press drifts as usual
+  if(p.drift){endDrift();p.straighten=.5;p.driftLock=p.brakeT>0;p.driftArm=-9;}
   if(p.nitroLevel===0){
     if(p.nitro<.06){toast('NO NITRO','plain','DRIFT \u00b7 NEAR MISS \u00b7 KNOCKDOWNS');return;}
     p.nitroLevel=1;p.nitroStart=G.raceTime;p.fullAtStart=p.nitro>=.97;sfx('ping');
@@ -3233,6 +3234,13 @@ function carPhysics(p,dt,steer,brake,racing){
       fx=(p.purple?5:0)+NT[p.nitroLevel].air*sp.accel;
       let dpsi=Math.atan2(p.wvz,p.wvx)-p.psi;dpsi=Math.atan2(Math.sin(dpsi),Math.cos(dpsi));p.yawR=dpsi*3+p.steerS*.4;
       p.wvx+=hx*fx*h;p.wvz+=hz*fx*h;p.psi+=p.yawR*h;wx+=p.wvx*h;wz+=p.wvz*h;continue;}
+    if(p.straighten>0){ // a drift cut short by nitro: the nose swings round to where the car is going in about half a
+      // second while the car carries on along its line at the same speed (no sideways scrub), so the nitro pushes it
+      // straight on. The driver can still steer it meanwhile.
+      const vA=Math.atan2(p.wvz,p.wvx),V0=Math.hypot(p.wvx,p.wvz);let d=vA-p.psi;d=Math.atan2(Math.sin(d),Math.cos(d));
+      const turn=p.steerS*1.4*STEER*h,dn=d*(1-Math.exp(-9*h)),nv=vA+turn;
+      p.psi+=dn+turn;p.yawR=(dn+turn)/h;p.wvx=Math.cos(nv)*V0+Math.cos(p.psi)*fx*h;p.wvz=Math.sin(nv)*V0+Math.sin(p.psi)*fx*h;
+      wx+=p.wvx*h;wz+=p.wvz*h;beta=d-dn;p.delta=0;continue;}
     // steering angle: finer as speed rises, and wider in a drift so you can counter-steer
     const dmax=(.06+.32/(1+Math.max(0,u)/6))*(.85+.15*hand)*(p.drift?1.8:1);
     p.delta=p.drift?p.steerS*dmax:clamp(Math.atan((p.rTp||0)*2*PH.ab/Math.max(u,4)),-dmax*1.6,dmax*1.6);
@@ -3274,6 +3282,7 @@ function carPhysics(p,dt,steer,brake,racing){
   if(p.drift){p.slipA=Math.min(1,Math.abs(beta)/.9);p.nitro=Math.min(1,p.nitro+.2*(.6+p.slipA)*dt);p.driftM=(p.driftM||0)+Math.hypot(p.wvx,p.wvz)*dt;
     if(Math.hypot(p.wvx,p.wvz)<22||(p.noSteerT>.15&&Math.abs(beta)<.06))endDrift();}
   if(!p.drift)p.slipA=0;
+  if(p.straighten>0){p.straighten=Math.max(0,p.straighten-dt);if(p.air||p.drift||p.betaAbs<.02&&p.straighten<.4)p.straighten=0;}
   // back onto the track, on whichever path of a fork it's on (bookkeeping only)
   projectTo(p,wx,wz);pickRoad(p);
   // walls: nothing but the driver steers the car. A wall stops it at its line and takes the speed it carried into it,

@@ -138,6 +138,12 @@ T.probes=function(){const p=player,out=[];G.modeSel='classic';G.lapsSel=5;startR
     if(!p.drift)T.note(MAP_ID+' brake+steer did not start a drift');else{if(p.nitroLevel)T.note(MAP_ID+' drift did not end nitro');const d0=p.driftDir;p.botSteer=-1;for(let i=0;i<20;i++)update(1/60);if(p.drift&&p.driftDir===d0)T.note(MAP_ID+' counter-steer did not chain the drift');
       p.botSteer=0;for(let i=0;i<120;i++)update(1/60);if(p.drift)T.note(MAP_ID+' drift did not end after letting go');}
     p.botSteer=undefined;p.botBrake=undefined;}
+  // nitro in a drift: the drift ends, the car is straight within 0.6 s and has not slowed down
+  {T.setAt(-1,T.clear(L*.45),0,60);p.nitro=1;p.botSteer=.6;p.botBrake=true;for(let i=0;i<4;i++)update(1/60);p.botBrake=false;for(let i=0;i<30;i++)update(1/60);
+    if(p.drift){const v0=p.speed;let wall=false,straight=false;pressNitro();p.botSteer=0;for(let i=0;i<36;i++){update(1/60);if(p.wallT>0)wall=true;if(!wall&&p.betaAbs<.05)straight=true;}
+      if(p.drift)T.note(MAP_ID+' nitro did not end the drift');else if(!straight)T.note(MAP_ID+' still sliding 0.6 s after nitro ended a drift');
+      if(p.speed<v0-1&&!wall)T.note(MAP_ID+' nitro out of a drift lost speed ('+Math.round(v0*3.6)+' -> '+Math.round(p.speed*3.6)+' km/h)');}
+    p.botSteer=undefined;p.botBrake=undefined;}
   // out of bounds: fly off an open edge and get put back
   {let k=-1;for(let j=0;j<NS;j+=5)if(ER[j]&&ROR[j]>=11&&!GAPK[j]&&Math.abs(wrapD(j/NS*L,0))>300&&!BR.some(b=>{const d=wrapD(j/NS*L,b.s0);return d>-100&&d<b.span+100;})){k=j;break;}
     if(k>=0){const s=k/NS*L;T.setAt(-1,s,0,45);const hi=limits(p)[1];p.x=hi+5;p.air=true;p.y=2;p.vy=0;p.airT=0;let saw=false;T.run(60*5,{lane:40,noBrake:true},()=>{if(p.oob)saw=true;return saw&&!p.oob;});
