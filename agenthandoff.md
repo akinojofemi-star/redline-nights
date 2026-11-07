@@ -66,10 +66,10 @@ Racing Heritage (renamed from Redline Nights; the repo, URL, file names and `rn-
 | `tools/test/` | test harness (see Testing) |
 | `tools/blender/` | car model pipeline scripts (see Car models) |
 | `tools/release-notes-1.6.4.md` | draft GitHub release notes (not published) |
-| `~/Documents/Racing Heritage/` (was "Redline Nights - Share") | desktop builds and `HOW TO PLAY.txt` for friends. Holds the 1.12.4 builds (2026-11-07, smoother nitro out of a drift, model download queue); the same version is installed in /Applications. Desktop builds are never pushed to git or released until the user says so |
+| `~/Documents/Racing Heritage/` (was "Redline Nights - Share") | desktop builds and `HOW TO PLAY.txt` for friends. Holds the 1.12.5 builds (2026-11-07, shrunk .glb models); the same version is installed in /Applications. Desktop builds are never pushed to git or released until the user says so |
 
 **Versions**
-- `package.json` is 1.12.4. Keep its major.minor equal to the multiplayer `VER` (1.12); the patch number is for app rebuilds that don't change online play. Keep the two in step so the version-mismatch message matches the app's version.
+- `package.json` is 1.12.5. Keep its major.minor equal to the multiplayer `VER` (1.12); the patch number is for app rebuilds that don't change online play. Keep the two in step so the version-mismatch message matches the app's version.
 - The latest GitHub release is **v1.6.3** (desktop).
 - Multiplayer protocol is `VER = '1.7'` in `app/shell.html`. Bump it when the network messages change, because only matching versions can play together.
 - `MODEL_VER = 12` in the game. Bump it when car models are re-exported.
@@ -430,5 +430,5 @@ Mac builds need `identity: '-'` and `hardenedRuntime: false` (already set). Dele
 - **Gap placement:** Tokyo's gap only fits with the 200 m run-out tier, and it still ends about 185 m before the long fork. That's the best spot the map allows.
 - **Sunset Coast palms** are code-built, not photo-real (Poly Haven has no palm).
 - **New maps:** the user once asked for maps modelled on an Asphalt video that can no longer be viewed. Ask for screenshots if new maps come up.
-- **Desktop builds** in the share folder are 1.12.4, also installed in `/Applications` (older builds and the old Redline Nights app are in the Trash). Rebuild (`npm run dist:all`, then copy from `dist/`) whenever the browser game changes and the user wants the apps updated. The old 1.6.4 builds are in the Trash (`Redline Nights 1.6.4 builds`). No GitHub release of 1.12.0 has been made.
+- **Desktop builds** in the share folder are 1.12.5, also installed in `/Applications` (older builds and the old Redline Nights app are in the Trash). Rebuild (`npm run dist:all`, then copy from `dist/`) whenever the browser game changes and the user wants the apps updated. The old 1.6.4 builds are in the Trash (`Redline Nights 1.6.4 builds`). No GitHub release of 1.12.0 has been made.
 - **No pause in multiplayer:** the pause menu is disabled online, but the HUD full-screen button still works.
