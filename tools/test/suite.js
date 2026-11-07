@@ -138,10 +138,11 @@ T.probes=function(){const p=player,out=[];G.modeSel='classic';G.lapsSel=5;startR
     if(!p.drift)T.note(MAP_ID+' brake+steer did not start a drift');else{if(p.nitroLevel)T.note(MAP_ID+' drift did not end nitro');const d0=p.driftDir;p.botSteer=-1;for(let i=0;i<20;i++)update(1/60);if(p.drift&&p.driftDir===d0)T.note(MAP_ID+' counter-steer did not chain the drift');
       p.botSteer=0;for(let i=0;i<120;i++)update(1/60);if(p.drift)T.note(MAP_ID+' drift did not end after letting go');}
     p.botSteer=undefined;p.botBrake=undefined;}
-  // nitro in a drift: the drift ends, the car is straight within 0.6 s and has not slowed down
-  {T.setAt(-1,T.clear(L*.45),0,60);p.nitro=1;p.botSteer=.6;p.botBrake=true;for(let i=0;i<4;i++)update(1/60);p.botBrake=false;for(let i=0;i<30;i++)update(1/60);
-    if(p.drift){const v0=p.speed;let wall=false,straight=false;pressNitro();p.botSteer=0;for(let i=0;i<36;i++){update(1/60);if(p.wallT>0)wall=true;if(!wall&&p.betaAbs<.05)straight=true;}
-      if(p.drift)T.note(MAP_ID+' nitro did not end the drift');else if(!straight)T.note(MAP_ID+' still sliding 0.6 s after nitro ended a drift');
+  // nitro in a drift: the drift ends, the car is straight within 0.9 s and has not slowed down (it starts by the far
+  // edge, as the slide carries it across the road)
+  {const s0=T.clear(L*.45);T.setAt(-1,s0,0,60);T.setAt(-1,s0,limits(p)[0]+3,60);p.nitro=1;p.botSteer=.6;p.botBrake=true;for(let i=0;i<4;i++)update(1/60);p.botBrake=false;for(let i=0;i<30;i++)update(1/60);
+    if(p.drift){const v0=p.speed;let wall=false,straight=false;pressNitro();p.botSteer=0;for(let i=0;i<54;i++){update(1/60);if(p.wallT>0)wall=true;if(!wall&&p.betaAbs<.05)straight=true;}
+      if(p.drift)T.note(MAP_ID+' nitro did not end the drift');else if(!straight&&!wall)T.note(MAP_ID+' still sliding 0.9 s after nitro ended a drift');
       if(p.speed<v0-1&&!wall)T.note(MAP_ID+' nitro out of a drift lost speed ('+Math.round(v0*3.6)+' -> '+Math.round(p.speed*3.6)+' km/h)');}
     p.botSteer=undefined;p.botBrake=undefined;}
   // out of bounds: fly off an open edge and get put back

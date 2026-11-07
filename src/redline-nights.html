@@ -2139,10 +2139,27 @@ function makeCar(color,{shape=SEDAN,flames=false}={}){
   return car;
 }
 // Blender-modelled bodies (models/<id>.glb). Materials are matched by name so paint colour and lighting stay consistent.
-const MODEL_CACHE={},MODEL_VER=12; // bump when the Blender models are re-exported
-function loadModel(id){
+// They download two at a time, most wanted first (pri 0: cars on screen or in the race, 1: scenery, 2: the rest of the
+// class, fetched ahead of time), so on a slow connection the cars you see arrive first instead of queueing behind a
+// dozen others. A failed download is tried again (a car keeps its built body meanwhile).
+const MODEL_CACHE={},MODEL_VER=12,MODEL_Q=[]; // (bump MODEL_VER when the Blender models are re-exported)
+let modelBusy=0;
+function loadModel(id,pri=0){
   if(!THREE.GLTFLoader)return Promise.reject(new Error('no loader'));
-  return MODEL_CACHE[id]||(MODEL_CACHE[id]=new Promise((res,rej)=>new THREE.GLTFLoader().load('models/'+id+'.json?v='+MODEL_VER,g=>res(g.scene),undefined,rej)));
+  let e=MODEL_CACHE[id];
+  if(e){e.pri=Math.min(e.pri,pri);return e.p;}
+  e=MODEL_CACHE[id]={pri,tries:0};e.p=new Promise((res,rej)=>{e.res=res;e.rej=rej;});
+  MODEL_Q.push(id);pumpModels();return e.p;
+}
+function pumpModels(){
+  while(modelBusy<2&&MODEL_Q.length){
+    let k=0;MODEL_Q.forEach((id,i)=>{if(MODEL_CACHE[id].pri<MODEL_CACHE[MODEL_Q[k]].pri)k=i;});
+    const id=MODEL_Q.splice(k,1)[0],e=MODEL_CACHE[id];modelBusy++;
+    new THREE.GLTFLoader().load('models/'+id+'.json?v='+MODEL_VER,g=>{modelBusy--;e.res(g.scene);pumpModels();},undefined,err=>{modelBusy--;
+      if(++e.tries<4)setTimeout(()=>{MODEL_Q.push(id);pumpModels();},2000*e.tries);
+      else{delete MODEL_CACHE[id];e.rej(err);} // (a later race asks again)
+      pumpModels();});
+  }
 }
 const DECAL=m=>{const c=m.clone();c.polygonOffset=true;c.polygonOffsetFactor=-1;c.polygonOffsetUnits=-1;return c;};
 const MODEL_MATS={glass:MAT.glass,trim:DECAL(MAT.trim),chrome:MAT.chrome,light_head:DECAL(MAT.head),light_tail:DECAL(MAT.tail),tyre:MAT.tyre,
@@ -2739,8 +2756,8 @@ function makeTrafficCar(type,color){
   const ph=new THREE.Group(),bus=type==='bus',lo=new THREE.Mesh(new THREE.BoxGeometry(w,bus?2.6:.8,len),car.paint);lo.position.y=bus?1.6:.62;ph.add(lo);
   if(!bus){const top=new THREE.Mesh(new THREE.BoxGeometry(w*.86,.5,len*.5),MAT.glass);top.position.set(0,1.27,-len*.05);ph.add(top);}
   body.add(ph);
-  if(bus)loadModel('bus').then(src=>{body.remove(ph);body.add(src.clone(true));}).catch(()=>{});
-  else loadModel('traffic').then(src=>{const n=src.getObjectByName('T_'+type);if(!n)return;const m=n.clone(true);m.position.set(0,0,0);
+  if(bus)loadModel('bus',1).then(src=>{body.remove(ph);body.add(src.clone(true));}).catch(()=>{});
+  else loadModel('traffic',1).then(src=>{const n=src.getObjectByName('T_'+type);if(!n)return;const m=n.clone(true);m.position.set(0,0,0);
     m.traverse(o=>{if(o.isMesh)o.material=Array.isArray(o.material)?o.material.map(x=>modelMat(x,car)):modelMat(o.material,car);});body.remove(ph);body.add(m);}).catch(()=>{});
   return car;
 }
@@ -2798,7 +2815,7 @@ const PROPS={};
       for(const z of [-5,5])add(w,new THREE.BoxGeometry(2.6,.8,2.6),MAT.dark,0,.7,z);
       cars.push({len:15.5,obj:w});}
     cars.forEach(c=>g.add(c.obj));
-    loadModel('train').then(src=>cars[0].obj.add(src.clone(true))).catch(()=>{});
+    loadModel('train',1).then(src=>cars[0].obj.add(src.clone(true))).catch(()=>{});
     const trainLen=cars.reduce((a,c)=>a+c.len,0);
     PROPS.train={len,cv,cars,trainLen,t:trainLen+10,dir:1,wait:0,speed:24};
   }
@@ -2813,7 +2830,7 @@ function updateTrain(dt){
 // airliner flyovers
 {
   const g=new THREE.Group();scene.add(g);g.visible=false;
-  loadModel('plane').then(src=>g.add(src.clone(true))).catch(()=>{});
+  loadModel('plane',1).then(src=>g.add(src.clone(true))).catch(()=>{});
   const lightMat=c=>new THREE.SpriteMaterial({map:softTex,color:c,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,fog:false});
   const lights=[[17,6,0xff3040],[-17,6,0x40ff80],[0,9,0xffffff]].map(([x,y,c])=>{const sp=new THREE.Sprite(lightMat(c));sp.scale.set(5,5,1);sp.position.set(x,y,0);g.add(sp);return sp;});
   PROPS.plane={g,lights,t:-15-Math.random()*15,vel:new V3()};
@@ -3134,7 +3151,7 @@ function pressNitro(){
   // nitro ends a drift: the car snaps straight (see carPhysics) and the nitro pushes it on. If the brake is still held
   // from that drift, a new one needs a fresh press of it (holding it would otherwise start another drift at once, which
   // would throw the nitro away); a new press drifts as usual
-  if(p.drift){endDrift();p.straighten=.5;p.driftLock=p.brakeT>0;p.driftArm=-9;}
+  if(p.drift){endDrift();p.straighten=.8;p.driftLock=p.brakeT>0;p.driftArm=-9;}
   if(p.nitroLevel===0){
     if(p.nitro<.06){toast('NO NITRO','plain','DRIFT \u00b7 NEAR MISS \u00b7 KNOCKDOWNS');return;}
     p.nitroLevel=1;p.nitroStart=G.raceTime;p.fullAtStart=p.nitro>=.97;sfx('ping');
@@ -3234,13 +3251,16 @@ function carPhysics(p,dt,steer,brake,racing){
       fx=(p.purple?5:0)+NT[p.nitroLevel].air*sp.accel;
       let dpsi=Math.atan2(p.wvz,p.wvx)-p.psi;dpsi=Math.atan2(Math.sin(dpsi),Math.cos(dpsi));p.yawR=dpsi*3+p.steerS*.4;
       p.wvx+=hx*fx*h;p.wvz+=hz*fx*h;p.psi+=p.yawR*h;wx+=p.wvx*h;wz+=p.wvz*h;continue;}
-    if(p.straighten>0){ // a drift cut short by nitro: the nose swings round to where the car is going in about half a
-      // second while the car carries on along its line at the same speed (no sideways scrub), so the nitro pushes it
-      // straight on. The driver can still steer it meanwhile.
+    if(p.straighten>0){ // a drift cut short by nitro: the car's line turns as hard as you steer (as when gripping), and
+      // the nose eases round onto it, never faster than about 90 degrees a second, so the slide unwinds smoothly in about
+      // half a second. Speed is kept but for a little scrub while it's still sideways, so the nitro pushes the car on.
       const vA=Math.atan2(p.wvz,p.wvx),V0=Math.hypot(p.wvx,p.wvz);let d=vA-p.psi;d=Math.atan2(Math.sin(d),Math.cos(d));
-      const turn=p.steerS*1.4*STEER*h,dn=d*(1-Math.exp(-9*h)),nv=vA+turn;
-      p.psi+=dn+turn;p.yawR=(dn+turn)/h;p.wvx=Math.cos(nv)*V0+Math.cos(p.psi)*fx*h;p.wvz=Math.sin(nv)*V0+Math.sin(p.psi)*fx*h;
-      wx+=p.wvx*h;wz+=p.wvz*h;beta=d-dn;p.delta=0;continue;}
+      const lim=(4.5+.0006*u*u)*(.8+.2*hand)*9.8*g*1.05/Math.max(u,4);
+      const rT=clamp(p.steerS*2.6*STEER*(.85+.15*hand)/(1+Math.max(0,u)/50),-lim,lim);
+      p.yawR+=(rT+clamp(d*4,-1.6,1.6)-p.yawR)*(1-Math.exp(-10*h));p.psi+=p.yawR*h;
+      const nv=vA+rT*h,V1=V0*(1-.5*d*d*h);
+      p.wvx=Math.cos(nv)*V1+Math.cos(p.psi)*fx*h;p.wvz=Math.sin(nv)*V1+Math.sin(p.psi)*fx*h;
+      wx+=p.wvx*h;wz+=p.wvz*h;beta=d;p.delta=0;continue;}
     // steering angle: finer as speed rises, and wider in a drift so you can counter-steer
     const dmax=(.06+.32/(1+Math.max(0,u)/6))*(.85+.15*hand)*(p.drift?1.8:1);
     p.delta=p.drift?p.steerS*dmax:clamp(Math.atan((p.rTp||0)*2*PH.ab/Math.max(u,4)),-dmax*1.6,dmax*1.6);
@@ -3282,7 +3302,7 @@ function carPhysics(p,dt,steer,brake,racing){
   if(p.drift){p.slipA=Math.min(1,Math.abs(beta)/.9);p.nitro=Math.min(1,p.nitro+.2*(.6+p.slipA)*dt);p.driftM=(p.driftM||0)+Math.hypot(p.wvx,p.wvz)*dt;
     if(Math.hypot(p.wvx,p.wvz)<22||(p.noSteerT>.15&&Math.abs(beta)<.06))endDrift();}
   if(!p.drift)p.slipA=0;
-  if(p.straighten>0){p.straighten=Math.max(0,p.straighten-dt);if(p.air||p.drift||p.betaAbs<.02&&p.straighten<.4)p.straighten=0;}
+  if(p.straighten>0){p.straighten=Math.max(0,p.straighten-dt);if(p.air||p.drift||p.betaAbs<.015&&p.straighten<.6)p.straighten=0;}
   // back onto the track, on whichever path of a fork it's on (bookkeeping only)
   projectTo(p,wx,wz);pickRoad(p);
   // walls: nothing but the driver steers the car. A wall stops it at its line and takes the speed it carried into it,
@@ -3885,7 +3905,7 @@ STATS.forEach(([k])=>{const sp=document.createElement('span');sp.textContent=k;c
 function pickCar(i){
   setPlayerCar(i);const c=player.spec;
   // fetch this class's car models now (not on a phone), so rivals show as real cars from the first frame of the race
-  if(!SMALL&&GFX_ID!=='low')CARS.forEach(x=>{if(x.cls===c.cls)loadModel(x.shape.model).catch(()=>{});});
+  if(!SMALL&&GFX_ID!=='low')CARS.forEach(x=>{if(x.cls===c.cls)loadModel(x.shape.model,2).catch(()=>{});});
   $('carName').textContent=c.name;$('carCls').textContent=c.cls;$('carCls').style.setProperty('--cc',CLS_COL[c.cls]);
   const inCls=CARS.filter(x=>x.cls===c.cls);$('carIdx').textContent=(inCls.indexOf(c)+1)+'/'+inCls.length+' in '+c.cls;$('carBlurb').textContent=c.blurb;
   [...$('classSeg').children].forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.cls===c.cls)));
