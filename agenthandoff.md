@@ -57,7 +57,7 @@ Racing Heritage (renamed from Redline Nights; the repo, URL, file names and `rn-
 | `src/redline-nights.html` | **the whole game**: one file, Three.js r128 from CDN, about 3,300 lines. Edit this, never `app/game.html` |
 | `tools/prepare.js` | builds `app/game.html` from `src/` (swaps CDN scripts for `app/lib/` copies). Run after every edit: `node tools/prepare.js` |
 | `app/shell.html` | the lobby and home page (`index.html` on the web). Runs the game in an iframe and talks to it via `postMessage` |
-| `app/models/<id>.json` | car models (glTF JSON with an embedded buffer), plus `boulder.json` |
+| `app/models/<id>.glb` | car models and the traffic, bus, train and plane: shrunk binary glTF (`tools/blender/shrink.py`). `boulder.json` is still glTF JSON (props code reads its raw geometry) |
 | `app/tex/` | CC0 ambientCG textures `<name>_c\|n\|r\|e.jpg`, and tree impostors `imp_<name>.png` |
 | `app/manifest.webmanifest` | lets the game added to a phone home screen open full screen |
 | `tools/build-web.js` | copies `app/` to `web/` (GitHub Pages). `.github/workflows/pages.yml` runs it on every push to `main` |
@@ -66,10 +66,10 @@ Racing Heritage (renamed from Redline Nights; the repo, URL, file names and `rn-
 | `tools/test/` | test harness (see Testing) |
 | `tools/blender/` | car model pipeline scripts (see Car models) |
 | `tools/release-notes-1.6.4.md` | draft GitHub release notes (not published) |
-| `~/Documents/Racing Heritage/` (was "Redline Nights - Share") | desktop builds and `HOW TO PLAY.txt` for friends. Holds the 1.12.3 builds (2026-10-29, make a Wi-Fi network); the same version is installed in /Applications. Desktop builds are never pushed to git or released until the user says so |
+| `~/Documents/Racing Heritage/` (was "Redline Nights - Share") | desktop builds and `HOW TO PLAY.txt` for friends. Holds the 1.12.4 builds (2026-11-07, smoother nitro out of a drift, model download queue); the same version is installed in /Applications. Desktop builds are never pushed to git or released until the user says so |
 
 **Versions**
-- `package.json` is 1.12.3. Keep its major.minor equal to the multiplayer `VER` (1.12); the patch number is for app rebuilds that don't change online play. Keep the two in step so the version-mismatch message matches the app's version.
+- `package.json` is 1.12.4. Keep its major.minor equal to the multiplayer `VER` (1.12); the patch number is for app rebuilds that don't change online play. Keep the two in step so the version-mismatch message matches the app's version.
 - The latest GitHub release is **v1.6.3** (desktop).
 - Multiplayer protocol is `VER = '1.7'` in `app/shell.html`. Bump it when the network messages change, because only matching versions can play together.
 - `MODEL_VER = 12` in the game. Bump it when car models are re-exported.
@@ -242,7 +242,12 @@ The models are real cars from Sketchfab (mostly CC BY-NC-SA, so the game must st
    - `smooth`, then export a GLB to `/tmp/rh_glb`.
 4. Run `python3 ../tools/blender/glb2json.py <dir>` from `app/` to produce `app/models/<id>.json`. Copy only the new GLBs into a fresh directory first.
    - Then run `python3 ../tools/blender/darktrim.py models/<id>.json`. Forza-sourced textures often bake light grey into parts that are black on the real car, and the game shows the trim's baked colour, so they come out white. The script scales the trim's mean colour down to 3.5% when it is above 15%. Most cars sit at 0.5–5%.
-5. Bump `MODEL_VER` (now 12).
+5. Run `python3 ../tools/blender/shrink.py models/<id>.json` (from `app/`). It writes `models/<id>.glb` and deletes the .json, so do every .json step (darktrim, turnaround) before it.
+   - What it does: welds vertices, then stores positions as 16-bit (KHR_mesh_quantization; each mesh moves to an unnamed child node holding the dequantization, so named nodes keep their pivots) and normals as 8-bit.
+   - What it drops: UVs, and on cars any textures and baked colours except trim and chrome. The game never shows those; the bus keeps its texture.
+6. Bump `MODEL_VER` (now 13).
+   - Shrinking (2026-11-07) halved the downloads: 52.7 → 25.7 MB gzipped for all 72, about 400–700 KB a car. Renders before and after match.
+   - To edit an existing car's .json again, get it from git history before that commit.
 
 Rule gotchas:
 - Interiors often share materials with the outside. Delete interior objects by name first (`SM_Interior`, `SteeringWheel`, `INTERIOR`, `BONNETCAM`, `polySurface*`), or tell them apart by phong number.
@@ -258,6 +263,12 @@ Smoothing pass (2026-10-08, all 43 cars): weld paint vertices at 0.5 mm, 4 round
 Gotcha: Rimac material names match the wheel rule (`^rim`), so rename them first.
 
 ## Releasing desktop apps (only when the user asks)
+- **Slow or no internet (offline rebuild):** electron-builder's own Electron download can hang at 100% on the user's connection (14–200 KB/s), and the Electron caches are empty. The build that worked on 2026-11-07:
+  - Mac arm64: build properly with `electronDist` set to `node_modules/electron/dist` (the local 44.5.1 arm64 Electron), using a config copy whose mac target is arm64 only. Otherwise it goes on to x64 and fails.
+  - Other five: copy the previous `dist/mac`, `win-unpacked`, `linux-unpacked` and `linux-arm64-unpacked` to scratch, drop in the new `app.asar` (pure JS, the same for every platform), then `electron-builder --prepackaged <dir> --win|--linux --x64|--arm64`.
+  - Intel Mac: also set `CFBundleShortVersionString` and `CFBundleVersion` in Info.plist and re-sign ad hoc with `@electron/osx-sign` (identity `-`, `app-builder-lib/templates/entitlements.mac.plist`, no hardened runtime) before `--prepackaged`. A prepackaged build doesn't re-sign, and the edit breaks the seal.
+  - Known gap: the Windows .exe's own file-version resource still says the older version (installer and app report the new one).
+  - With good internet, use `npm run dist:all`. Downloaded zips also work as `-c.electronDist=<folder of electron-vX-platform-arch.zip>`; keep them outside the scratchpad, which gets cleared.
 
 1. Run `npm run dist:all`. Windows NSIS and zip and Linux AppImages build fine on this Mac.
 2. Copy the builds into the share folder, replacing the old version, and update `HOW TO PLAY.txt`.
@@ -419,5 +430,5 @@ Mac builds need `identity: '-'` and `hardenedRuntime: false` (already set). Dele
 - **Gap placement:** Tokyo's gap only fits with the 200 m run-out tier, and it still ends about 185 m before the long fork. That's the best spot the map allows.
 - **Sunset Coast palms** are code-built, not photo-real (Poly Haven has no palm).
 - **New maps:** the user once asked for maps modelled on an Asphalt video that can no longer be viewed. Ask for screenshots if new maps come up.
-- **Desktop builds** in the share folder are 1.12.3, also installed in `/Applications` (older builds and the old Redline Nights app are in the Trash). Rebuild (`npm run dist:all`, then copy from `dist/`) whenever the browser game changes and the user wants the apps updated. The old 1.6.4 builds are in the Trash (`Redline Nights 1.6.4 builds`). No GitHub release of 1.12.0 has been made.
+- **Desktop builds** in the share folder are 1.12.4, also installed in `/Applications` (older builds and the old Redline Nights app are in the Trash). Rebuild (`npm run dist:all`, then copy from `dist/`) whenever the browser game changes and the user wants the apps updated. The old 1.6.4 builds are in the Trash (`Redline Nights 1.6.4 builds`). No GitHub release of 1.12.0 has been made.
 - **No pause in multiplayer:** the pause menu is disabled online, but the HUD full-screen button still works.

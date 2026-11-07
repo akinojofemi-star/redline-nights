@@ -13,7 +13,7 @@ const { WebSocketServer } = require('ws');
 const GAME_PORT = 47800, BEACON_PORT = 47801, MAX_MEMBERS = 8;
 let relay = null, members = new Map(), nextId = 1, beacon = null, beaconTimer = null, beaconInfo = null;
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.json': 'application/json', '.css': 'text/css',
-  '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.map': 'application/json', '.webmanifest': 'application/manifest+json' };
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.glb': 'model/gltf-binary', '.map': 'application/json', '.webmanifest': 'application/manifest+json' };
 // a read-only file server for the game's folder (the app's own window and LAN browsers both use it)
 function serveDir(dir) {
   return (req, res) => {

@@ -2142,7 +2142,7 @@ function makeCar(color,{shape=SEDAN,flames=false}={}){
 // They download two at a time, most wanted first (pri 0: cars on screen or in the race, 1: scenery, 2: the rest of the
 // class, fetched ahead of time), so on a slow connection the cars you see arrive first instead of queueing behind a
 // dozen others. A failed download is tried again (a car keeps its built body meanwhile).
-const MODEL_CACHE={},MODEL_VER=12,MODEL_Q=[]; // (bump MODEL_VER when the Blender models are re-exported)
+const MODEL_CACHE={},MODEL_VER=13,MODEL_Q=[]; // (bump MODEL_VER when the Blender models are re-exported; they're shrunk .glb, tools/blender/shrink.py)
 let modelBusy=0;
 function loadModel(id,pri=0){
   if(!THREE.GLTFLoader)return Promise.reject(new Error('no loader'));
@@ -2155,7 +2155,7 @@ function pumpModels(){
   while(modelBusy<2&&MODEL_Q.length){
     let k=0;MODEL_Q.forEach((id,i)=>{if(MODEL_CACHE[id].pri<MODEL_CACHE[MODEL_Q[k]].pri)k=i;});
     const id=MODEL_Q.splice(k,1)[0],e=MODEL_CACHE[id];modelBusy++;
-    new THREE.GLTFLoader().load('models/'+id+'.json?v='+MODEL_VER,g=>{modelBusy--;e.res(g.scene);pumpModels();},undefined,err=>{modelBusy--;
+    new THREE.GLTFLoader().load('models/'+id+'.glb?v='+MODEL_VER,g=>{modelBusy--;e.res(g.scene);pumpModels();},undefined,err=>{modelBusy--;
       if(++e.tries<4)setTimeout(()=>{MODEL_Q.push(id);pumpModels();},2000*e.tries);
       else{delete MODEL_CACHE[id];e.rej(err);} // (a later race asks again)
       pumpModels();});
